@@ -18,7 +18,7 @@ import { mergeLogParserResults, maxLineNumber, type NamedLogParserResult } from 
 import { parseDetailsJson } from '../src/utils/detailsJson.ts';
 import { isAnalyzableEntry } from '../src/utils/archiveSummary.ts';
 import { isValidGzipHeader, isValidTextContent, decodeTextBytes } from '../src/utils/fileValidator.ts';
-import { detectAnonymizedLog, MATRIX_IDENTIFIER_RE } from '../src/utils/anonymizeUtils.ts';
+import { decodeIdentifier, detectAnonymizedLog, MATRIX_IDENTIFIER_RE } from '../src/utils/anonymizeUtils.ts';
 import { computeSummaryStats } from '../src/utils/summaryStats.ts';
 import { lastColdStartUs, lastForegroundUs, deriveAppStateSegments, MARKER_KINDS, type AppStateSegment } from '../src/utils/lifecycleEvents.ts';
 import { buildLogOverview, extractTarget, type OverviewNode } from '../src/utils/logOverview.ts';
@@ -600,12 +600,13 @@ export function cmdPrecheck(ing: Ingest): { ok: boolean; report: string } {
     const re = new RegExp(MATRIX_IDENTIFIER_RE.source, flags);
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
-      if (ALIAS_RE.test(m[0])) {
+      const id = decodeIdentifier(m[0]);
+      if (ALIAS_RE.test(id)) {
         aliasCount++;
         continue;
       }
       rawByFile.set(name, (rawByFile.get(name) ?? 0) + 1);
-      const kind = m[0][0] === '@' ? 'user-id' : m[0][0] === '#' ? 'room-alias' : m[0][0] === '!' ? 'room-id' : 'event-id';
+      const kind = id[0] === '@' ? 'user-id' : id[0] === '#' ? 'room-alias' : id[0] === '!' ? 'room-id' : 'event-id';
       rawByKind.set(kind, (rawByKind.get(kind) ?? 0) + 1);
     }
   }

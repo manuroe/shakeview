@@ -211,6 +211,49 @@ describe('buildAnonymizationDictionary', () => {
   });
 });
 
+describe('buildAnonymizationDictionary — percent-encoded identifiers', () => {
+  /** Encode an alias the way the anonymizer writes it back into a URL. */
+  const enc = (alias: string) => `%${alias.charCodeAt(0).toString(16).toUpperCase()}${alias.slice(1).replace(/:/g, '%3A')}`;
+
+  it('maps an encoded identifier to the encoded alias of the plain identifier', async () => {
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '@alice:example.org !room1:example.org #lobby:example.org $event1:example.org',
+      '?userId=%40alice%3Aexample.org&roomId=%21room1%3Aexample.org',
+      'https://matrix.to/#/%23lobby%3Aexample.org/%24event1%3Aexample.org',
+    ], SALT);
+    expect(dict.forward['%40alice%3Aexample.org']).toBe(enc(dict.forward['@alice:example.org']));
+    expect(dict.forward['%21room1%3Aexample.org']).toBe(enc(dict.forward['!room1:example.org']));
+    expect(dict.forward['%23lobby%3Aexample.org']).toBe(enc(dict.forward['#lobby:example.org']));
+    expect(dict.forward['%24event1%3Aexample.org']).toBe(enc(dict.forward['$event1:example.org']));
+  });
+
+  it('decodes escaped localpart characters and ports before hashing', async () => {
+    // Modern (domainless) room ids are base64: `+` and `/` arrive as %2B / %2F.
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '!AbCdEf+gh/IjKl @bob:example.org:8448',
+      'roomId=%21AbCdEf%2Bgh%2FIjKl userId=%40bob%3Aexample.org%3A8448',
+    ], SALT);
+    expect(dict.forward['%21AbCdEf%2Bgh%2FIjKl']).toBe(enc(dict.forward['!AbCdEf+gh/IjKl']));
+    expect(dict.forward['%40bob%3Aexample.org%3A8448']).toBe(enc(dict.forward['@bob:example.org:8448']));
+  });
+
+  it('anonymizes an encoded identifier seen only in its encoded form', async () => {
+    const text = 'index.html#?userId=%40alice%3Aexample.org&roomId=%21room1%3Aexample.org&widgetId=w1';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const anonymized = applyAnonymization(text, dict);
+    expect(anonymized).not.toContain('alice');
+    expect(anonymized).not.toContain('room1');
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+    expect(buildCompiledUnanonymizer(dict)(anonymized)).toBe(text);
+  });
+
+  it('accepts two spellings of the same encoded identifier', async () => {
+    // `%3a` vs `%3A` decode to the same id: one alias, not a collision error.
+    const dict = await buildAnonymizationDictionaryFromTexts(['%21room1%3Aexample.org %21room1%3aexample.org'], SALT);
+    expect(dict.forward['%21room1%3aexample.org']).toBe(dict.forward['%21room1%3Aexample.org']);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // applyAnonymization / applyUnanonymization
 // ---------------------------------------------------------------------------

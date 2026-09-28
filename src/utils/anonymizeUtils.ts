@@ -41,9 +41,17 @@ const ACCEPTED_LOG_MARKERS = [ANONYMIZED_LOG_MARKER, '# [rageshake-viewer-anonym
  * would cause every `0` digit in every log line to be replaced with a domain
  * alias, silently corrupting timestamps and other unrelated values.
  */
-const SERVER_NAME_PAT =
-  '(?:\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9][A-Za-z0-9\\-]*(?:\\.[A-Za-z0-9][A-Za-z0-9\\-]*)+'  +
-  ')(?::\\d{1,5})?';
+const HOST_PAT =
+  '(?:\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9][A-Za-z0-9\\-]*(?:\\.[A-Za-z0-9][A-Za-z0-9\\-]*)+)';
+const SERVER_NAME_PAT = `${HOST_PAT}(?::\\d{1,5})?`;
+
+/**
+ * Percent-encoded identifier parts, as found in URL query strings (e.g. Element
+ * Call widget URLs: `userId=%40alice%3Aexample.org`). A localpart character is
+ * unreserved or any escape but `%3A` (`:`), which starts the server name.
+ */
+const ENC_CHAR = '(?:[A-Za-z0-9._~\\-]|%(?!3[Aa])[0-9A-Fa-f]{2})';
+const ENC_SERVER_NAME_PAT = `%3[Aa]${HOST_PAT}(?:%3[Aa]\\d{1,5})?`;
 
 /**
  * Matches all Matrix identifiers in a text string.
@@ -73,9 +81,24 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
     `\\$[A-Za-z0-9+/=_\\-]{10,}`,
     // Modern room ID (no domain, base64url, min 10 chars)
     `![A-Za-z0-9+/=_\\-]{10,}`,
+    // Percent-encoded user ID, room alias, room ID, event ID (%40 @, %23 #,
+    // %21 !, %24 $), with domain, then the modern domainless room/event IDs.
+    `%(?:40|2[134])${ENC_CHAR}+${ENC_SERVER_NAME_PAT}`,
+    `%2[14]${ENC_CHAR}{10,}`,
   ].join('|'),
   'g',
 );
+
+/**
+ * Decode the escapes of a percent-encoded identifier (`%21abc%3Aexample.org` →
+ * `!abc:example.org`). Plain identifiers come back unchanged.
+ */
+export function decodeIdentifier(id: string): string {
+  // ponytail: ASCII escapes only, so a stray non-UTF-8 byte can never throw. A
+  // non-ASCII localpart stays escaped: still anonymized, just not linked to its
+  // plain spelling.
+  return id.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+}
 
 // ---------------------------------------------------------------------------
 // Hashing
@@ -113,6 +136,9 @@ export async function sha256Hex(input: string, len: number): Promise<string> {
  * - Room IDs:     `!room-<hash12>:domain-<hash8>.org` (or `!room-<hash12>` modern)
  * - Room aliases: `#room_alias-<hash12>:domain-<hash8>.org`
  * - Event IDs:    `$event-<hash12>:domain-<hash8>.org` (or `$event-<hash12>` modern)
+ * - Percent-encoded IDs (`%21abc%3Aexample.org`): the alias of the decoded ID,
+ *   encoded back (`%21room-<hash12>%3Adomain-<hash8>.org`), so an ID in a URL
+ *   query links to the same ID logged plain.
  *
  * The bare server name is hashed separately from the full identifier so all
  * users on one server share one domain alias (preserves "same server" debugging
@@ -208,7 +234,17 @@ export async function buildAnonymizationDictionaryFromTexts(
   }
 
   async function processIdentifier(id: string): Promise<void> {
-    if (id.startsWith('@')) {
+    if (id.startsWith('%')) {
+      const plain = decodeIdentifier(id);
+      await processIdentifier(plain);
+      const plainAlias = forward[plain];
+      if (plainAlias === undefined) return;
+      const alias = `%${plainAlias.charCodeAt(0).toString(16).toUpperCase()}${plainAlias.slice(1).replace(/:/g, '%3A')}`;
+      // Spellings of one ID (`%3A` / `%3a`) share its alias; unanonymization
+      // restores the first one seen.
+      if (reverse[alias] === undefined) register(id, alias);
+      else forward[id] = alias;
+    } else if (id.startsWith('@')) {
       const colonIdx = id.indexOf(':');
       if (colonIdx === -1) return;
       const domainAlias = await getOrCreateDomainAlias(id.slice(colonIdx + 1));
@@ -348,7 +384,8 @@ export function applyUnanonymization(text: string, dict: AnonymizationDictionary
   // punctuation (`,;)\]>"'?`) so tokens like `@user0:domain0.org,` are matched
   // as `@user0:domain0.org`. Dots and colons are intentionally allowed so that
   // domain names (`domain0.org`) and port suffixes (`:8448`) are included.
-  const candidateRe = /[@#!$](?!\/)[^\s:]+(?::[^\s/,;)\]>"'?]+)?/g;
+  // The second alternative matches percent-encoded aliases (`%21room-…%3Adomain-….org`).
+  const candidateRe = /[@#!$](?!\/)[^\s:]+(?::[^\s/,;)\]>"'?]+)?|%(?:40|2[134])[\w-]+(?:%3A[\w.-]+)*/g;
   let result = text.replace(candidateRe, (m) => reverse[m] ?? m);
   // Phase 2: bare domain alias names.
   for (const [key, val] of Object.entries(reverse)
@@ -424,7 +461,8 @@ export function buildCompiledUnanonymizer(dict: AnonymizationDictionary): (text:
   // `@user0:domain0.org,` or `!room0:domain0.org)` are matched cleanly and found
   // in the reverse dict. Dots and colons are intentionally allowed so that domain
   // names (`domain0.org`) and port suffixes (`:8448`) are fully included.
-  const candidateRe = new RegExp("[@#!$](?!/)[^\\s:]+(?::[^\\s/,;)\\]>\"'?]+)?", 'g');
+  // The second alternative matches percent-encoded aliases (`%21room-…%3Adomain-….org`).
+  const candidateRe = new RegExp("[@#!$](?!/)[^\\s:]+(?::[^\\s/,;)\\]>\"'?]+)?|%(?:40|2[134])[\\w-]+(?:%3A[\\w.-]+)*", 'g');
   return (text: string): string => {
     let result = text.replace(candidateRe, (m) => reverse[m] ?? m);
     for (const [key, val] of domainAliasPairs) {
