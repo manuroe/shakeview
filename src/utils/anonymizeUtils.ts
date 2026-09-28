@@ -47,12 +47,23 @@ const SERVER_NAME_PAT = `${HOST_PAT}(?::\\d{1,5})?`;
 
 /**
  * Percent-encoded identifier parts, as found in URL query strings (e.g. Element
- * Call widget URLs: `userId=%40alice%3Aexample.org`). A localpart character is
- * unreserved or any escape but `%3A` (`:`), which starts the server name. An
- * IPv6 server name arrives as `%5B…%5D` (`[…]`).
+ * Call widget URLs: `userId=%40alice%3Aexample.org`). `ESC` is a `%` at any
+ * nesting depth: `%` single-encoded, `%25` double-encoded (a URL in a URL), ….
+ *
+ * A localpart character is unreserved or an escape of a character legal in
+ * that localpart, never a URL separator (`%20`, `%26` `&`, `%23` `#`, …), so a
+ * match cannot run across query parameters. Room IDs and user IDs allow `+`,
+ * `/`, `=` and non-ASCII bytes, room aliases `+` and non-ASCII bytes (mirroring
+ * the plain alias pattern), domainless IDs only base64. An IPv6 server name
+ * arrives as `%5B…%5D` (`[…]`).
  */
-const ENC_CHAR = '(?:[A-Za-z0-9._~\\-]|%(?!3[Aa])[0-9A-Fa-f]{2})';
-const ENC_SERVER_NAME_PAT = `%3[Aa](?:%5[Bb](?:[0-9A-Fa-f.]|%3[Aa])+%5[Dd]|${HOST_PAT})(?:%3[Aa]\\d{1,5})?`;
+const ESC = '%(?:25)*';
+const ENC_COLON = `${ESC}3[Aa]`;
+const ENC_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[BbFf]|3[Dd]|[89A-Fa-f][0-9A-Fa-f]))`;
+const ENC_ALIAS_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[Bb]|[89A-Fa-f][0-9A-Fa-f]))`;
+const ENC_BASE64_CHAR = `(?:[A-Za-z0-9_\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
+const ENC_SERVER_NAME_PAT =
+  `${ENC_COLON}(?:${ESC}5[Bb](?:[0-9A-Fa-f.]|${ENC_COLON})+${ESC}5[Dd]|${HOST_PAT})(?:${ENC_COLON}\\d{1,5})?`;
 
 /**
  * Matches all Matrix identifiers in a text string.
@@ -70,35 +81,66 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
     // historical servers (e.g. old Synapse versions) allowed uppercase letters
     // such as "@Bob:matrix.org". Accept both cases so those IDs are anonymized.
     `@[a-zA-Z0-9._=\\-/+]+:${SERVER_NAME_PAT}`,
-    // Room alias: #alias:server_name. Never `#/…`: that is a URL fragment
-    // (`matrix.to/#/!room:server`, `app.element.io/#/room/!room:server`), and
-    // matching it as an alias would hide the room ID behind a different hash.
-    `#(?!/)[^:\\s\\x00]+:${SERVER_NAME_PAT}`,
+    // Room alias: #alias:server_name. The localpart excludes URL delimiters
+    // (`/?&=#`): a `#` followed by one is a URL fragment (`matrix.to/#/!room:…`,
+    // `app.element.io/#/room/!room:…`, `index.html#?roomId=!room:…`), and
+    // matching it as an alias would hide the ID inside behind a different hash.
+    `#[^:\\s\\x00/?&=#]+:${SERVER_NAME_PAT}`,
     // Room ID with domain: !opaque_id:server_name
     `![A-Za-z0-9._~=+\\-/]+:${SERVER_NAME_PAT}`,
     // Event ID with domain: $opaque_id:server_name
     `\\$[A-Za-z0-9._~=+\\-/]+:${SERVER_NAME_PAT}`,
+    // Percent-encoded user ID, room ID, event ID, room alias with domain (%40 @,
+    // %21 !, %24 $, %23 #). The sigil may be left unescaped (encodeURIComponent
+    // keeps `!`). Before the modern patterns, which would stop `!id%3A…` at `%`.
+    `(?:${ESC}(?:40|2[14])|[@!$])${ENC_CHAR}+${ENC_SERVER_NAME_PAT}`,
+    `(?:${ESC}23|#)${ENC_ALIAS_CHAR}+${ENC_SERVER_NAME_PAT}`,
+    // Percent-encoded modern room/event ID (no domain, base64, min 10 chars)
+    `${ESC}2[14]${ENC_BASE64_CHAR}{10,}`,
     // Modern event ID (no domain, base64url, min 10 chars to reduce false positives)
     `\\$[A-Za-z0-9+/=_\\-]{10,}`,
     // Modern room ID (no domain, base64url, min 10 chars)
     `![A-Za-z0-9+/=_\\-]{10,}`,
-    // Percent-encoded user ID, room alias, room ID, event ID (%40 @, %23 #,
-    // %21 !, %24 $), with domain, then the modern domainless room/event IDs.
-    `%(?:40|2[134])${ENC_CHAR}+${ENC_SERVER_NAME_PAT}`,
-    `%2[14]${ENC_CHAR}{10,}`,
   ].join('|'),
   'g',
 );
 
 /**
- * Decode the escapes of a percent-encoded identifier (`%21abc%3Aexample.org` →
- * `!abc:example.org`). Plain identifiers come back unchanged.
+ * Decode a percent-encoded identifier (`%21abc%3Aexample.org` → `!abc:example.org`),
+ * as many times as it was encoded. `levels` is that count; plain identifiers
+ * come back unchanged with `levels` 0.
  */
-export function decodeIdentifier(id: string): string {
+function decodeIdentifierLevels(id: string): { plain: string; levels: number } {
+  if (!/^%|%(?:25)*3[Aa]/.test(id)) return { plain: id, levels: 0 };
   // ponytail: ASCII escapes only, so a stray non-UTF-8 byte can never throw. A
   // non-ASCII localpart stays escaped: still anonymized, just not linked to its
   // plain spelling.
-  return id.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  const decodeOnce = (s: string) => s.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  let plain = id;
+  let levels = 0;
+  for (let next = decodeOnce(plain); next !== plain; next = decodeOnce(plain)) {
+    plain = next;
+    levels++;
+  }
+  return { plain, levels };
+}
+
+/** Plain form of a percent-encoded identifier. Plain identifiers come back unchanged. */
+export function decodeIdentifier(id: string): string {
+  return decodeIdentifierLevels(id).plain;
+}
+
+/**
+ * Inverse of `decodeIdentifierLevels` for an alias: encode `levels` times,
+ * escaping the sigil only when the original identifier escaped it.
+ */
+function encodeIdentifier(alias: string, levels: number, escapeSigil: boolean): string {
+  let s = alias;
+  for (let i = 0; i < levels; i++) {
+    s = s.replace(/%/g, '%25').replace(/:/g, '%3A');
+    if (i === 0 && escapeSigil) s = `%${s.charCodeAt(0).toString(16).toUpperCase()}${s.slice(1)}`;
+  }
+  return s;
 }
 
 // ---------------------------------------------------------------------------
@@ -234,56 +276,38 @@ export async function buildAnonymizationDictionaryFromTexts(
     return alias;
   }
 
-  async function processIdentifier(id: string): Promise<void> {
-    if (id.startsWith('%')) {
-      const plain = decodeIdentifier(id);
-      await processIdentifier(plain);
-      const plainAlias = forward[plain];
-      if (plainAlias === undefined) return;
-      const alias = `%${plainAlias.charCodeAt(0).toString(16).toUpperCase()}${plainAlias.slice(1).replace(/:/g, '%3A')}`;
-      // Spellings of one ID (`%3A` / `%3a`) share its alias; unanonymization
-      // restores the first one seen.
-      if (reverse[alias] === undefined) register(id, alias);
-      else forward[id] = alias;
-    } else if (id.startsWith('@')) {
-      const colonIdx = id.indexOf(':');
-      if (colonIdx === -1) return;
-      const domainAlias = await getOrCreateDomainAlias(id.slice(colonIdx + 1));
-      if (forward[id] === undefined) {
-        register(id, `@user-${await sha256Hex(salt + id, 12)}:${domainAlias}`);
-      }
-    } else if (id.startsWith('#')) {
-      const colonIdx = id.indexOf(':');
-      if (colonIdx === -1) return;
-      const domainAlias = await getOrCreateDomainAlias(id.slice(colonIdx + 1));
-      if (forward[id] === undefined) {
-        register(id, `#room_alias-${await sha256Hex(salt + id, 12)}:${domainAlias}`);
-      }
-    } else if (id.startsWith('!')) {
-      const colonIdx = id.indexOf(':');
-      if (colonIdx !== -1) {
-        const domainAlias = await getOrCreateDomainAlias(id.slice(colonIdx + 1));
-        if (forward[id] === undefined) {
-          register(id, `!room-${await sha256Hex(salt + id, 12)}:${domainAlias}`);
-        }
-      } else {
-        if (forward[id] === undefined) {
-          register(id, `!room-${await sha256Hex(salt + id, 12)}`);
-        }
-      }
-    } else if (id.startsWith('$')) {
-      const colonIdx = id.indexOf(':');
-      if (colonIdx !== -1) {
-        const domainAlias = await getOrCreateDomainAlias(id.slice(colonIdx + 1));
-        if (forward[id] === undefined) {
-          register(id, `$event-${await sha256Hex(salt + id, 12)}:${domainAlias}`);
-        }
-      } else {
-        if (forward[id] === undefined) {
-          register(id, `$event-${await sha256Hex(salt + id, 12)}`);
-        }
-      }
+  const aliasPrefixes = new Map([['@', '@user'], ['#', '#room_alias'], ['!', '!room'], ['$', '$event']]);
+
+  /** Alias of a plain identifier, or undefined when it cannot be hashed. */
+  async function aliasFor(id: string): Promise<string | undefined> {
+    const prefix = aliasPrefixes.get(id[0]);
+    if (prefix === undefined) return undefined;
+    const colonIdx = id.indexOf(':');
+    if (colonIdx === -1) {
+      // Only room and event IDs exist without a server name (modern IDs).
+      return prefix === '!room' || prefix === '$event' ? `${prefix}-${await sha256Hex(salt + id, 12)}` : undefined;
     }
+    const domainAlias = await getOrCreateDomainAlias(id.slice(colonIdx + 1));
+    return `${prefix}-${await sha256Hex(salt + id, 12)}:${domainAlias}`;
+  }
+
+  async function processIdentifier(id: string): Promise<void> {
+    if (forward[id] !== undefined) return;
+    // An encoded ID gets the alias of its plain form, encoded back the same
+    // way, so it links to the same ID logged plain. The plain form itself is
+    // not registered: it may not be in the text.
+    const { plain, levels } = decodeIdentifierLevels(id);
+    const plainAlias = forward[plain] ?? await aliasFor(plain);
+    if (plainAlias === undefined) return;
+    if (levels === 0) {
+      register(id, plainAlias);
+      return;
+    }
+    const alias = encodeIdentifier(plainAlias, levels, id.startsWith('%'));
+    // Spellings of one ID (`%3A` / `%3a`) share its alias; unanonymization
+    // restores the first one seen.
+    if (reverse[alias] !== undefined && decodeIdentifier(reverse[alias]) === plain) forward[id] = alias;
+    else register(id, alias);
   }
 
   // Phase 1 — synchronous scan collecting unique identifiers in first-seen order.
@@ -317,12 +341,29 @@ export async function buildAnonymizationDictionaryFromTexts(
 // ---------------------------------------------------------------------------
 
 /**
- * Checks whether a forward/reverse map key is a bare domain name (no sigil).
- * Used to separate the two replacement strategies.
+ * Matches every alias form `buildAnonymizationDictionary` writes, to look up in
+ * `reverse`: a sigil, a `[\w-]` localpart (`user-<hash>`, legacy `room0`), then
+ * up to two `:`-separated parts (domain alias, port). Percent-encoded aliases
+ * (`%21room-…%3Adomain-….org`, `!room-…%3A…`, double-encoded `%2521…%253A…`)
+ * come first, so the plain branch does not stop them at `%`. The localpart
+ * never holds `/`, `?`, `&` or `=`, so a URL fragment (`#/`, `#?userId=…`) never
+ * swallows the aliases in it, and a domain part never ends on a `.`, `/` or `&`
+ * that follows it.
+ */
+const ALIAS_DOMAIN_PAT = '[\\w-]+(?:\\.[\\w-]+)*';
+const ALIAS_CANDIDATE_PAT = [
+  `(?:%(?:25)*(?:40|2[134])|[@#!$])[\\w-]+(?:%(?:25)*3A${ALIAS_DOMAIN_PAT}){1,2}`,
+  '%(?:25)*2[14][\\w-]+',
+  `[@#!$][\\w-]+(?::${ALIAS_DOMAIN_PAT}){0,2}`,
+].join('|');
+
+/**
+ * Checks whether a forward/reverse map key is a bare domain name (no sigil,
+ * not percent-encoded). Used to separate the two replacement strategies.
  */
 function isBareKey(k: string): boolean {
   const c = k[0];
-  return c !== '@' && c !== '#' && c !== '!' && c !== '$';
+  return c !== '@' && c !== '#' && c !== '!' && c !== '$' && c !== '%';
 }
 
 /**
@@ -379,14 +420,8 @@ export function applyAnonymization(text: string, dict: AnonymizationDictionary):
 export function applyUnanonymization(text: string, dict: AnonymizationDictionary): string {
   const { reverse } = dict;
   if (Object.keys(reverse).length === 0) return text;
-  // Phase 1: sigil-prefixed aliases. Stops at `/` so identifiers embedded in
-  // URIs (e.g. `!room0:domain0.org/messages`) are matched as `!room0:domain0.org`
-  // rather than consuming the path suffix. Also stops before common trailing
-  // punctuation (`,;)\]>"'?`) so tokens like `@user0:domain0.org,` are matched
-  // as `@user0:domain0.org`. Dots and colons are intentionally allowed so that
-  // domain names (`domain0.org`) and port suffixes (`:8448`) are included.
-  // The second alternative matches percent-encoded aliases (`%21room-…%3Adomain-….org`).
-  const candidateRe = /[@#!$](?!\/)[^\s:]+(?::[^\s/,;)\]>"'?]+)?|%(?:40|2[134])[\w-]+(?:%3A[\w.-]+)*/g;
+  // Phase 1: sigil-prefixed aliases (see ALIAS_CANDIDATE_PAT).
+  const candidateRe = new RegExp(ALIAS_CANDIDATE_PAT, 'g');
   let result = text.replace(candidateRe, (m) => reverse[m] ?? m);
   // Phase 2: bare domain alias names.
   for (const [key, val] of Object.entries(reverse)
@@ -453,17 +488,7 @@ export function buildCompiledUnanonymizer(dict: AnonymizationDictionary): (text:
   const domainAliasPairs = Object.entries(reverse)
     .filter(([k]) => isBareKey(k))
     .sort(([a], [b]) => b.length - a.length) as Array<[string, string]>;
-  // Pattern: sigil + non-whitespace-non-colon local part + optional `:server` suffix.
-  // Matches all alias forms produced by buildAnonymizationDictionary, including
-  // short ones like !room0 and $event0 that have no domain component.
-  // Stops at `/` so that URIs like `/_matrix/...rooms/!room0:domain0.org/messages`
-  // are matched as `!room0:domain0.org`, not `!room0:domain0.org/messages`.
-  // Also stops before common trailing punctuation (`,;)\]>"'?`) so tokens like
-  // `@user0:domain0.org,` or `!room0:domain0.org)` are matched cleanly and found
-  // in the reverse dict. Dots and colons are intentionally allowed so that domain
-  // names (`domain0.org`) and port suffixes (`:8448`) are fully included.
-  // The second alternative matches percent-encoded aliases (`%21room-…%3Adomain-….org`).
-  const candidateRe = new RegExp("[@#!$](?!/)[^\\s:]+(?::[^\\s/,;)\\]>\"'?]+)?|%(?:40|2[134])[\\w-]+(?:%3A[\\w.-]+)*", 'g');
+  const candidateRe = new RegExp(ALIAS_CANDIDATE_PAT, 'g');
   return (text: string): string => {
     let result = text.replace(candidateRe, (m) => reverse[m] ?? m);
     for (const [key, val] of domainAliasPairs) {
