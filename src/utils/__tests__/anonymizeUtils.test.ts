@@ -196,6 +196,19 @@ describe('buildAnonymizationDictionary', () => {
       dict.forward['@bob:matrix.org'].split(':')[1],
     );
   });
+
+  it('gives an identifier inside a permalink the same alias as the bare identifier', async () => {
+    // Regression: the room-alias pattern swallowed the URL fragment, so
+    // `matrix.to/#/!room1:…` registered `#/!room1:…` as a separate room alias.
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '!room1:example.org #lobby:example.org',
+      'https://matrix.to/#/!room1:example.org https://matrix.to/#/#lobby:example.org',
+      'https://app.element.io/#/room/!room1:example.org',
+    ], SALT);
+    expect(Object.keys(dict.forward).sort()).toEqual(['!room1:example.org', '#lobby:example.org', 'example.org']);
+    expect(applyAnonymization('https://matrix.to/#/!room1:example.org', dict))
+      .toBe(`https://matrix.to/#/${dict.forward['!room1:example.org']}`);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -283,6 +296,18 @@ describe('applyUnanonymization', () => {
     const anonymized = applyAnonymization('@alice:example.org, !room1:example.org)', dict);
     const restored = applyUnanonymization(anonymized, dict);
     expect(restored).toBe('@alice:example.org, !room1:example.org)');
+  });
+
+  it('round-trips identifiers inside matrix.to and Element Web permalinks', async () => {
+    const text = [
+      'https://matrix.to/#/!room1:example.org/$event1:example.org?via=example.org',
+      'https://matrix.to/#/#lobby:example.org https://matrix.to/#/@alice:example.org',
+      'https://app.element.io/#/room/!room1:example.org',
+    ].join(' ');
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const anonymized = applyAnonymization(text, dict);
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+    expect(buildCompiledUnanonymizer(dict)(anonymized)).toBe(text);
   });
 });
 

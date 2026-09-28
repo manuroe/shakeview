@@ -61,8 +61,10 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
     // historical servers (e.g. old Synapse versions) allowed uppercase letters
     // such as "@Bob:matrix.org". Accept both cases so those IDs are anonymized.
     `@[a-zA-Z0-9._=\\-/+]+:${SERVER_NAME_PAT}`,
-    // Room alias: #alias:server_name
-    `#[^:\\s\\x00]+:${SERVER_NAME_PAT}`,
+    // Room alias: #alias:server_name. Never `#/…`: that is a URL fragment
+    // (`matrix.to/#/!room:server`, `app.element.io/#/room/!room:server`), and
+    // matching it as an alias would hide the room ID behind a different hash.
+    `#(?!/)[^:\\s\\x00]+:${SERVER_NAME_PAT}`,
     // Room ID with domain: !opaque_id:server_name
     `![A-Za-z0-9._~=+\\-/]+:${SERVER_NAME_PAT}`,
     // Event ID with domain: $opaque_id:server_name
@@ -346,7 +348,7 @@ export function applyUnanonymization(text: string, dict: AnonymizationDictionary
   // punctuation (`,;)\]>"'?`) so tokens like `@user0:domain0.org,` are matched
   // as `@user0:domain0.org`. Dots and colons are intentionally allowed so that
   // domain names (`domain0.org`) and port suffixes (`:8448`) are included.
-  const candidateRe = /[@#!$][^\s:]+(?::[^\s/,;)\]>"'?]+)?/g;
+  const candidateRe = /[@#!$](?!\/)[^\s:]+(?::[^\s/,;)\]>"'?]+)?/g;
   let result = text.replace(candidateRe, (m) => reverse[m] ?? m);
   // Phase 2: bare domain alias names.
   for (const [key, val] of Object.entries(reverse)
@@ -422,7 +424,7 @@ export function buildCompiledUnanonymizer(dict: AnonymizationDictionary): (text:
   // `@user0:domain0.org,` or `!room0:domain0.org)` are matched cleanly and found
   // in the reverse dict. Dots and colons are intentionally allowed so that domain
   // names (`domain0.org`) and port suffixes (`:8448`) are fully included.
-  const candidateRe = new RegExp("[@#!$][^\\s:]+(?::[^\\s/,;)\\]>\"'?]+)?", 'g');
+  const candidateRe = new RegExp("[@#!$](?!/)[^\\s:]+(?::[^\\s/,;)\\]>\"'?]+)?", 'g');
   return (text: string): string => {
     let result = text.replace(candidateRe, (m) => reverse[m] ?? m);
     for (const [key, val] of domainAliasPairs) {
