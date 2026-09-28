@@ -48,10 +48,11 @@ const SERVER_NAME_PAT = `${HOST_PAT}(?::\\d{1,5})?`;
 /**
  * Percent-encoded identifier parts, as found in URL query strings (e.g. Element
  * Call widget URLs: `userId=%40alice%3Aexample.org`). A localpart character is
- * unreserved or any escape but `%3A` (`:`), which starts the server name.
+ * unreserved or any escape but `%3A` (`:`), which starts the server name. An
+ * IPv6 server name arrives as `%5B…%5D` (`[…]`).
  */
 const ENC_CHAR = '(?:[A-Za-z0-9._~\\-]|%(?!3[Aa])[0-9A-Fa-f]{2})';
-const ENC_SERVER_NAME_PAT = `%3[Aa]${HOST_PAT}(?:%3[Aa]\\d{1,5})?`;
+const ENC_SERVER_NAME_PAT = `%3[Aa](?:%5[Bb](?:[0-9A-Fa-f.]|%3[Aa])+%5[Dd]|${HOST_PAT})(?:%3[Aa]\\d{1,5})?`;
 
 /**
  * Matches all Matrix identifiers in a text string.

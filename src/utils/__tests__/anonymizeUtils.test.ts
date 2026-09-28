@@ -247,6 +247,11 @@ describe('buildAnonymizationDictionary — percent-encoded identifiers', () => {
     expect(buildCompiledUnanonymizer(dict)(anonymized)).toBe(text);
   });
 
+  it('matches encoded IPv6 server names', async () => {
+    const dict = await buildAnonymizationDictionaryFromTexts(['!room1:[::1] roomId=%21room1%3A%5B%3A%3A1%5D'], SALT);
+    expect(dict.forward['%21room1%3A%5B%3A%3A1%5D']).toBe(enc(dict.forward['!room1:[::1]']));
+  });
+
   it('accepts two spellings of the same encoded identifier', async () => {
     // `%3a` vs `%3A` decode to the same id: one alias, not a collision error.
     const dict = await buildAnonymizationDictionaryFromTexts(['%21room1%3Aexample.org %21room1%3aexample.org'], SALT);
