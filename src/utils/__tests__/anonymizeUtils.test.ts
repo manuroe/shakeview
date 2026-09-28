@@ -10,7 +10,9 @@ import {
   detectAnonymizedLog,
   stripAnonymizedMarker,
   buildCompiledUnanonymizer,
+  decodeIdentifier,
 } from '../anonymizeUtils';
+import type { AnonymizationDictionary } from '../../types/log.types';
 import { createParsedLogLine } from '../../test/fixtures';
 
 // ---------------------------------------------------------------------------
@@ -196,6 +198,134 @@ describe('buildAnonymizationDictionary', () => {
       dict.forward['@bob:matrix.org'].split(':')[1],
     );
   });
+
+  it('gives an identifier inside a permalink the same alias as the bare identifier', async () => {
+    // Regression: the room-alias pattern swallowed the URL fragment, so
+    // `matrix.to/#/!room1:…` registered `#/!room1:…` as a separate room alias.
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '!room1:example.org #lobby:example.org',
+      'https://matrix.to/#/!room1:example.org https://matrix.to/#/#lobby:example.org',
+      'https://app.element.io/#/room/!room1:example.org',
+      'element-call/index.html#?roomId=!room1:example.org',
+    ], SALT);
+    expect(Object.keys(dict.forward).sort()).toEqual(['!room1:example.org', '#lobby:example.org', 'example.org']);
+    expect(applyAnonymization('https://matrix.to/#/!room1:example.org', dict))
+      .toBe(`https://matrix.to/#/${dict.forward['!room1:example.org']}`);
+  });
+});
+
+describe('buildAnonymizationDictionary — percent-encoded identifiers', () => {
+  /** Assert `encoded` got the alias of `plain`, written back in `encoded`'s shape
+   *  (same sigil spelling, no literal `:`). Checked through the decoder, so the
+   *  test does not re-implement the encoding. */
+  function expectLinked(dict: AnonymizationDictionary, encoded: string, plain: string) {
+    const alias = dict.forward[encoded];
+    expect(dict.forward[plain]).toBeDefined();
+    expect(decodeIdentifier(alias)).toBe(dict.forward[plain]);
+    expect(alias[0]).toBe(encoded[0]);
+    expect(alias).not.toContain(':');
+  }
+
+  it('maps an encoded identifier to the encoded alias of the plain identifier', async () => {
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '@alice:example.org !room1:example.org #lobby:example.org $event1:example.org',
+      '?userId=%40alice%3Aexample.org&roomId=%21room1%3Aexample.org',
+      'https://matrix.to/#/%23lobby%3Aexample.org/%24event1%3Aexample.org',
+    ], SALT);
+    expectLinked(dict, '%40alice%3Aexample.org', '@alice:example.org');
+    expectLinked(dict, '%21room1%3Aexample.org', '!room1:example.org');
+    expectLinked(dict, '%23lobby%3Aexample.org', '#lobby:example.org');
+    expectLinked(dict, '%24event1%3Aexample.org', '$event1:example.org');
+    expect(dict.forward['%21room1%3Aexample.org']).toMatch(/^%21room-[0-9a-f]{12}%3Adomain-[0-9a-f]{8}\.org$/);
+  });
+
+  it('decodes escaped localpart characters and ports before hashing', async () => {
+    // Modern (domainless) room ids are base64: `+` and `/` arrive as %2B / %2F.
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '!AbCdEf+gh/IjKl @bob:example.org:8448',
+      'roomId=%21AbCdEf%2Bgh%2FIjKl userId=%40bob%3Aexample.org%3A8448',
+    ], SALT);
+    expectLinked(dict, '%21AbCdEf%2Bgh%2FIjKl', '!AbCdEf+gh/IjKl');
+    expectLinked(dict, '%40bob%3Aexample.org%3A8448', '@bob:example.org:8448');
+  });
+
+  it('links an unescaped `!` sigil followed by an encoded colon', async () => {
+    // encodeURIComponent and Android Uri.encode leave `!` as is.
+    const text = '!abcdefghijklmnop:example.org roomId=!abcdefghijklmnop%3Aexample.org';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expectLinked(dict, '!abcdefghijklmnop%3Aexample.org', '!abcdefghijklmnop:example.org');
+    const anonymized = applyAnonymization(text, dict);
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+    expect(buildCompiledUnanonymizer(dict)(anonymized)).toBe(text);
+  });
+
+  it('links double-encoded identifiers (an encoded URL inside a URL)', async () => {
+    const text = '!room1:example.org returnUrl=https%253A%252F%252Fx.org%253FroomId%253D%2521room1%253Aexample.org';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const alias = dict.forward['%2521room1%253Aexample.org'];
+    expect(decodeIdentifier(alias)).toBe(dict.forward['!room1:example.org']);
+    expect(alias.startsWith('%2521room-')).toBe(true);
+    const anonymized = applyAnonymization(text, dict);
+    expect(anonymized).not.toContain('room1');
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+  });
+
+  it('anonymizes an encoded identifier seen only in its encoded form', async () => {
+    const text = 'index.html#?userId=%40alice%3Aexample.org&roomId=%21room1%3Aexample.org&widgetId=w1';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const anonymized = applyAnonymization(text, dict);
+    expect(anonymized).not.toContain('alice');
+    expect(anonymized).not.toContain('room1');
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+    expect(buildCompiledUnanonymizer(dict)(anonymized)).toBe(text);
+    // Only what the text holds is in the dictionary, not the decoded spellings.
+    expect(Object.keys(dict.forward).sort()).toEqual(['%21room1%3Aexample.org', '%40alice%3Aexample.org', 'example.org']);
+  });
+
+  it('never runs an encoded match across URL separators or fragments', async () => {
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '!abcdefghijklmnop:example.org @alice:example.org',
+      // `#/room/!id` nested in an encoded URL is a fragment, not a room alias.
+      'parentUrl=https%3A%2F%2Fapp.element.io%2F%23%2Froom%2F%21abcdefghijklmnop%3Aexample.org',
+      // `&` and `=` end the room id: alice is a separate identifier.
+      'roomId=%21x%26userId%3D%40alice%3Aexample.org',
+    ], SALT);
+    expectLinked(dict, '%21abcdefghijklmnop%3Aexample.org', '!abcdefghijklmnop:example.org');
+    expectLinked(dict, '%40alice%3Aexample.org', '@alice:example.org');
+    expect(Object.keys(dict.forward).filter((k) => k.startsWith('%23'))).toEqual([]);
+  });
+
+  it('leaves URL-encoded prose containing `!` or `$` alone', async () => {
+    const text = 'msg=Hi%21%20How%20are%20you%20doing price=%2410%20000%20000%20000';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(dict.forward).toEqual({});
+  });
+
+  it('accepts only the localpart characters the plain pattern accepts', async () => {
+    // `~` is legal in a room ID but not in a user ID; non-ASCII only in an alias.
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '@alice~bob:example.org userId=%40alice~bob%3Aexample.org',
+      '!r%C3%A9:example.org roomId=%21r%C3%A9%3Aexample.org',
+    ], SALT);
+    expect(dict.forward).toEqual({});
+    const linked = await buildAnonymizationDictionaryFromTexts([
+      '!a~b:example.org roomId=%21a~b%3Aexample.org',
+      '#caf%C3%A9:example.org alias=%23caf%C3%A9%3Aexample.org',
+    ], SALT);
+    expectLinked(linked, '%21a~b%3Aexample.org', '!a~b:example.org');
+    expectLinked(linked, '%23caf%C3%A9%3Aexample.org', '#caf%C3%A9:example.org');
+  });
+
+  it('matches encoded IPv6 server names', async () => {
+    const dict = await buildAnonymizationDictionaryFromTexts(['!room1:[::1] roomId=%21room1%3A%5B%3A%3A1%5D'], SALT);
+    expectLinked(dict, '%21room1%3A%5B%3A%3A1%5D', '!room1:[::1]');
+  });
+
+  it('accepts two spellings of the same encoded identifier', async () => {
+    // `%3a` vs `%3A` decode to the same id: one alias, not a collision error.
+    const dict = await buildAnonymizationDictionaryFromTexts(['%21room1%3Aexample.org %21room1%3aexample.org'], SALT);
+    expect(dict.forward['%21room1%3aexample.org']).toBe(dict.forward['%21room1%3Aexample.org']);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -283,6 +413,18 @@ describe('applyUnanonymization', () => {
     const anonymized = applyAnonymization('@alice:example.org, !room1:example.org)', dict);
     const restored = applyUnanonymization(anonymized, dict);
     expect(restored).toBe('@alice:example.org, !room1:example.org)');
+  });
+
+  it('round-trips identifiers inside matrix.to and Element Web permalinks', async () => {
+    const text = [
+      'https://matrix.to/#/!room1:example.org/$event1:example.org?via=example.org',
+      'https://matrix.to/#/#lobby:example.org https://matrix.to/#/@alice:example.org',
+      'https://app.element.io/#/room/!room1:example.org',
+    ].join(' ');
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const anonymized = applyAnonymization(text, dict);
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+    expect(buildCompiledUnanonymizer(dict)(anonymized)).toBe(text);
   });
 });
 

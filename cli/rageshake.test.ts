@@ -92,6 +92,17 @@ describe('rageshake CLI', () => {
     expect(anon.report).toContain('alias signal');
   });
 
+  it('precheck flags percent-encoded raw identifiers and accepts encoded aliases', () => {
+    const url = (userId: string, roomId: string) => `2026-01-15T10:00:00.000000Z ERROR [ElementCall] index.html#?userId=${userId}&roomId=${roomId}`;
+    const raw = cmdPrecheck(ingest(strToU8(url('%40alice%3Aexample.org', '%21abcdefgh%3Aexample.org')), 'raw.log'));
+    expect(raw.ok).toBe(false);
+    expect(raw.report).toContain('user-id');
+    expect(raw.report).toContain('room-id');
+
+    const anon = cmdPrecheck(ingest(strToU8(url('%40user-0123456789ab%3Adomain-01234567.org', '%21room-0123456789ab%3Adomain-01234567.org')), 'anon.log'));
+    expect(anon.ok).toBe(true);
+  });
+
   it('precheck fails when no anonymization evidence exists', () => {
     const bytes = strToU8('2026-01-15T10:00:00.000000Z INFO nothing identifiable here');
     expect(cmdPrecheck(ingest(bytes, 'plain.log')).ok).toBe(false);
