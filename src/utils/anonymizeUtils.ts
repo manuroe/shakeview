@@ -50,16 +50,17 @@ const SERVER_NAME_PAT = `${HOST_PAT}(?::\\d{1,5})?`;
  * Call widget URLs: `userId=%40alice%3Aexample.org`). `ESC` is a `%` at any
  * nesting depth: `%` single-encoded, `%25` double-encoded (a URL in a URL), ….
  *
- * A localpart character is unreserved or an escape of a character legal in
- * that localpart, never a URL separator (`%20`, `%26` `&`, `%23` `#`, …), so a
- * match cannot run across query parameters. Room IDs and user IDs allow `+`,
- * `/`, `=` and non-ASCII bytes, room aliases `+` and non-ASCII bytes (mirroring
- * the plain alias pattern), domainless IDs only base64. An IPv6 server name
+ * Each localpart class accepts exactly what the plain pattern of that kind
+ * accepts, written unreserved or escaped, and never a URL separator (`%20`,
+ * `%26` `&`, `%23` `#`, …), so a match cannot run across query parameters:
+ * user IDs `[a-zA-Z0-9._=\-/+]`, room/event IDs the same plus `~`, room
+ * aliases `+` and non-ASCII bytes, domainless IDs base64. An IPv6 server name
  * arrives as `%5B…%5D` (`[…]`).
  */
 const ESC = '%(?:25)*';
 const ENC_COLON = `${ESC}3[Aa]`;
-const ENC_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[BbFf]|3[Dd]|[89A-Fa-f][0-9A-Fa-f]))`;
+const ENC_USER_CHAR = `(?:[A-Za-z0-9._\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
+const ENC_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
 const ENC_ALIAS_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[Bb]|[89A-Fa-f][0-9A-Fa-f]))`;
 const ENC_BASE64_CHAR = `(?:[A-Za-z0-9_\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
 const ENC_SERVER_NAME_PAT =
@@ -93,7 +94,8 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
     // Percent-encoded user ID, room ID, event ID, room alias with domain (%40 @,
     // %21 !, %24 $, %23 #). The sigil may be left unescaped (encodeURIComponent
     // keeps `!`). Before the modern patterns, which would stop `!id%3A…` at `%`.
-    `(?:${ESC}(?:40|2[14])|[@!$])${ENC_CHAR}+${ENC_SERVER_NAME_PAT}`,
+    `(?:${ESC}40|@)${ENC_USER_CHAR}+${ENC_SERVER_NAME_PAT}`,
+    `(?:${ESC}2[14]|[!$])${ENC_CHAR}+${ENC_SERVER_NAME_PAT}`,
     `(?:${ESC}23|#)${ENC_ALIAS_CHAR}+${ENC_SERVER_NAME_PAT}`,
     // Percent-encoded modern room/event ID (no domain, base64, min 10 chars)
     `${ESC}2[14]${ENC_BASE64_CHAR}{10,}`,

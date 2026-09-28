@@ -301,6 +301,21 @@ describe('buildAnonymizationDictionary — percent-encoded identifiers', () => {
     expect(dict.forward).toEqual({});
   });
 
+  it('accepts only the localpart characters the plain pattern accepts', async () => {
+    // `~` is legal in a room ID but not in a user ID; non-ASCII only in an alias.
+    const dict = await buildAnonymizationDictionaryFromTexts([
+      '@alice~bob:example.org userId=%40alice~bob%3Aexample.org',
+      '!r%C3%A9:example.org roomId=%21r%C3%A9%3Aexample.org',
+    ], SALT);
+    expect(dict.forward).toEqual({});
+    const linked = await buildAnonymizationDictionaryFromTexts([
+      '!a~b:example.org roomId=%21a~b%3Aexample.org',
+      '#caf%C3%A9:example.org alias=%23caf%C3%A9%3Aexample.org',
+    ], SALT);
+    expectLinked(linked, '%21a~b%3Aexample.org', '!a~b:example.org');
+    expectLinked(linked, '%23caf%C3%A9%3Aexample.org', '#caf%C3%A9:example.org');
+  });
+
   it('matches encoded IPv6 server names', async () => {
     const dict = await buildAnonymizationDictionaryFromTexts(['!room1:[::1] roomId=%21room1%3A%5B%3A%3A1%5D'], SALT);
     expectLinked(dict, '%21room1%3A%5B%3A%3A1%5D', '!room1:[::1]');
