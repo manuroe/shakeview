@@ -5,7 +5,7 @@ import { detectLifecycleKind } from './lifecycleEvents';
 import { parseSizeString } from './sizeUtils';
 import { ParsingError } from './errorHandling';
 import { INCOMPLETE_STATUS_KEY } from './statusCodeUtils';
-import { ISO_TIMESTAMP_RE, stripLogPrefix } from './logMessageUtils';
+import { ISO_TIMESTAMP_RE, WEB_LEVEL_PREFIX_RE, stripLogPrefix } from './logMessageUtils';
 import { detectAnonymizedLog, stripAnonymizedMarker } from './anonymizeUtils';
 import { isLogcatFormat, parseLogcatContent } from './logcatParser';
 
@@ -50,10 +50,35 @@ const CLIENT_ERROR_SOURCE_RE = /\bsource:\s*([A-Za-z]\w*)/;
 // The SDK emits num_attempt=1 on the first send and increments on each retry.
 const NUM_ATTEMPT_RE = /\bnum_attempt=(\d+)/;
 
+// Element Web (matrix-js-sdk FetchHttpApi) request lines carry no request id:
+//   FetchHttpApi: --> GET <url>
+//   FetchHttpApi: <-- GET <url> [655ms 200]   or   [8ms TypeError: NetworkError …]
+const WEB_HTTP_RE = /FetchHttpApi: (?<dir>-->|<--) (?<method>[A-Z]+) (?<uri>\S+)(?: \[(?<ms>\d+)ms (?<outcome>.*)\])?/;
+
+/**
+ * Element Web requests log no id, so the parser numbers them 1, 2, 3… in send
+ * order (mergeLogParserResults renumbers them across files). SDK ids
+ * (`REQ-42`, `req-001`) are never bare digits.
+ *
+ * @example
+ * isWebRequestId('12');     // true
+ * isWebRequestId('REQ-12'); // false
+ */
+export function isWebRequestId(requestId: string): boolean {
+  return /^\d+$/.test(requestId);
+}
+
 // Pattern for extracting log level - matches common Rust log formats
 const LOG_LEVEL_RE = /\s(TRACE|DEBUG|INFO|WARN|ERROR)\s/;
 
+// Element Web writes a single-letter level; map it onto the shared level names.
+const WEB_LEVELS: Readonly<Record<string, LogLevel>> = { D: 'DEBUG', I: 'INFO', W: 'WARN', E: 'ERROR' };
+
 function extractLogLevel(line: string): LogLevel {
+  // Anchored web form first: a web line's payload can itself contain a Rust
+  // level word (crypto-wasm lines repeat it), but the letter is authoritative.
+  const web = line.match(WEB_LEVEL_PREFIX_RE);
+  if (web) return WEB_LEVELS[web[1]];
   const match = line.match(LOG_LEVEL_RE);
   return match ? (match[1] as LogLevel) : 'UNKNOWN';
 }
@@ -163,6 +188,9 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
   const rawLogLines: ParsedLogLine[] = [];
   const sentryEvents: SentryEvent[] = [];
   const lifecycleEvents: LifecycleEvent[] = [];
+  // Element Web sends still awaiting their response, keyed by "METHOD url", oldest first.
+  const openWebSends = new Map<string, HttpRequestRecord[]>();
+  let webRequestCount = 0;
   let linesWithTimestamps = 0;
   // Counts non-empty physical lines so the file-size gate below can fire even
   // when all physical lines are continuation lines folded into one UNKNOWN entry.
@@ -271,6 +299,41 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         lineNumber: i + 1,
         timestampUs,
       });
+    }
+
+    // Element Web request lines have no request id: pair each response with the
+    // oldest open send for the same method+url and mint a synthetic id.
+    if (line.includes('FetchHttpApi: ')) {
+      const webMatch = line.match(WEB_HTTP_RE);
+      if (webMatch?.groups) {
+        const { dir, method, uri, ms, outcome } = webMatch.groups;
+        const key = `${method} ${uri}`;
+        if (dir === '-->') {
+          const rec: HttpRequestRecord = {
+            requestId: String(++webRequestCount),
+            method,
+            uri,
+            sendLineNumber: i + 1,
+            attemptTimestampsUs: timestampUs ? [timestampUs] : [],
+          };
+          allRecordsList.push(rec);
+          const queue = openWebSends.get(key);
+          if (queue) queue.push(rec);
+          else openWebSends.set(key, [rec]);
+        } else if (outcome !== undefined) {
+          let rec = openWebSends.get(key)?.shift();
+          if (!rec) {
+            // Response with no send in this file (log starts mid-request).
+            rec = { requestId: String(++webRequestCount), method, uri };
+            allRecordsList.push(rec);
+          }
+          rec.responseLineNumber = i + 1;
+          rec.requestDurationMs = Number(ms);
+          if (/^\d{3}$/.test(outcome)) rec.status = outcome;
+          else rec.clientError = outcome;
+        }
+      }
+      continue;
     }
 
     // Early filter for performance - look for HTTP request patterns

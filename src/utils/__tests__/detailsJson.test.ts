@@ -25,7 +25,22 @@ describe('parseDetailsJson', () => {
       appId: 'io.element.app',
       version: '1.2.3',
       sdkSha: 'deadbeef',
+      cryptoVersion: null,
       reportUrl: 'https://github.com/element-hq/element-ios/issues/1234',
+    });
+  });
+
+  it('reads Element Web\'s top-level app name and crypto version', () => {
+    const details = parseDetailsJson(JSON.stringify({
+      app: 'element-web',
+      data: { Version: '1ee97aafa800-js-19b6c36aa554', crypto_version: 'Rust SDK 0.18.0 (e5f8295), Vodozemac 0.10.0' },
+    }));
+
+    expect(details).toMatchObject({
+      appId: 'element-web',
+      version: '1ee97aafa800-js-19b6c36aa554',
+      sdkSha: null,
+      cryptoVersion: 'Rust SDK 0.18.0 (e5f8295), Vodozemac 0.10.0',
     });
   });
 

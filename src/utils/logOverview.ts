@@ -1,4 +1,5 @@
 import type { ParsedLogLine } from '../types/log.types';
+import { WEB_LEVEL_PREFIX_RE } from './logMessageUtils';
 
 /**
  * Builds the data model behind the `/triaged` tree: log lines grouped by
@@ -15,6 +16,9 @@ import type { ParsedLogLine } from '../types/log.types';
 //   INFO [matrix-rust-sdk] Login successful ...
 const RUST_TARGET_RE = /(?:TRACE|DEBUG|INFO|WARN|ERROR)\s+([a-z_][\w:]*?):\s/;
 const BRACKET_TARGET_RE = /(?:TRACE|DEBUG|INFO|WARN|ERROR)\s+\[([^\]]+)\]/;
+// Element Web: single-letter level, then a logger prefix ending in ": ".
+//   2026-09-28T15:36:15.377Z I FetchHttpApi: --> GET …
+const WEB_TARGET_RE = new RegExp(`${WEB_LEVEL_PREFIX_RE.source}\\s*([A-Za-z_][\\w.]*):\\s`);
 
 const NO_TARGET = '(no target)';
 
@@ -28,6 +32,7 @@ const TARGET_SEPARATOR = '::';
  * @example
  * extractTarget('… ERROR matrix_sdk::http_client: boom');  // 'matrix_sdk::http_client'
  * extractTarget('… INFO [matrix-rust-sdk] hello');          // 'matrix-rust-sdk'
+ * extractTarget('2026-09-28T15:36:15.377Z I FetchHttpApi: --> GET …'); // 'FetchHttpApi'
  * extractTarget('… plain line, no target');                 // null
  */
 export function extractTarget(rawText: string): string | null {
@@ -41,6 +46,9 @@ export function extractTarget(rawText: string): string | null {
 
   const bracket = firstLine.match(BRACKET_TARGET_RE);
   if (bracket) return bracket[1];
+
+  const web = firstLine.match(WEB_TARGET_RE);
+  if (web) return web[2];
 
   return null;
 }

@@ -34,6 +34,25 @@ function file(name: string, lines: number, reqs: HttpRequest[], connIds: string[
 }
 
 describe('mergeLogParserResults', () => {
+  it('renumbers Element Web request ids in time order across files', () => {
+    // logs-0000 is the NEWEST page load but comes first, as the archive lists it.
+    const webFile = (name: string, baseUs: number): NamedLogParserResult => {
+      const rawLogLines = [1, 2, 3].map((n) => ({ ...line(n), timestampUs: (baseUs + n) as TimestampMicros }));
+      const reqs = [{ ...http(1, 2), requestId: '1' }, { ...http(3, 0), requestId: '2', uri: '/sync' }];
+      const sync: SyncRequest = { ...reqs[1], connId: '', timeout: undefined };
+      return { name, result: { requests: [sync], httpRequests: reqs, connectionIds: [], rawLogLines, sentryEvents: [] } };
+    };
+    const merged = mergeLogParserResults([webFile('logs-0000.log', 2_000), webFile('logs-0001.log', 1_000)]);
+    // Older file (logs-0001, lines 4-6 once rebased) gets 1-2, newer gets 3-4.
+    expect(merged.httpRequests.map((r) => [r.requestId, r.sendLineNumber])).toEqual([['1', 4], ['2', 6], ['3', 1], ['4', 3]]);
+    expect(merged.requests.map((r) => [r.requestId, r.sendLineNumber])).toEqual([['2', 6], ['4', 3]]);
+  });
+
+  it('keeps SDK request ids as logged', () => {
+    const merged = mergeLogParserResults([file('08.log', 3, [http(1, 2)], []), file('09.log', 3, [http(1, 2)], [])]);
+    expect(merged.httpRequests.map((r) => r.requestId)).toEqual(['r1', 'r1']);
+  });
+
   it('rebases line numbers and keeps request refs consistent', () => {
     const merged = mergeLogParserResults([
       file('08.log', 3, [http(1, 2)], ['room-list']),

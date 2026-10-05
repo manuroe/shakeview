@@ -23,6 +23,11 @@ export interface ListingDetails {
   readonly appId: string | null;
   readonly version: string | null;
   readonly sdkSha: string | null;
+  /**
+   * Element Web's crypto stack, e.g. "Rust SDK 0.18.0 (e5f8295), Vodozemac 0.10.0".
+   * Web has no `sdk_sha`; this is the only pointer to the Rust crypto code it ran.
+   */
+  readonly cryptoVersion: string | null;
   /** Link back to the report on the rageshake server, for citing a source in analysis notes. */
   readonly reportUrl: string | null;
 }

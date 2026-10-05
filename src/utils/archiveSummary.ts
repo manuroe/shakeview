@@ -49,9 +49,13 @@ export interface ArchiveSummary {
  * @example
  * isAnalyzableEntry('logs.2026-04-12-09.log.gz'); // true
  * isAnalyzableEntry('details.json');               // false
+ * isAnalyzableEntry('details.log.gz');             // false
  */
 export function isAnalyzableEntry(name: string): boolean {
   const lower = name.toLowerCase();
+  // details.log.gz is the rageshake server's plain-text copy of the report
+  // metadata, not a log: it has no timestamps and would parse as UNKNOWN lines.
+  if (lower === 'details.log.gz' || lower.endsWith('/details.log.gz')) return false;
   return lower.endsWith('.log.gz') || lower.endsWith('.log');
 }
 

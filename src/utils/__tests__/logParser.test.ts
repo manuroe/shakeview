@@ -1059,3 +1059,55 @@ describe('parseLogFile', () => {
       expect(result.sentryEvents).toHaveLength(0);
     });
   });
+
+describe('Element Web logs', () => {
+  // Shape of an Element Web rageshake: `<ISO> <D|I|W|E> <message>`, request lines
+  // from matrix-js-sdk's FetchHttpApi, crypto-wasm lines repeating the Rust level.
+  const SYNC = 'https://matrix.example.org/_matrix/client/v3/sync?timeout=30000';
+  const VERSIONS = 'https://matrix.example.org/_matrix/client/versions';
+  const WEB_LOG = [
+    `2026-09-28T15:36:15.417Z I FetchHttpApi: --> GET ${SYNC}`,
+    `2026-09-28T15:36:15.500Z I FetchHttpApi: --> GET ${VERSIONS}`,
+    `2026-09-28T15:36:15.508Z I FetchHttpApi: <-- GET ${VERSIONS} [8ms TypeError: NetworkError when attempting to fetch resource.]`,
+    `2026-09-28T15:36:16.296Z I FetchHttpApi: <-- GET ${SYNC} [879ms 200]`,
+    `2026-09-28T15:36:16.300Z I FetchHttpApi: --> GET ${SYNC}`,
+    '2026-09-28T15:36:16.400Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
+    '2026-09-28T15:36:16.500Z E sync /sync error fetch failed',
+    '2026-09-28T15:36:16.600Z D DEBUG matrix_sdk_crypto::olm: debug line',
+  ].join('\n');
+
+  it('maps single-letter levels and drops the repeated Rust level from the message', () => {
+    const lines = parseAllHttpRequests(WEB_LOG).rawLogLines;
+    expect(lines.map((l) => l.level)).toEqual(['INFO', 'INFO', 'INFO', 'INFO', 'INFO', 'WARN', 'ERROR', 'DEBUG']);
+    expect(lines[5].strippedMessage).toBe('matrix_sdk_crypto::machine: Failed to decrypt a room event');
+    expect(lines[6].strippedMessage).toBe('sync /sync error fetch failed');
+  });
+
+  it('pairs FetchHttpApi requests by method+url, oldest open send first', () => {
+    const reqs = parseAllHttpRequests(WEB_LOG).httpRequests;
+    expect(reqs).toHaveLength(3);
+    expect(reqs[0]).toMatchObject({ method: 'GET', uri: SYNC, status: '200', requestDurationMs: 879, sendLineNumber: 1, responseLineNumber: 4 });
+    expect(reqs[1]).toMatchObject({
+      uri: VERSIONS,
+      status: '',
+      clientError: 'TypeError: NetworkError when attempting to fetch resource.',
+      requestDurationMs: 8,
+      sendLineNumber: 2,
+      responseLineNumber: 3,
+    });
+    // The second sync send never got its response: incomplete, like an unanswered SDK send.
+    expect(reqs[2]).toMatchObject({ uri: SYNC, status: '', sendLineNumber: 5, responseLineNumber: 0 });
+    // No id in web lines: requests are numbered in send order.
+    expect(reqs.map((r) => r.requestId)).toEqual(['1', '2', '3']);
+  });
+
+  it('keeps a response whose send predates the log', () => {
+    const reqs = parseAllHttpRequests(`2026-09-28T15:36:16.296Z I FetchHttpApi: <-- GET ${SYNC} [879ms 404]`).httpRequests;
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0]).toMatchObject({ status: '404', sendLineNumber: 0, responseLineNumber: 1 });
+  });
+
+  it('lists web /sync requests as sync requests', () => {
+    expect(parseLogFile(WEB_LOG).requests.map((r) => r.timeout)).toEqual([30000, 30000]);
+  });
+});

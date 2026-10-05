@@ -150,6 +150,30 @@ describe('rageshake CLI', () => {
     expect(summary.removedFiles).toBeUndefined();
   });
 
+  it('summary and http understand an Element Web archive', () => {
+    const webLog = [
+      '# [shakeview-anonymized]',
+      '2026-09-28T15:36:15.417Z I FetchHttpApi: --> GET https://matrix/_matrix/client/v3/rooms/x',
+      '2026-09-28T15:36:15.549Z I FetchHttpApi: <-- GET https://matrix/_matrix/client/v3/rooms/x [132ms 404]',
+      '2026-09-28T15:36:16.400Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
+      '2026-09-28T15:36:16.500Z E sync /sync error fetch failed',
+    ].join('\n');
+    const archive = gzipSync(buildTar([
+      { name: 'details.json', data: strToU8(JSON.stringify({ app: 'element-web', data: { crypto_version: 'Rust SDK 0.18.0 (e5f8295)' } })) },
+      // Server-side metadata dump, no timestamps: must not be parsed as a log.
+      { name: 'details.log.gz', data: gzipSync(strToU8('Application: element-web\nVersion: 1.0\n')) },
+      { name: 'logs-0000.log.gz', data: gzipSync(strToU8(webLog)) },
+    ]));
+    const ing = ingest(archive, 'web.tar.gz');
+    const summary = JSON.parse(cmdSummary(ing));
+    expect(summary.details.app).toBe('element-web');
+    expect(summary.details.cryptoVersion).toBe('Rust SDK 0.18.0 (e5f8295)');
+    expect(summary.files.map((f: { name: string }) => f.name)).toEqual(['logs-0000.log.gz']);
+    expect(summary.timeSpan.start).not.toBe('');
+    expect(summary.totals).toMatchObject({ errors: 1, warnings: 1, httpRequests: 1 });
+    expect(cmdHttp(ing, { errors: true })).toContain('→ 404 132ms');
+  });
+
   it('summary names the members the anonymizer dropped', () => {
     const archive = gzipSync(buildTar([
       { name: '2026-01-15_100000-ABCD/details.json', data: strToU8(DETAILS) },

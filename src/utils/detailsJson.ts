@@ -21,9 +21,11 @@ export function parseDetailsJson(text: string): ListingDetails | null {
       userId: getString(data['user_id']),
       deviceId: getString(data['device_id']),
       deviceKeys: getString(data['device_keys']),
-      appId: getString(data['base_bundle_identifier']) ?? getString(data['app_id']),
+      // Element Web reports its app name top-level (`"app": "element-web"`), not in data.
+      appId: getString(data['base_bundle_identifier']) ?? getString(data['app_id']) ?? getString(json['app']),
       version: getString(data['Version']),
       sdkSha: getString(data['sdk_sha']),
+      cryptoVersion: getString(data['crypto_version']),
       reportUrl: getString(json['report_url']),
     };
   } catch {

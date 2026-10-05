@@ -6,6 +6,7 @@ import type {
   SentryEvent,
   LifecycleEvent,
 } from '../types/log.types';
+import { isWebRequestId } from './logParser';
 
 /** A parsed log file paired with the source-file name it came from. */
 export interface NamedLogParserResult {
@@ -136,9 +137,23 @@ export function mergeLogParserResults(files: readonly NamedLogParserResult[]): L
   // Lifecycle events carry their own timestamp, so sort on it directly.
   lifecycleEvents.sort((a, b) => a.timestampUs - b.timestampUs);
 
+  // Element Web ids are per-file counters: renumber them in merged time order so
+  // they stay unique and still read as the request sequence across page loads.
+  // Keyed by the rebased line number, unique per request and shared by the
+  // /sync copy in `requests`.
+  const lineKey = (r: HttpRequest) => r.sendLineNumber || r.responseLineNumber;
+  const webIds = new Map<number, string>();
+  for (const r of httpRequests) {
+    if (isWebRequestId(r.requestId)) webIds.set(lineKey(r), String(webIds.size + 1));
+  }
+  const renumber = <T extends HttpRequest>(r: T): T => {
+    const id = isWebRequestId(r.requestId) ? webIds.get(lineKey(r)) : undefined;
+    return id ? { ...r, requestId: id } : r;
+  };
+
   return {
-    requests,
-    httpRequests,
+    requests: requests.map(renumber),
+    httpRequests: httpRequests.map(renumber),
     connectionIds: [...connectionIds],
     rawLogLines,
     sentryEvents,
