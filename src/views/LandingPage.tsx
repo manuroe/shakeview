@@ -57,17 +57,17 @@ export function LandingPage() {
     ? `https://github.com/manuroe/shakeview/pull/${prNumber}`
     : 'https://github.com/manuroe/shakeview';
 
-  const handleLoadDemo = async () => {
+  const handleLoadDemo = async (fileName: 'demo.log' | 'demo-web.log') => {
     setDemoError(null);
     setDemoLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.BASE_URL}demo/demo.log`);
+      const response = await fetch(`${import.meta.env.BASE_URL}demo/${fileName}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       const content = await response.text();
       const result = parseLogFile(content);
-      loadMergedLogParserResults([{ name: 'demo.log', result }]);
+      loadMergedLogParserResults([{ name: fileName, result }]);
       void navigate('/summary');
     } catch (error) {
       setDemoError(wrapError(error, 'Failed to load demo. Please try again.'));
@@ -85,8 +85,13 @@ export function LandingPage() {
         className={uploadStyles.dropZoneError}
       />
       <div className={uploadStyles.dropZoneFooter}>
-        <button type="button" onClick={() => { void handleLoadDemo(); }} disabled={demoLoading}>
-          Try with demo logs
+        Try with demo logs:{' '}
+        <button type="button" onClick={() => { void handleLoadDemo('demo.log'); }} disabled={demoLoading} aria-label="Try with mobile demo logs">
+          Mobile
+        </button>
+        {' · '}
+        <button type="button" onClick={() => { void handleLoadDemo('demo-web.log'); }} disabled={demoLoading} aria-label="Try with web demo logs">
+          Web
         </button>
         {' · '}
         <a href={githubUrl} target="_blank" rel="noopener noreferrer">

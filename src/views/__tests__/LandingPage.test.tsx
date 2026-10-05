@@ -40,13 +40,14 @@ describe('LandingPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the FileUpload component and the Try Demo link', () => {
+  it('renders the FileUpload component and the mobile and web demo buttons', () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(new Response(''));
 
     renderLandingPage();
 
     expect(screen.getByTestId('file-upload')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /try with demo logs/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try with mobile demo logs/i })).toHaveTextContent('Mobile');
+    expect(screen.getByRole('button', { name: /try with web demo logs/i })).toHaveTextContent('Web');
   });
 
   it('renders the GitHub link', () => {
@@ -62,11 +63,24 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with mobile demo logs/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId('summary-view')).toBeInTheDocument();
     });
+  });
+
+  it('loads the web demo log from its own file', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(DEMO_LOG_TEXT));
+
+    renderLandingPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /try with web demo logs/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('summary-view')).toBeInTheDocument();
+    });
+    expect(String(fetchSpy.mock.calls[0][0])).toMatch(/demo\/demo-web\.log$/);
   });
 
   it('shows an error message when the fetch fails', async () => {
@@ -74,14 +88,14 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with mobile demo logs/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/failed to load demo/i)).toBeInTheDocument();
     });
 
     // Button should be re-enabled after error
-    expect(screen.getByRole('button', { name: /try with demo logs/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /try with mobile demo logs/i })).not.toBeDisabled();
   });
 
   it('shows an error message when the server returns a non-ok response', async () => {
@@ -89,7 +103,7 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with mobile demo logs/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/failed to load demo/i)).toBeInTheDocument();
@@ -101,7 +115,7 @@ describe('LandingPage', () => {
 
     renderLandingPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /try with demo logs/i }));
+    fireEvent.click(screen.getByRole('button', { name: /try with mobile demo logs/i }));
 
     // Wait for error to appear
     await waitFor(() => {
