@@ -6,6 +6,7 @@ import { createParsedLogLine } from '../../test/fixtures';
 const RUST = '2026-01-15T10:02:02.120000Z ERROR matrix_sdk::http_client::native: boom | crates/matrix-sdk/src/http_client/native.rs:214 | spans: root';
 const BRACKET = '2026-01-15T10:00:01.010000Z  INFO [matrix-rust-sdk] Login successful | ClientProxy.swift:1092 | auth';
 const NO_TARGET_LINE = '2026-01-15T10:00:00.000000Z hello world with no level';
+const WEB = '2026-09-28T15:36:15.417Z I FetchHttpApi: --> GET https://matrix.example.org/_matrix/client/versions';
 
 describe('extractTarget', () => {
   it('extracts a Rust module path', () => {
@@ -14,6 +15,14 @@ describe('extractTarget', () => {
 
   it('extracts a bracket tag', () => {
     expect(extractTarget(BRACKET)).toBe('matrix-rust-sdk');
+  });
+
+  it('extracts an Element Web logger prefix', () => {
+    expect(extractTarget(WEB)).toBe('FetchHttpApi');
+  });
+
+  it('prefers the Rust module path on Element Web crypto-wasm lines', () => {
+    expect(extractTarget('2026-09-28T15:36:16.400Z W WARN matrix_sdk_crypto::machine: boom')).toBe('matrix_sdk_crypto::machine');
   });
 
   it('returns null when neither form is present', () => {

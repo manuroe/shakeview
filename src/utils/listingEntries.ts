@@ -35,7 +35,10 @@ export function extractDateKey(name: string): string | null {
 export function extractCategory(name: string): string {
   const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name;
   const match = basename.match(/^([^.]+)/);
-  return match ? match[1] : basename;
+  const category = match ? match[1] : basename;
+  // Element Web numbers one file per page load (logs-0000, logs-0001, …): all of
+  // them are the app stream, so they share one process and its app-state lane.
+  return /^logs-\d+$/.test(category) ? 'logs' : category;
 }
 
 /**
@@ -67,8 +70,14 @@ export function sortEntries<T extends { readonly name: string }>(entries: readon
 export function getEntryKind(name: string): EntryKind {
   const lower = name.toLowerCase();
   const isLog = lower.endsWith('.log.gz') || lower.endsWith('.log');
-  if (!isLog) return 'other';
-  return extractDateKey(name) !== null ? 'dated-log' : 'plain-log';
+  // details.log.gz is the rageshake server's plain-text copy of the report
+  // metadata, not a log: it has no timestamps and would parse as UNKNOWN lines.
+  const isMetadata = lower === 'details.log.gz' || lower.endsWith('/details.log.gz');
+  if (!isLog || isMetadata) return 'other';
+  // Element Web numbers its logs (logs-0000.log.gz) instead of dating them,
+  // but they are app logs like the dated ones and open on the summary.
+  const isWebLog = /(^|\/)logs-\d+\.log/.test(lower);
+  return extractDateKey(name) !== null || isWebLog ? 'dated-log' : 'plain-log';
 }
 
 /**

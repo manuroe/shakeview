@@ -1,0 +1,225 @@
+2026-01-15T10:00:00.000Z D Initialised rageshake.
+2026-01-15T10:00:00.000Z D Using Web platform
+2026-01-15T10:00:00.001Z I App version: 1.12.3
+2026-01-15T10:00:00.030Z D Configuring rageshake persistence...
+2026-01-15T10:00:00.070Z D rageshake: removing logs: instance-4fQ2xVb7KpL9sT1a
+2026-01-15T10:00:00.090Z D set language to en
+2026-01-15T10:00:00.110Z D Application is running in production mode
+2026-01-15T10:00:00.112Z D Vector starting at https://app.example.org/
+2026-01-15T10:00:00.113Z I startUpdater, current version is 1.12.3
+2026-01-15T10:00:00.114Z D Verifying homeserver configuration
+2026-01-15T10:00:00.120Z D FetchHttpApi: --> GET https://example.org/.well-known/matrix/client
+2026-01-15T10:00:00.205Z D FetchHttpApi: <-- GET https://example.org/.well-known/matrix/client [85ms 200]
+2026-01-15T10:00:00.210Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/versions
+2026-01-15T10:00:00.274Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/versions [64ms 200]
+2026-01-15T10:00:00.300Z D Using homeserver config: {"hsUrl":"https://matrix-client.example.org","hsName":"example.org","hsNameIsDifferent":true,"isUrl":"https://vector.im","isDefault":true,"warning":null}
+2026-01-15T10:00:00.310Z D StorageManager: Checking storage consistency
+2026-01-15T10:00:00.311Z D StorageManager: Local storage supported? true
+2026-01-15T10:00:00.312Z D StorageManager: IndexedDB supported? true
+2026-01-15T10:00:00.313Z D StorageManager: Crypto initialised? true
+2026-01-15T10:00:00.314Z D StorageManager: Storage consistency checks passed
+2026-01-15T10:00:00.330Z D Lifecycle: Starting MatrixClient
+2026-01-15T10:00:00.340Z D IndexedDBStore.startup: connecting to backend
+2026-01-15T10:00:00.345Z D MatrixClientPeg: waiting for MatrixClient store to initialise
+2026-01-15T10:00:01.200Z D IndexedDBStore.startup: loading presence events
+2026-01-15T10:00:01.300Z D MatrixClientPeg: really starting MatrixClient
+2026-01-15T10:00:01.360Z D MatrixClientPeg: MatrixClient started
+2026-01-15T10:00:01.400Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/pushrules/
+2026-01-15T10:00:01.410Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/capabilities
+2026-01-15T10:00:01.420Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/user/%40alice%3Aexample.org/filter
+2026-01-15T10:00:01.508Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/capabilities [98ms 200]
+2026-01-15T10:00:01.520Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/pushrules/ [120ms 200]
+2026-01-15T10:00:01.560Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/user/%40alice%3Aexample.org/filter [140ms 200]
+2026-01-15T10:00:01.600Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/upload
+2026-01-15T10:00:01.620Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
+2026-01-15T10:00:01.700Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx
+2026-01-15T10:00:01.810Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/upload [210ms 200]
+2026-01-15T10:00:05.000Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx [3300ms 200]
+2026-01-15T10:00:05.010Z D MatrixClient sync state => PREPARED
+2026-01-15T10:00:05.020Z D MatrixClient sync state => SYNCING
+2026-01-15T10:00:05.130Z D Presence: online
+2026-01-15T10:00:05.130Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:00:05.820Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/query [4200ms 200]
+2026-01-15T10:00:06.200Z D Switching to room id !room1:example.org at event undefined
+2026-01-15T10:00:06.250Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx
+2026-01-15T10:00:06.300Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/members?not_membership=xxx&at=xxx
+2026-01-15T10:00:06.590Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx [340ms 200]
+2026-01-15T10:00:06.710Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/members?not_membership=xxx&at=xxx [410ms 200]
+2026-01-15T10:00:06.800Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
+    at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+2026-01-15T10:00:06.810Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ab12Cd34?version=xxx
+2026-01-15T10:00:06.850Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
+    at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+2026-01-15T10:00:06.860Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ef56Gh78?version=xxx
+2026-01-15T10:00:06.900Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
+    at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+2026-01-15T10:00:06.910Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ij90Kl12?version=xxx
+2026-01-15T10:00:06.950Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ab12Cd34?version=xxx [140ms 404]
+2026-01-15T10:00:07.000Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ef56Gh78?version=xxx [140ms 404]
+2026-01-15T10:00:07.050Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ij90Kl12?version=xxx [140ms 404]
+2026-01-15T10:00:07.400Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
+2026-01-15T10:00:08.100Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/read_markers
+2026-01-15T10:00:08.175Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/read_markers [75ms 200]
+2026-01-15T10:00:09.000Z W Falling back to unread room because of no read receipt or counting message found {"roomId":"!room2:example.org","earliestUnimportantEventId":"$evOld1"}
+2026-01-15T10:00:09.100Z W Falling back to unread room because of no read receipt or counting message found {"roomId":"!room2:example.org","earliestUnimportantEventId":"$evOld1"}
+2026-01-15T10:00:10.300Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/query [2900ms 200]
+2026-01-15T10:00:14.000Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/send/m.room.message/m1768471000001.0
+2026-01-15T10:00:14.400Z D FetchHttpApi: <-- PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/send/m.room.message/m1768471000001.0 [400ms 200]
+2026-01-15T10:00:14.402Z D Event sent to !room1:example.org with event id $msg1Xq7aLw2Ns9Pc
+2026-01-15T10:00:14.450Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/receipt/m.read/%24msg1Xq7aLw2Ns9Pc
+2026-01-15T10:00:14.540Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/receipt/m.read/%24msg1Xq7aLw2Ns9Pc [90ms 200]
+2026-01-15T10:00:18.500Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org
+2026-01-15T10:00:18.530Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org [30ms 429]
+2026-01-15T10:00:19.600Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org
+2026-01-15T10:00:19.655Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org [55ms 200]
+2026-01-15T10:00:22.000Z D Switching to room id !room2:example.org at event undefined
+2026-01-15T10:00:22.050Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx
+2026-01-15T10:00:22.340Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx [290ms 200]
+2026-01-15T10:00:22.400Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/event/%24evGone404
+2026-01-15T10:00:22.460Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/event/%24evGone404 [60ms 404]
+2026-01-15T10:00:22.470Z E Failed to load parent event of unhandled relation MatrixError: [404] Event not found. (https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/event/%24evGone404)
+2026-01-15T10:00:25.000Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/media/v3/upload?filename=xxx
+2026-01-15T10:00:26.800Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/media/v3/upload?filename=xxx [1800ms 500]
+2026-01-15T10:00:26.810Z E Error uploading file: MatrixError: [500] Internal server error (https://matrix-client.example.org/_matrix/media/v3/upload?filename=xxx)
+2026-01-15T10:00:31.000Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/media/v3/upload?filename=xxx
+2026-01-15T10:00:33.100Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/media/v3/upload?filename=xxx [2100ms 200]
+2026-01-15T10:00:33.300Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/send/m.room.message/m1768471000002.0
+2026-01-15T10:00:33.720Z D FetchHttpApi: <-- PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/send/m.room.message/m1768471000002.0 [420ms 200]
+2026-01-15T10:00:33.722Z D Event sent to !room2:example.org with event id $msg2Xq7aLw2Ns9Pc
+2026-01-15T10:00:33.770Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/receipt/m.read/%24msg2Xq7aLw2Ns9Pc
+2026-01-15T10:00:33.860Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/receipt/m.read/%24msg2Xq7aLw2Ns9Pc [90ms 200]
+2026-01-15T10:00:35.130Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:00:35.135Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:00:38.000Z D Switching to room id !room3:example.org at event undefined
+2026-01-15T10:00:38.050Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx
+2026-01-15T10:00:38.100Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/unstable/im.nheko.summary/summary/!room3%3Aexample.org
+2026-01-15T10:00:38.145Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/unstable/im.nheko.summary/summary/!room3%3Aexample.org [45ms 400]
+2026-01-15T10:00:38.570Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx [520ms 200]
+2026-01-15T10:00:44.000Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/invite
+2026-01-15T10:00:44.120Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/invite [120ms 403]
+2026-01-15T10:00:44.130Z E MatrixError: [403] You don't have permission to invite users (https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/invite)
+2026-01-15T10:00:47.200Z E Index or size is negative or greater than the allowed amount (IndexSizeError | 1)
+onSelectionChange@https://app.example.org/bundles/1a2b3c/init.js:4410:21
+2026-01-15T10:00:52.000Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
+    at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+2026-01-15T10:00:52.010Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room3%3Aexample.org/Mn34Op56?version=xxx
+2026-01-15T10:00:52.150Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room3%3Aexample.org/Mn34Op56?version=xxx [140ms 404]
+2026-01-15T10:00:55.000Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/send/m.room.message/m1768471000003.0
+2026-01-15T10:00:55.440Z D FetchHttpApi: <-- PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/send/m.room.message/m1768471000003.0 [440ms 200]
+2026-01-15T10:00:55.442Z D Event sent to !room3:example.org with event id $msg3Xq7aLw2Ns9Pc
+2026-01-15T10:00:55.490Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/receipt/m.read/%24msg3Xq7aLw2Ns9Pc
+2026-01-15T10:00:55.580Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/receipt/m.read/%24msg3Xq7aLw2Ns9Pc [90ms 200]
+2026-01-15T10:00:58.000Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
+2026-01-15T10:00:59.100Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/query [1100ms 200]
+2026-01-15T10:01:05.135Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:01:05.140Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:01:07.540Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [2400ms 200]
+2026-01-15T10:01:07.545Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:01:15.345Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [7800ms 200]
+2026-01-15T10:01:15.350Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:01:45.350Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:01:45.355Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:02:15.355Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:02:15.360Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:02:15.670Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [310ms 200]
+2026-01-15T10:02:15.675Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:02:16.315Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [640ms 200]
+2026-01-15T10:02:16.320Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:02:46.320Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:02:46.325Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:03:16.325Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:03:16.330Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:03:16.970Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [640ms 200]
+2026-01-15T10:03:16.975Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:03:46.975Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:03:46.980Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:03:47.620Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [640ms 200]
+2026-01-15T10:03:47.625Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:03:58.000Z D Presence: unavailable
+2026-01-15T10:04:10.000Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
+2026-01-15T10:04:10.800Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/query [800ms 200]
+2026-01-15T10:04:17.625Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:04:17.630Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:04:47.630Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:04:47.635Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:05:39.635Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [52000ms TypeError: NetworkError when attempting to fetch resource.]
+2026-01-15T10:05:39.638Z E sync /sync error %s fetch failed: NetworkError when attempting to fetch resource. (matrix-client.example.org)
+ConnectionError@https://app.example.org/bundles/1a2b3c/init.js:1876:5
+requestOtherUrl@https://app.example.org/bundles/1a2b3c/init.js:2210:13
+2026-01-15T10:05:39.640Z D sync Number of consecutive failed sync requests: 1
+2026-01-15T10:05:39.641Z D sync Starting keep-alive
+2026-01-15T10:05:39.645Z D MatrixClient sync state => RECONNECTING
+2026-01-15T10:05:39.655Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/versions
+2026-01-15T10:05:39.663Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/versions [8ms TypeError: NetworkError when attempting to fetch resource.]
+2026-01-15T10:05:41.635Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/versions
+2026-01-15T10:05:41.643Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/versions [8ms TypeError: NetworkError when attempting to fetch resource.]
+2026-01-15T10:05:45.635Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/versions
+2026-01-15T10:05:45.643Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/versions [8ms TypeError: NetworkError when attempting to fetch resource.]
+2026-01-15T10:05:49.135Z D sync Browser thinks we are back online
+2026-01-15T10:05:49.145Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/versions
+2026-01-15T10:05:49.215Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/versions [70ms 200]
+2026-01-15T10:05:49.225Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:05:50.675Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [1450ms 200]
+2026-01-15T10:05:50.685Z D MatrixClient sync state => SYNCING
+2026-01-15T10:05:50.695Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:05:52.175Z D Presence: online
+2026-01-15T10:05:54.675Z D Switching to room id !room1:example.org at event undefined
+2026-01-15T10:05:59.675Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/send/m.room.message/m1768471000004.0
+2026-01-15T10:06:00.135Z D FetchHttpApi: <-- PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/send/m.room.message/m1768471000004.0 [460ms 200]
+2026-01-15T10:06:00.137Z D Event sent to !room1:example.org with event id $msg4Xq7aLw2Ns9Pc
+2026-01-15T10:06:00.185Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/receipt/m.read/%24msg4Xq7aLw2Ns9Pc
+2026-01-15T10:06:00.275Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/receipt/m.read/%24msg4Xq7aLw2Ns9Pc [90ms 200]
+2026-01-15T10:06:08.675Z D element-web closing
+2026-01-15T10:06:11.175Z D Initialised rageshake.
+2026-01-15T10:06:11.175Z D Using Web platform
+2026-01-15T10:06:11.176Z I App version: 1.12.3
+2026-01-15T10:06:11.205Z D Configuring rageshake persistence...
+2026-01-15T10:06:11.265Z D set language to en
+2026-01-15T10:06:11.285Z D Application is running in production mode
+2026-01-15T10:06:11.287Z D Vector starting at https://app.example.org/
+2026-01-15T10:06:11.288Z I startUpdater, current version is 1.12.3
+2026-01-15T10:06:11.289Z D Verifying homeserver configuration
+2026-01-15T10:06:11.295Z D FetchHttpApi: --> GET https://example.org/.well-known/matrix/client
+2026-01-15T10:06:11.380Z D FetchHttpApi: <-- GET https://example.org/.well-known/matrix/client [85ms 200]
+2026-01-15T10:06:11.385Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/versions
+2026-01-15T10:06:11.449Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/versions [64ms 200]
+2026-01-15T10:06:11.475Z D Using homeserver config: {"hsUrl":"https://matrix-client.example.org","hsName":"example.org","hsNameIsDifferent":true,"isUrl":"https://vector.im","isDefault":true,"warning":null}
+2026-01-15T10:06:11.485Z D StorageManager: Checking storage consistency
+2026-01-15T10:06:11.486Z D StorageManager: Local storage supported? true
+2026-01-15T10:06:11.487Z D StorageManager: IndexedDB supported? true
+2026-01-15T10:06:11.488Z D StorageManager: Crypto initialised? true
+2026-01-15T10:06:11.489Z D StorageManager: Storage consistency checks passed
+2026-01-15T10:06:11.505Z D Lifecycle: Starting MatrixClient
+2026-01-15T10:06:11.515Z D IndexedDBStore.startup: connecting to backend
+2026-01-15T10:06:11.520Z D MatrixClientPeg: waiting for MatrixClient store to initialise
+2026-01-15T10:06:12.375Z D IndexedDBStore.startup: loading presence events
+2026-01-15T10:06:12.475Z D MatrixClientPeg: really starting MatrixClient
+2026-01-15T10:06:12.535Z D MatrixClientPeg: MatrixClient started
+2026-01-15T10:06:12.575Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/pushrules/
+2026-01-15T10:06:12.585Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/capabilities
+2026-01-15T10:06:12.595Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/user/%40alice%3Aexample.org/filter
+2026-01-15T10:06:12.683Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/capabilities [98ms 200]
+2026-01-15T10:06:12.695Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/pushrules/ [120ms 200]
+2026-01-15T10:06:12.735Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/user/%40alice%3Aexample.org/filter [140ms 200]
+2026-01-15T10:06:12.775Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/upload
+2026-01-15T10:06:12.795Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
+2026-01-15T10:06:12.875Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx
+2026-01-15T10:06:12.985Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/upload [210ms 200]
+2026-01-15T10:06:14.095Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/query [1300ms 200]
+2026-01-15T10:06:14.775Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx [1900ms 200]
+2026-01-15T10:06:14.785Z D MatrixClient sync state => PREPARED
+2026-01-15T10:06:14.795Z D MatrixClient sync state => SYNCING
+2026-01-15T10:06:14.905Z D Presence: online
+2026-01-15T10:06:14.905Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:06:15.805Z D Switching to room id !room1:example.org at event undefined
+2026-01-15T10:06:15.855Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx
+2026-01-15T10:06:16.115Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx [260ms 200]
+2026-01-15T10:06:17.305Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [2400ms 200]
+2026-01-15T10:06:17.310Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:06:19.710Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [2400ms 200]
+2026-01-15T10:06:19.715Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:06:44.805Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
+2026-01-15T10:06:49.715Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:06:49.720Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
+2026-01-15T10:07:19.720Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
+2026-01-15T10:07:19.725Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx

@@ -42,9 +42,10 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 
 vi.mock('../../views/LogDisplayView', () => ({
-  LogDisplayView: vi.fn(({ onClose, onExpand, requestFilter, lineRange }) => (
+  LogDisplayView: vi.fn(({ onClose, onExpand, requestFilter, lineRange, logLines }) => (
     <div data-testid="log-display-view">
       <span data-testid="log-display-request-filter">{requestFilter ?? ''}</span>
+      <span data-testid="log-display-lines">{(logLines as { lineNumber: number }[] | undefined)?.map((l) => l.lineNumber).join(',')}</span>
       <span data-testid="log-display-line-range">{lineRange ? 'line-range-set' : 'line-range-unset'}</span>
       <button onClick={onClose}>Close</button>
       <button onClick={onExpand}>Expand</button>
@@ -508,6 +509,30 @@ describe('RequestTable', () => {
       expect(navigatedUrl).toContain('filter=%22REQ-LOG%22');
       expect(navigatedUrl).not.toContain('start_line');
       expect(navigatedUrl).not.toContain('end_line');
+    });
+
+    it('shows only the send and response lines of an Element Web request', async () => {
+      const req = createHttpRequest({ requestId: '1', sendLineNumber: 10, responseLineNumber: 20 });
+      const rawLines = Array.from({ length: 25 }, (_, i) =>
+        createParsedLogLine({ lineNumber: i, timestampUs: 1700000000000000 + i * 1000000 })
+      );
+      useLogStore.getState().setHttpRequests([req], rawLines);
+
+      renderWithRouter(<RequestTable {...createProps({ filteredRequests: [req], totalCount: 1 })} />);
+      act(() => {
+        useLogStore.setState({
+          openLogViewerIds: new Set<number>([10]),
+          expandedRows: new Set<number>([10]),
+        });
+      });
+
+      expect(await screen.findByTestId('log-display-lines')).toHaveTextContent(/^10,20$/);
+      expect(screen.getByTestId('log-display-request-filter')).toBeEmptyDOMElement();
+
+      fireEvent.click(screen.getByText('Expand'));
+      const navigatedUrl: string = mockNavigate.mock.calls[0][0] as string;
+      expect(navigatedUrl).toContain('line=10-20');
+      expect(navigatedUrl).not.toContain('filter=');
     });
   });
 

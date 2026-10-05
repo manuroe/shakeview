@@ -343,6 +343,28 @@ describe('BurgerMenu', () => {
     });
   });
 
+  describe('By span', () => {
+    const openMenu = (rawText: string) => {
+      useLogStore.setState({ rawLogLines: [createParsedLogLine({ lineNumber: 1, rawText })] });
+      render(
+        <MemoryRouter>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    };
+
+    it('is listed when the logs carry spans', () => {
+      openMenu('2026-01-01T00:00:00.000000Z INFO msg | spans: sync');
+      expect(screen.getByText('By span')).toBeInTheDocument();
+    });
+
+    it('is hidden when the logs carry no spans (Element Web)', () => {
+      openMenu('2026-01-01T00:00:00.000Z I FetchHttpApi: --> GET https://x');
+      expect(screen.queryByText('By span')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Keyboard Shortcuts Button', () => {
     it('calls toggleHelp and closes menu when Keyboard Shortcuts is clicked', () => {
       const toggleHelp = vi.fn();

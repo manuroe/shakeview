@@ -682,6 +682,7 @@ export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
       app: details.appId,
       version: details.version,
       sdkSha: details.sdkSha,
+      cryptoVersion: details.cryptoVersion,
       reportUrl: details.reportUrl,
     },
     files: shownFiles,

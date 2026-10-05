@@ -18,6 +18,11 @@ describe('isAnalyzableEntry', () => {
     expect(isAnalyzableEntry('details.json')).toBe(false);
   });
 
+  it('rejects the rageshake server\'s details.log.gz', () => {
+    expect(isAnalyzableEntry('details.log.gz')).toBe(false);
+    expect(isAnalyzableEntry('2026-04-14_ID/details.log.gz')).toBe(false);
+  });
+
   it('rejects files with no extension', () => {
     expect(isAnalyzableEntry('README')).toBe(false);
   });

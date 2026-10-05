@@ -2,6 +2,7 @@
  * Unit tests for logParser.ts
  * Tests parsing correctness, edge cases, and error handling.
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { parseAllHttpRequests, parseLogFile } from '../logParser';
 import { ParsingError } from '../errorHandling';
@@ -1059,3 +1060,91 @@ describe('parseLogFile', () => {
       expect(result.sentryEvents).toHaveLength(0);
     });
   });
+
+describe('Element Web logs', () => {
+  // Shape of an Element Web rageshake: `<ISO> <D|I|W|E> <message>`, request lines
+  // from matrix-js-sdk's FetchHttpApi, crypto-wasm lines repeating the Rust level.
+  const SYNC = 'https://matrix.example.org/_matrix/client/v3/sync?timeout=30000';
+  const VERSIONS = 'https://matrix.example.org/_matrix/client/versions';
+  const WEB_LOG = [
+    `2026-09-28T15:36:15.417Z I FetchHttpApi: --> GET ${SYNC}`,
+    `2026-09-28T15:36:15.500Z I FetchHttpApi: --> GET ${VERSIONS}`,
+    `2026-09-28T15:36:15.508Z I FetchHttpApi: <-- GET ${VERSIONS} [8ms TypeError: NetworkError when attempting to fetch resource.]`,
+    `2026-09-28T15:36:16.296Z I FetchHttpApi: <-- GET ${SYNC} [879ms 200]`,
+    `2026-09-28T15:36:16.300Z I FetchHttpApi: --> GET ${SYNC}`,
+    '2026-09-28T15:36:16.400Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
+    '2026-09-28T15:36:16.500Z E sync /sync error fetch failed',
+    '2026-09-28T15:36:16.600Z D DEBUG matrix_sdk_crypto::olm: debug line',
+  ].join('\n');
+
+  it('maps single-letter levels and drops the repeated Rust level from the message', () => {
+    const lines = parseAllHttpRequests(WEB_LOG).rawLogLines;
+    expect(lines.map((l) => l.level)).toEqual(['INFO', 'INFO', 'INFO', 'INFO', 'INFO', 'WARN', 'ERROR', 'DEBUG']);
+    expect(lines[5].strippedMessage).toBe('matrix_sdk_crypto::machine: Failed to decrypt a room event');
+    expect(lines[6].strippedMessage).toBe('sync /sync error fetch failed');
+  });
+
+  it('pairs FetchHttpApi requests by method+url, oldest open send first', () => {
+    const reqs = parseAllHttpRequests(WEB_LOG).httpRequests;
+    expect(reqs).toHaveLength(3);
+    expect(reqs[0]).toMatchObject({ method: 'GET', uri: SYNC, status: '200', requestDurationMs: 879, sendLineNumber: 1, responseLineNumber: 4 });
+    expect(reqs[1]).toMatchObject({
+      uri: VERSIONS,
+      status: '',
+      clientError: 'TypeError: NetworkError when attempting to fetch resource.',
+      requestDurationMs: 8,
+      sendLineNumber: 2,
+      responseLineNumber: 3,
+    });
+    // The second sync send never got its response: incomplete, like an unanswered SDK send.
+    expect(reqs[2]).toMatchObject({ uri: SYNC, status: '', sendLineNumber: 5, responseLineNumber: 0 });
+    // No id in web lines: requests are numbered in send order.
+    expect(reqs.map((r) => r.requestId)).toEqual(['1', '2', '3']);
+  });
+
+  it('does not pair a response with a send from before a page reload', () => {
+    const reqs = parseAllHttpRequests([
+      `2026-09-28T15:36:15.000Z D FetchHttpApi: --> GET ${SYNC}`,
+      '2026-09-28T15:36:20.000Z D Vector starting at https://app.element.io/',
+      `2026-09-28T15:36:21.000Z D FetchHttpApi: --> GET ${SYNC}`,
+      `2026-09-28T15:36:22.000Z D FetchHttpApi: <-- GET ${SYNC} [1000ms 200]`,
+    ].join('\n')).httpRequests;
+    // The pre-reload send stays incomplete; the response belongs to line 3.
+    expect(reqs.map((r) => [r.sendLineNumber, r.responseLineNumber])).toEqual([[1, 0], [3, 4]]);
+  });
+
+  it('pairs every response of the web demo log with its own send', () => {
+    const { httpRequests, rawLogLines } = parseAllHttpRequests(readFileSync('public/demo/demo-web.log', 'utf8'));
+    const tsByLine = new Map(rawLogLines.map((l) => [l.lineNumber, l.timestampUs]));
+    const paired = httpRequests.filter((r) => r.sendLineNumber > 0 && r.responseLineNumber > 0);
+    expect(paired.length).toBeGreaterThan(60);
+    // The logged duration is the send→response gap (ms), so a wrong pairing shows up here.
+    for (const r of paired) {
+      const gapMs = (tsByLine.get(r.responseLineNumber)! - tsByLine.get(r.sendLineNumber)!) / 1000;
+      expect(Math.abs(gapMs - r.requestDurationMs), `request ${r.requestId}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('keeps a response whose send predates the log', () => {
+    const reqs = parseAllHttpRequests(`2026-09-28T15:36:16.296Z I FetchHttpApi: <-- GET ${SYNC} [879ms 404]`).httpRequests;
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0]).toMatchObject({ status: '404', sendLineNumber: 0, responseLineNumber: 1 });
+  });
+
+  it('detects web page load and presence lifecycle events', () => {
+    const log = [
+      '2026-09-28T15:36:15.000Z I Vector starting at https://app.element.io/',
+      '2026-09-28T15:36:20.000Z D Presence: online',
+      '2026-09-28T15:39:20.000Z D Presence: unavailable',
+    ].join('\n');
+    expect(parseAllHttpRequests(log).lifecycleEvents.map((e) => [e.kind, e.platform, e.lineNumber])).toEqual([
+      ['coldStart', 'web', 1],
+      ['foreground', 'web', 2],
+      ['background', 'web', 3],
+    ]);
+  });
+
+  it('lists web /sync requests as sync requests', () => {
+    expect(parseLogFile(WEB_LOG).requests.map((r) => r.timeout)).toEqual([30000, 30000]);
+  });
+});

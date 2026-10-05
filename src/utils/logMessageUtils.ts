@@ -22,20 +22,35 @@
 export const ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/;
 
 /**
+ * Matches the Element Web rageshake prefix `<ISO> <D|I|W|E> `, capturing the
+ * single-letter level. Element Web logs one letter per line instead of a Rust
+ * level word, so level detection must try this anchored form first.
+ *
+ * @example
+ * "2026-09-28T15:36:15.377Z W FetchHttpApi: …".match(WEB_LEVEL_PREFIX_RE)?.[1] // => "W"
+ * WEB_LEVEL_PREFIX_RE.test("2026-01-28T13:24:43.950890Z INFO foo")              // => false
+ */
+export const WEB_LEVEL_PREFIX_RE = new RegExp(`${ISO_TIMESTAMP_RE.source}\\s+([DIWE])\\s`);
+
+/**
  * Regular expression that matches the ISO timestamp + log-level prefix of a
  * rageshake log line, allowing the prefix to be stripped via
  * {@link stripLogPrefix}.
  *
  * Derived from {@link ISO_TIMESTAMP_RE}.source so the timestamp portion is
  * defined exactly once; accepts any single-word level token (`\w+`) rather
- * than enumerating the known levels.
+ * than enumerating the known levels. An Element Web letter level (`D`/`I`/`W`/`E`)
+ * also swallows the Rust level word that follows it on crypto-wasm lines
+ * (`Z D DEBUG matrix_sdk_crypto…`), so the payload doesn't repeat the level.
  *
  * @example
  * LOG_PREFIX_RE.test("2026-01-28T13:24:43.950890Z INFO foo") // => true
  * LOG_PREFIX_RE.test("2026-01-28T13:24:43Z INFO foo")       // => true (no fractions)
  * LOG_PREFIX_RE.test("2026-01-28T13:24:43.123456 INFO foo")  // => true (no Z)
  */
-export const LOG_PREFIX_RE = new RegExp(`${ISO_TIMESTAMP_RE.source}\\s+\\w+\\s+`);
+export const LOG_PREFIX_RE = new RegExp(
+  `${ISO_TIMESTAMP_RE.source}\\s+(?:[DIWE]\\s+(?:(?:TRACE|DEBUG|INFO|WARN|ERROR)\\s+)?|\\w+\\s+)`,
+);
 
 /**
  * Strip the ISO timestamp + log-level prefix from a raw log line, keeping only

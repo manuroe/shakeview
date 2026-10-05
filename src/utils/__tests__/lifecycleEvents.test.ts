@@ -47,6 +47,17 @@ describe('detectLifecycleKind', () => {
       .toEqual({ kind: 'crash', platform: 'android' });
   });
 
+  it('detects Element Web page load and presence changes', () => {
+    expect(detectLifecycleKind('2026-09-29T15:36:15.377Z I Vector starting at https://app.element.io/'))
+      .toEqual({ kind: 'coldStart', platform: 'web' });
+    expect(detectLifecycleKind('2026-09-29T15:36:20.000Z D Presence: online'))
+      .toEqual({ kind: 'foreground', platform: 'web' });
+    expect(detectLifecycleKind('2026-09-29T15:39:20.000Z D Presence: unavailable'))
+      .toEqual({ kind: 'background', platform: 'web' });
+    expect(detectLifecycleKind('2026-10-03T07:04:59.426Z D element-web closing'))
+      .toEqual({ kind: 'background', platform: 'web' });
+  });
+
   it('returns null for non-lifecycle lines', () => {
     expect(detectLifecycleKind('… Sending a message to !room:example.org')).toBeNull();
     expect(detectLifecycleKind('… Initial sync complete: 42 rooms')).toBeNull();

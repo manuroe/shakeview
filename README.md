@@ -20,7 +20,9 @@ Live at **https://manuroe.github.io/shakeview/**
 
 ## Demo mode
 
-Click **"Try with demo logs"** on the landing page to explore the app without a real log file.
+Click **"Try with demo logs: Mobile · Web"** on the landing page to explore the app with an Element X or Element Web log, without a real log file.
+
+Element X and Element Web logs are both supported, with some differences: see [LOG_FORMATS.md](LOG_FORMATS.md).
 
 ## Run locally
 

@@ -16,6 +16,7 @@
 
 import { parseLogFile } from './logParser';
 import { parseSizeString } from './sizeUtils';
+import { getEntryKind } from './listingEntries';
 
 /** Comprehensive summary matching what the browser extension shows per log file. */
 export interface ArchiveSummary {
@@ -49,10 +50,12 @@ export interface ArchiveSummary {
  * @example
  * isAnalyzableEntry('logs.2026-04-12-09.log.gz'); // true
  * isAnalyzableEntry('details.json');               // false
+ * isAnalyzableEntry('details.log.gz');             // false
  */
 export function isAnalyzableEntry(name: string): boolean {
-  const lower = name.toLowerCase();
-  return lower.endsWith('.log.gz') || lower.endsWith('.log');
+  // One rule for "is a log" (incl. the details.log.gz exclusion), shared with
+  // how the archive/listing views open an entry.
+  return getEntryKind(name) !== 'other';
 }
 
 /**

@@ -68,7 +68,7 @@ export const APP_STATE_LABEL: Record<AppState, string> = {
   backgroundWorking: 'Background refresh',
 };
 
-type Platform = 'android' | 'ios';
+type Platform = LifecycleEvent['platform'];
 
 /**
  * One detection rule: a log message matches this rule when it contains every
@@ -83,8 +83,9 @@ interface LifecycleRule {
 }
 
 /**
- * Per-platform message substrings emitted by Element X at lifecycle moments,
- * confirmed against the iOS (MXLog) and Android (Timber) sources.
+ * Per-platform message substrings emitted by Element X and Element Web at
+ * lifecycle moments, confirmed against the iOS (MXLog), Android (Timber) and
+ * element-web sources.
  *
  * The Android retrospective `Sending error to Sentry` line is intentionally NOT
  * a crash rule — it is a generic error report, not necessarily a crash, and is
@@ -144,6 +145,18 @@ const RULES: readonly LifecycleRule[] = [
     platform: 'android',
     includes: ['MainActivity', 'onResume'],
   },
+
+  // Element Web (matrix-js-sdk logger → rageshake console capture).
+  // One page load = one rageshake instance = one logs-NNNN file.
+  { kind: 'coldStart', platform: 'web', includes: ['Vector starting at '] },
+  // Presence is driven by UserActivity: online on the first input after idle,
+  // unavailable after 3 min without mouse/keyboard/focus. Idle, not tab-hidden:
+  // the page's visibility change itself is never logged.
+  { kind: 'foreground', platform: 'web', includes: ['Presence: online'] },
+  { kind: 'background', platform: 'web', includes: ['Presence: unavailable'] },
+  // Logged on beforeunload, then an async flush: often lost, but when present it
+  // ends the session instead of letting it read as foreground until the next load.
+  { kind: 'background', platform: 'web', includes: ['element-web closing'] },
 ];
 
 /** Escape regex metacharacters so a literal substring can go in an alternation. */

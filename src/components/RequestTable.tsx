@@ -18,6 +18,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { calculateTimelineWidth, computeAutoScale } from '../utils/timelineUtils';
 import { buildCompressedTimeline, buildLinearTimeline, formatGapDuration, LABEL_PADDING_PX } from '../utils/waterfallGapUtils';
 import { LogDisplayView } from '../views/LogDisplayView';
+import { isWebRequestId } from '../utils/logParser';
 import { useUrlRequestAutoScroll } from '../hooks/useUrlRequestAutoScroll';
 import { microsToMs, getMinMaxTimestamps } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
@@ -498,20 +499,29 @@ export function RequestTable({
     const req = displayedRequests.find(r => getRowKey(r) === expandedRowKey);
     if (!req) return null;
 
+    // Element Web lines carry no request id to filter on: show the request's
+    // own send and response lines, picked by line number (0 = not in the log).
+    const isWeb = isWebRequestId(req.requestId);
+    const webLineNumbers = [req.sendLineNumber, req.responseLineNumber].filter((n) => n > 0);
+    const sourceLines = isWeb
+      ? webLineNumbers.flatMap((n) => lineNumberIndex.get(n) ?? [])
+      : rawLogLines;
+
     return (
       <div className={styles.expandedLogViewer}>
         <LogDisplayView
           key={expandedRowKey}
-          requestFilter={`"${req.requestId}"`}
+          requestFilter={isWeb ? '' : `"${req.requestId}"`}
           defaultShowOnlyMatching
           defaultLineWrap
-          logLines={rawLogLines.map(line => ({
+          logLines={sourceLines.map(line => ({
             ...line,
             timestamp: line.displayTime
           }))}
           onExpand={() => {
             const params = new URLSearchParams();
-            params.set('filter', `"${req.requestId}"`);
+            if (isWeb) params.set('line', webLineNumbers.join('-'));
+            else params.set('filter', `"${req.requestId}"`);
             const { startTime: storeStart, endTime: storeEnd } = useLogStore.getState();
             if (storeStart) params.set('start', storeStart);
             if (storeEnd) params.set('end', storeEnd);

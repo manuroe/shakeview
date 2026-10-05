@@ -160,7 +160,7 @@ async function main(): Promise<void> {
 
   // Load demo data.
   await setTheme('light');
-  const demoTrigger = page.locator('button, a', { hasText: 'Try with demo logs' }).first();
+  const demoTrigger = page.getByRole('button', { name: 'Try with mobile demo logs' });
   await demoTrigger.waitFor({ state: 'visible', timeout: 15_000 });
   await demoTrigger.click();
   await page.waitForURL(/\/#\/summary/, { timeout: 15_000 });
