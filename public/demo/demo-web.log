@@ -218,8 +218,6 @@ requestOtherUrl@https://app.example.org/bundles/1a2b3c/init.js:2210:13
 2026-01-15T10:06:17.310Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
 2026-01-15T10:06:19.710Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [2400ms 200]
 2026-01-15T10:06:19.715Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
-2026-01-15T10:06:20.695Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
-2026-01-15T10:06:20.700Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
 2026-01-15T10:06:44.805Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/keys/query
 2026-01-15T10:06:49.715Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
 2026-01-15T10:06:49.720Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx

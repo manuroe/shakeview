@@ -2,6 +2,7 @@
  * Unit tests for logParser.ts
  * Tests parsing correctness, edge cases, and error handling.
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { parseAllHttpRequests, parseLogFile } from '../logParser';
 import { ParsingError } from '../errorHandling';
@@ -1110,6 +1111,18 @@ describe('Element Web logs', () => {
     ].join('\n')).httpRequests;
     // The pre-reload send stays incomplete; the response belongs to line 3.
     expect(reqs.map((r) => [r.sendLineNumber, r.responseLineNumber])).toEqual([[1, 0], [3, 4]]);
+  });
+
+  it('pairs every response of the web demo log with its own send', () => {
+    const { httpRequests, rawLogLines } = parseAllHttpRequests(readFileSync('public/demo/demo-web.log', 'utf8'));
+    const tsByLine = new Map(rawLogLines.map((l) => [l.lineNumber, l.timestampUs]));
+    const paired = httpRequests.filter((r) => r.sendLineNumber > 0 && r.responseLineNumber > 0);
+    expect(paired.length).toBeGreaterThan(60);
+    // The logged duration is the send→response gap (ms), so a wrong pairing shows up here.
+    for (const r of paired) {
+      const gapMs = (tsByLine.get(r.responseLineNumber)! - tsByLine.get(r.sendLineNumber)!) / 1000;
+      expect(Math.abs(gapMs - r.requestDurationMs), `request ${r.requestId}`).toBeLessThanOrEqual(2);
+    }
   });
 
   it('keeps a response whose send predates the log', () => {
