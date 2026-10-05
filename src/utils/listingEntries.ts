@@ -35,7 +35,10 @@ export function extractDateKey(name: string): string | null {
 export function extractCategory(name: string): string {
   const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name;
   const match = basename.match(/^([^.]+)/);
-  return match ? match[1] : basename;
+  const category = match ? match[1] : basename;
+  // Element Web numbers one file per page load (logs-0000, logs-0001, …): all of
+  // them are the app stream, so they share one process and its app-state lane.
+  return /^logs-\d+$/.test(category) ? 'logs' : category;
 }
 
 /**
@@ -68,7 +71,10 @@ export function getEntryKind(name: string): EntryKind {
   const lower = name.toLowerCase();
   const isLog = lower.endsWith('.log.gz') || lower.endsWith('.log');
   if (!isLog) return 'other';
-  return extractDateKey(name) !== null ? 'dated-log' : 'plain-log';
+  // Element Web numbers its logs (logs-0000.log.gz) instead of dating them,
+  // but they are app logs like the dated ones and open on the summary.
+  const isWebLog = /(^|\/)logs-\d+\.log/.test(lower);
+  return extractDateKey(name) !== null || isWebLog ? 'dated-log' : 'plain-log';
 }
 
 /**

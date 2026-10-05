@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extractCategory,
   extractDateKey,
   getEntryKind,
   getMimeType,
@@ -18,9 +19,16 @@ describe('listingEntries', () => {
     expect(extractDateKey('2026-04-14_ID/console.2026-04-14-09.log.gz')).toBe('2026-04-14-09');
   });
 
+  it('groups Element Web page-load logs into one process', () => {
+    expect(extractCategory('2026-04-14_ID/logs-0000.log.gz')).toBe('logs');
+    expect(extractCategory('logs-0012.log.gz')).toBe('logs');
+    expect(extractCategory('console.2026-04-14-09.log.gz')).toBe('console');
+  });
+
   it('classifies dated logs, plain logs, and other files', () => {
     expect(getEntryKind('console.2026-04-14-09.log.gz')).toBe('dated-log');
     expect(getEntryKind('logcat.log.gz')).toBe('plain-log');
+    expect(getEntryKind('logs-0000.log.gz')).toBe('dated-log');
     expect(getEntryKind('details.json')).toBe('other');
   });
 

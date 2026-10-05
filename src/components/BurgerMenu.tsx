@@ -11,6 +11,7 @@ import { buildAnonymizedFileText, deriveAnonymizedFilename } from '../utils/anon
 import { buildAnonymisedArchiveGz, buildArchiveDictionary, deriveAnonymizedArchiveName, type ArchiveProgress } from '../utils/anonymizeArchive';
 import { fetchExtensionFileBytes } from '../utils/extensionFileLoader';
 import { downloadBlob } from '../utils/downloadBlob';
+import { SPANS_MARKER } from '../utils/spansParser';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { LogSelectionDialog } from './LogSelectionDialog';
@@ -29,7 +30,10 @@ export function BurgerMenu() {
   const { clearData, clearLastRoute } = useLogStore();
   const loadedEntryNames = useLogStore((state) => state.loadedEntryNames);
   const anonymizationDictionary = useLogStore((state) => state.anonymizationDictionary);
-  const hasLogs = useLogStore((state) => state.rawLogLines.length > 0);
+  const loadedLines = useLogStore((state) => state.rawLogLines);
+  const hasLogs = loadedLines.length > 0;
+  // Element Web logs carry no tracing spans: hide the view that would be empty.
+  const hasSpans = useMemo(() => loadedLines.some((line) => line.rawText.includes(SPANS_MARKER)), [loadedLines]);
   const archiveEntries = useArchiveStore((state) => state.archiveEntries);
   const archiveName = useArchiveStore((state) => state.archiveName);
   const listingEntries = useListingStore((state) => state.listingEntries);
@@ -230,12 +234,14 @@ export function BurgerMenu() {
           >
             By target
           </button>
-          <button
-            className={`${styles.burgerItem} ${styles.burgerSubItem} ${isActive('/spans') ? styles.active : ''}`}
-            onClick={() => handleNavigate('/spans')}
-          >
-            By span
-          </button>
+          {hasSpans && (
+            <button
+              className={`${styles.burgerItem} ${styles.burgerSubItem} ${isActive('/spans') ? styles.active : ''}`}
+              onClick={() => handleNavigate('/spans')}
+            >
+              By span
+            </button>
+          )}
           <div className={styles.burgerDivider} />
           <button
             className={`${styles.burgerItem} ${isActive('/http_requests') ? styles.active : ''}`}
