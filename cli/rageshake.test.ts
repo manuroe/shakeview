@@ -103,6 +103,15 @@ describe('rageshake CLI', () => {
     expect(anon.ok).toBe(true);
   });
 
+  it('precheck passes anonymized permalinks (the #/ fragment is not a room alias)', () => {
+    const bytes = strToU8([
+      '# [shakeview-anonymized]',
+      '2026-09-29T15:36:15.377Z I The message is https://matrix.to/#/!room-56b8a38cf0f0:domain-d40e97c9.org/$event-dd06b04bbd34?via=domain-60fc0bb7.org',
+      '2026-09-29T15:36:16.000Z I Switching to https://app.element.io/#/room/!room-56b8a38cf0f0:domain-d40e97c9.org',
+    ].join('\n'));
+    expect(cmdPrecheck(ingest(bytes, 'web.log')).report).toMatch(/^PASS/);
+  });
+
   it('precheck fails when no anonymization evidence exists', () => {
     const bytes = strToU8('2026-01-15T10:00:00.000000Z INFO nothing identifiable here');
     expect(cmdPrecheck(ingest(bytes, 'plain.log')).ok).toBe(false);
