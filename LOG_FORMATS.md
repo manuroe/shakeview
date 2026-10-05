@@ -54,7 +54,8 @@ FetchHttpApi: --> GET https://matrix.example.org/_matrix/client/v3/sync?…
 FetchHttpApi: <-- GET https://matrix.example.org/_matrix/client/v3/sync?… [879ms 200]
 ```
 
-Shakeview pairs a response with the oldest pending request to the same URL, and numbers the requests itself.
+Shakeview pairs a response with the oldest pending request to the same URL in the same page load, and numbers
+the requests itself. Requests still pending when the page reloads stay incomplete.
 As a result:
 - a **retry is a new request**: nothing links it to the attempt it repeats;
 - **request and response sizes are unknown**, so the bandwidth chart stays empty;

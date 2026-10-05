@@ -299,6 +299,9 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         lineNumber: i + 1,
         timestampUs,
       });
+      // A page reload drops every in-flight request: sends still open stay
+      // incomplete instead of claiming the new page's responses to the same URL.
+      if (lifecycle.platform === 'web' && lifecycle.kind === 'coldStart') openWebSends.clear();
     }
 
     // Element Web request lines have no request id: pair each response with the

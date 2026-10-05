@@ -1101,6 +1101,17 @@ describe('Element Web logs', () => {
     expect(reqs.map((r) => r.requestId)).toEqual(['1', '2', '3']);
   });
 
+  it('does not pair a response with a send from before a page reload', () => {
+    const reqs = parseAllHttpRequests([
+      `2026-09-28T15:36:15.000Z D FetchHttpApi: --> GET ${SYNC}`,
+      '2026-09-28T15:36:20.000Z D Vector starting at https://app.element.io/',
+      `2026-09-28T15:36:21.000Z D FetchHttpApi: --> GET ${SYNC}`,
+      `2026-09-28T15:36:22.000Z D FetchHttpApi: <-- GET ${SYNC} [1000ms 200]`,
+    ].join('\n')).httpRequests;
+    // The pre-reload send stays incomplete; the response belongs to line 3.
+    expect(reqs.map((r) => [r.sendLineNumber, r.responseLineNumber])).toEqual([[1, 0], [3, 4]]);
+  });
+
   it('keeps a response whose send predates the log', () => {
     const reqs = parseAllHttpRequests(`2026-09-28T15:36:16.296Z I FetchHttpApi: <-- GET ${SYNC} [879ms 404]`).httpRequests;
     expect(reqs).toHaveLength(1);
