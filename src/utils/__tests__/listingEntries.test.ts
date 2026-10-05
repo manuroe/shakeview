@@ -30,6 +30,9 @@ describe('listingEntries', () => {
     expect(getEntryKind('logcat.log.gz')).toBe('plain-log');
     expect(getEntryKind('logs-0000.log.gz')).toBe('dated-log');
     expect(getEntryKind('details.json')).toBe('other');
+    // The rageshake server's metadata dump, not a log: opened as a plain file.
+    expect(getEntryKind('details.log.gz')).toBe('other');
+    expect(getEntryKind('2026-04-14_ID/details.log.gz')).toBe('other');
   });
 
   it('sorts dated entries newest-first within each category', () => {

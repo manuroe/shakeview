@@ -70,7 +70,10 @@ export function sortEntries<T extends { readonly name: string }>(entries: readon
 export function getEntryKind(name: string): EntryKind {
   const lower = name.toLowerCase();
   const isLog = lower.endsWith('.log.gz') || lower.endsWith('.log');
-  if (!isLog) return 'other';
+  // details.log.gz is the rageshake server's plain-text copy of the report
+  // metadata, not a log: it has no timestamps and would parse as UNKNOWN lines.
+  const isMetadata = lower === 'details.log.gz' || lower.endsWith('/details.log.gz');
+  if (!isLog || isMetadata) return 'other';
   // Element Web numbers its logs (logs-0000.log.gz) instead of dating them,
   // but they are app logs like the dated ones and open on the summary.
   const isWebLog = /(^|\/)logs-\d+\.log/.test(lower);

@@ -16,6 +16,7 @@
 
 import { parseLogFile } from './logParser';
 import { parseSizeString } from './sizeUtils';
+import { getEntryKind } from './listingEntries';
 
 /** Comprehensive summary matching what the browser extension shows per log file. */
 export interface ArchiveSummary {
@@ -52,11 +53,9 @@ export interface ArchiveSummary {
  * isAnalyzableEntry('details.log.gz');             // false
  */
 export function isAnalyzableEntry(name: string): boolean {
-  const lower = name.toLowerCase();
-  // details.log.gz is the rageshake server's plain-text copy of the report
-  // metadata, not a log: it has no timestamps and would parse as UNKNOWN lines.
-  if (lower === 'details.log.gz' || lower.endsWith('/details.log.gz')) return false;
-  return lower.endsWith('.log.gz') || lower.endsWith('.log');
+  // One rule for "is a log" (incl. the details.log.gz exclusion), shared with
+  // how the archive/listing views open an entry.
+  return getEntryKind(name) !== 'other';
 }
 
 /**
