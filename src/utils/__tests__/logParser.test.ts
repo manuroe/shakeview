@@ -1107,6 +1107,19 @@ describe('Element Web logs', () => {
     expect(reqs[0]).toMatchObject({ status: '404', sendLineNumber: 0, responseLineNumber: 1 });
   });
 
+  it('detects web page load and presence lifecycle events', () => {
+    const log = [
+      '2026-09-28T15:36:15.000Z I Vector starting at https://app.element.io/',
+      '2026-09-28T15:36:20.000Z D Presence: online',
+      '2026-09-28T15:39:20.000Z D Presence: unavailable',
+    ].join('\n');
+    expect(parseAllHttpRequests(log).lifecycleEvents.map((e) => [e.kind, e.platform, e.lineNumber])).toEqual([
+      ['coldStart', 'web', 1],
+      ['foreground', 'web', 2],
+      ['background', 'web', 3],
+    ]);
+  });
+
   it('lists web /sync requests as sync requests', () => {
     expect(parseLogFile(WEB_LOG).requests.map((r) => r.timeout)).toEqual([30000, 30000]);
   });

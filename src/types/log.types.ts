@@ -161,7 +161,7 @@ export type LifecycleEventKind =
  */
 export interface LifecycleEvent {
   readonly kind: LifecycleEventKind;
-  readonly platform: 'android' | 'ios';
+  readonly platform: 'android' | 'ios' | 'web';
   readonly lineNumber: number;
   readonly timestampUs: TimestampMicros;
 }
