@@ -146,9 +146,11 @@ CI runs benchmark suites via CodSpeed and publishes performance tracking/results
 
 ## Demo Log File
 
-A hand-crafted demo log lives at [`public/demo/demo.log`](public/demo/demo.log). It is served as a static asset and loaded by the **"Try with demo logs"** link on the landing page, letting users explore the app without a real log file.
+Two hand-crafted demo logs are served as static assets and loaded by the **"Try with demo logs: Mobile · Web"** buttons on the landing page, letting users explore the app without a real log file:
+- [`public/demo/demo.log`](public/demo/demo.log) — Element X (mobile, Rust SDK tracing format).
+- [`public/demo/demo-web.log`](public/demo/demo-web.log) — Element Web (`<ISO> <D|I|W|E> <message>`, `FetchHttpApi` requests, presence lifecycle, a reload).
 
-**When adding a new feature**, extend `public/demo/demo.log` so the feature is visible and exercisable in the demo. The log must remain a valid, parseable rageshake log that exercises all existing app capabilities as well as the new one.
+**When adding a new feature**, extend the demo log(s) of the platform(s) it applies to so the feature is visible and exercisable in the demo. The log must remain a valid, parseable rageshake log that exercises all existing app capabilities as well as the new one.
 
 ## Demo Screenshots
 
@@ -159,7 +161,7 @@ Screenshots in [`public/demo/screenshot-*.png`](public/demo/) are **generated an
 ## Contribution Guidelines
 - Use camelCase for identifiers (lint enforced).
 - Prefer additive changes over refactors unless necessary.
-- Every new feature must be represented in [`public/demo/demo.log`](public/demo/demo.log).
+- Every new feature must be represented in [`public/demo/demo.log`](public/demo/demo.log) and/or [`public/demo/demo-web.log`](public/demo/demo-web.log).
 - Always pass the [Pre-Commit Checklist](#pre-commit-checklist-for-agents) (`npm run build`, `npm run lint`, `npm test -- --run --coverage`) before committing.
 
 ## Reference Files (Entry Points)
@@ -169,7 +171,7 @@ Screenshots in [`public/demo/screenshot-*.png`](public/demo/) are **generated an
 - Parser: [src/utils/logParser.ts](src/utils/logParser.ts)
 - Time utilities: [src/utils/timeUtils.ts](src/utils/timeUtils.ts)
 - Log views: [src/views](src/views)
-- Demo log: [public/demo/demo.log](public/demo/demo.log)
+- Demo logs: [public/demo/demo.log](public/demo/demo.log), [public/demo/demo-web.log](public/demo/demo-web.log)
 - Extension manifest: [extension/manifest.json](extension/manifest.json)
 - Extension build config: [vite.config.extension.ts](vite.config.extension.ts)
 
