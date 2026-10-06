@@ -15,7 +15,7 @@ import { gunzipSync } from 'fflate';
 import { parseTar } from '../src/utils/tarParser.ts';
 import { parseLogFile } from '../src/utils/logParser.ts';
 import { mergeLogParserResults, maxLineNumber, type NamedLogParserResult } from '../src/utils/mergeLogParserResults.ts';
-import { parseDetailsJson } from '../src/utils/detailsJson.ts';
+import { parseDetailsJson, rustSdkShaFromLogs } from '../src/utils/detailsJson.ts';
 import { isAnalyzableEntry } from '../src/utils/archiveSummary.ts';
 import { isValidGzipHeader, isValidTextContent, decodeTextBytes } from '../src/utils/fileValidator.ts';
 import { decodeIdentifier, detectAnonymizedLog, MATRIX_IDENTIFIER_RE } from '../src/utils/anonymizeUtils.ts';
@@ -681,7 +681,8 @@ export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
       userText: details.userText,
       app: details.appId,
       version: details.version,
-      sdkSha: details.sdkSha,
+      // Element Web sends no sdk_sha; its crypto-wasm lines name the SDK checkout.
+      sdkSha: details.sdkSha ?? rustSdkShaFromLogs(merged.rawLogLines),
       cryptoVersion: details.cryptoVersion,
       reportUrl: details.reportUrl,
     },

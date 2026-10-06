@@ -32,3 +32,28 @@ export function parseDetailsJson(text: string): ListingDetails | null {
     return null;
   }
 }
+
+// matrix-sdk-crypto-wasm builds against a git checkout of matrix-rust-sdk, and its
+// tracing source paths keep that checkout dir: `.cargo/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/…`.
+const RUST_SDK_CHECKOUT_RE = /\.cargo\/git\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/([0-9a-f]{7,40})\//;
+
+/**
+ * The matrix-rust-sdk commit an Element Web build ran, read from its crypto-wasm log
+ * lines. Web's `details.json` has no `sdk_sha`, only `crypto_version`, which names a
+ * crypto-wasm commit rather than the SDK one. Scans newest first: an archive can span
+ * app updates, and details.json describes the build that sent it. Returns null when
+ * no line carries a path.
+ *
+ * @example
+ * rustSdkShaFromLogs([{ rawText: '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb579/f333a32/crates/a.rs:1' }]);
+ * // 'f333a32'
+ */
+export function rustSdkShaFromLogs(lines: readonly { readonly rawText: string }[]): string | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const { rawText } = lines[i];
+    if (!rawText.includes('/checkouts/matrix-rust-sdk-')) continue;
+    const m = rawText.match(RUST_SDK_CHECKOUT_RE);
+    if (m) return m[1];
+  }
+  return null;
+}

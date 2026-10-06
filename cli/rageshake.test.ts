@@ -157,6 +157,8 @@ describe('rageshake CLI', () => {
       '2026-09-28T15:36:15.549Z I FetchHttpApi: <-- GET https://matrix/_matrix/client/v3/rooms/x [132ms 404]',
       '2026-09-28T15:36:16.400Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
       '2026-09-28T15:36:16.500Z E sync /sync error fetch failed',
+      '2026-09-28T15:36:16.600Z D DEBUG matrix_sdk_crypto::olm: Decrypted an Olm message',
+      '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/olm/session.rs:42',
     ].join('\n');
     const archive = gzipSync(buildTar([
       { name: 'details.json', data: strToU8(JSON.stringify({ app: 'element-web', data: { crypto_version: 'Rust SDK 0.18.0 (e5f8295)' } })) },
@@ -168,6 +170,8 @@ describe('rageshake CLI', () => {
     const summary = JSON.parse(cmdSummary(ing));
     expect(summary.details.app).toBe('element-web');
     expect(summary.details.cryptoVersion).toBe('Rust SDK 0.18.0 (e5f8295)');
+    // No sdk_sha in a web details.json: read from the crypto-wasm checkout path instead.
+    expect(summary.details.sdkSha).toBe('f333a32');
     expect(summary.files.map((f: { name: string }) => f.name)).toEqual(['logs-0000.log.gz']);
     expect(summary.timeSpan.start).not.toBe('');
     expect(summary.totals).toMatchObject({ errors: 1, warnings: 1, httpRequests: 1 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDetailsJson } from '../detailsJson';
+import { parseDetailsJson, rustSdkShaFromLogs } from '../detailsJson';
 import { isValidPublicHomeserver, mxcToThumbnailUrl, userInitial } from '../matrixProfile';
 
 describe('parseDetailsJson', () => {
@@ -63,5 +63,27 @@ describe('matrixProfile helpers', () => {
   it('accepts public domains and rejects localhost-style hosts', () => {
     expect(isValidPublicHomeserver('matrix.org')).toBe(true);
     expect(isValidPublicHomeserver('localhost')).toBe(false);
+  });
+});
+
+describe('rustSdkShaFromLogs', () => {
+  it('reads the matrix-rust-sdk commit from a crypto-wasm checkout path', () => {
+    const lines = [{ rawText: '2026-09-29T07:06:20.000Z I no path here' }, { rawText: [
+    '2026-09-29T07:06:20.662Z D DEBUG matrix_sdk_crypto::session_manager::group_sessions::share_strategy: Rotating room key to protect room history',
+    '    device_removed=true visibility_changed=false algorithm_changed=false',
+    '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
+    '    in matrix_sdk_crypto::session_manager::group_sessions::share_strategy::collect_session_recipients',
+    '    in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room-af33e3161742:example.org" session_id="CCJQ"',
+  ].join('\n') }];
+    expect(rustSdkShaFromLogs(lines)).toBe('f333a32');
+  });
+
+  it('prefers the newest line when the archive spans builds', () => {
+    const at = (sha: string) => ({ rawText: `x\n    at /r/.cargo/git/checkouts/matrix-rust-sdk-5cafb579/${sha}/crates/a.rs:1` });
+    expect(rustSdkShaFromLogs([at('aaaaaaa'), at('bbbbbbb')])).toBe('bbbbbbb');
+  });
+
+  it('returns null when no line names a checkout', () => {
+    expect(rustSdkShaFromLogs([{ rawText: '2026-09-29T07:06:20.000Z I hello' }])).toBeNull();
   });
 });
