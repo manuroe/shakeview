@@ -34,8 +34,10 @@ export function parseDetailsJson(text: string): ListingDetails | null {
 }
 
 // matrix-sdk-crypto-wasm builds against a git checkout of matrix-rust-sdk, and its
-// tracing source paths keep that checkout dir: `.cargo/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/…`.
-const RUST_SDK_CHECKOUT_RE = /\.cargo\/git\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/([0-9a-f]{7,40})\//;
+// tracing source paths keep that checkout dir: `<CARGO_HOME>/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/…`.
+// CARGO_HOME is `~/.cargo` by default but configurable (`/usr/local/cargo` in Docker images),
+// so only the stable `git/checkouts/…` suffix is matched.
+const RUST_SDK_CHECKOUT_RE = /\/git\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/([0-9a-f]{7,40})\//;
 
 /**
  * The matrix-rust-sdk commit an Element Web build ran, read from its crypto-wasm log

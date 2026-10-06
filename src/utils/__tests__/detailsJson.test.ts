@@ -78,6 +78,11 @@ describe('rustSdkShaFromLogs', () => {
     expect(rustSdkShaFromLogs([at('aaaaaaa'), at('bbbbbbb')])).toBe('bbbbbbb');
   });
 
+  it('reads the commit under a custom CARGO_HOME', () => {
+    const line = { rawText: 'x\n    at /usr/local/cargo/git/checkouts/matrix-rust-sdk-5cafb579/f333a32/crates/matrix-sdk-crypto/src/olm/session.rs:42' };
+    expect(rustSdkShaFromLogs([line])).toBe('f333a32');
+  });
+
   it('returns null when no line names a checkout', () => {
     expect(rustSdkShaFromLogs([{ rawText: '2026-09-29T07:06:20.000Z I hello' }])).toBeNull();
   });
