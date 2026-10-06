@@ -5,7 +5,7 @@
  * with simple fixture data and assert on concrete output values.
  */
 import { describe, it, expect } from 'vitest';
-import { computeSummaryStats, messageGroupFilter } from '../summaryStats';
+import { computeSummaryStats, messageGroupFilter, messageGroupKey } from '../summaryStats';
 import {
   createParsedLogLine,
   createHttpRequest,
@@ -148,6 +148,17 @@ describe('computeSummaryStats — error / warning counts', () => {
     ];
     const result = computeSummaryStats(lines, [], [], [], [], null, null, null, buildIndex(lines));
     expect(result.warningsByType).toEqual([{ type: 'Falling back to unread room {…}', count: 2 }]);
+  });
+
+  it('keeps the diagnostic text after an inline JSON object, and collapses nested or escaped payloads', () => {
+    const at = '2026-09-29T07:06:20.662Z E ';
+    // Text after the object is the reason: two different failures stay two groups.
+    expect(messageGroupKey(`${at}Failed to process event {"type":"m.room.message"}: missing body`))
+      .toBe('Failed to process event {"type":"m.room.message"}: missing body');
+    expect(messageGroupKey(`${at}Failed to process event {"type":"m.room.message"}: missing sender`))
+      .toBe('Failed to process event {"type":"m.room.message"}: missing sender');
+    expect(messageGroupKey(`${at}Sync {"room":{"id":"!a:example.org","n":[1,2]}}`)).toBe('Sync {…}');
+    expect(messageGroupKey(`${at}Bad name {"name":"say \\"hi\\" {\\"x\\"}"}`)).toBe('Bad name {…}');
   });
 
   it('filters a collapsed group by the text its lines share, without the placeholder', () => {
