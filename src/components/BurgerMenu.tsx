@@ -11,7 +11,7 @@ import { buildAnonymizedFileText, deriveAnonymizedFilename } from '../utils/anon
 import { buildAnonymisedArchiveGz, buildArchiveDictionary, deriveAnonymizedArchiveName, type ArchiveProgress } from '../utils/anonymizeArchive';
 import { fetchExtensionFileBytes } from '../utils/extensionFileLoader';
 import { downloadBlob } from '../utils/downloadBlob';
-import { SPANS_MARKER } from '../utils/spansParser';
+import { spanSegments } from '../utils/spansParser';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { LogSelectionDialog } from './LogSelectionDialog';
@@ -32,8 +32,9 @@ export function BurgerMenu() {
   const anonymizationDictionary = useLogStore((state) => state.anonymizationDictionary);
   const loadedLines = useLogStore((state) => state.rawLogLines);
   const hasLogs = loadedLines.length > 0;
-  // Element Web logs carry no tracing spans: hide the view that would be empty.
-  const hasSpans = useMemo(() => loadedLines.some((line) => line.rawText.includes(SPANS_MARKER)), [loadedLines]);
+  // Element Web logs carry spans only on crypto-wasm lines, and some carry none:
+  // hide the view that would be empty.
+  const hasSpans = useMemo(() => loadedLines.some((line) => spanSegments(line.rawText).length > 0), [loadedLines]);
   const archiveEntries = useArchiveStore((state) => state.archiveEntries);
   const archiveName = useArchiveStore((state) => state.archiveName);
   const listingEntries = useListingStore((state) => state.listingEntries);

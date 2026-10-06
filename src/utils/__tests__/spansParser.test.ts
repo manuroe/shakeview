@@ -117,3 +117,28 @@ describe('spanFilterValue', () => {
     expect(spanFilterValue('op{}')).toBe('op');
   });
 });
+
+describe('spanSegments — tracing pretty format (Element Web crypto-wasm)', () => {
+  const pretty = [
+    '2026-09-29T07:06:20.662Z D DEBUG matrix_sdk_crypto::session_manager::group_sessions::share_strategy: Rotating room key to protect room history',
+    '    device_removed=true visibility_changed=false algorithm_changed=false',
+    '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
+    '    in matrix_sdk_crypto::session_manager::group_sessions::share_strategy::collect_session_recipients',
+    '    in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room-af33e3161742:example.org" session_id="CCJQ"',
+  ].join('\n');
+
+  it('reads the `in …` lines root first, keeping the last path segment as the name', () => {
+    expect(spanSegments(pretty)).toEqual([
+      'share_room_key{room_id="!room-af33e3161742:example.org" session_id="CCJQ"}',
+      'collect_session_recipients',
+    ]);
+    expect(parseSpans(pretty)[0]).toEqual({
+      name: 'share_room_key',
+      fields: { room_id: '!room-af33e3161742:example.org', session_id: 'CCJQ' },
+    });
+  });
+
+  it('returns [] for a multi-line entry with no `in …` line', () => {
+    expect(spanSegments('2026-09-29T07:06:20.662Z W Failed\n    at Object.foo (bundle.js:1:2)')).toEqual([]);
+  });
+});

@@ -101,6 +101,12 @@ function stripMessagePrefix(message: string): string {
     .trim();
 }
 
+// Pretty-format source line: `    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/x/src/y.rs:211`.
+// Keeps the repo-relative `crates/…` part so the GitHub link resolves like a `| … |` one.
+// Anchored on the matrix-rust-sdk checkout: other git deps (ruma) also have `crates/`,
+// but every `.rs` link points at matrix-rust-sdk.
+const PRETTY_SOURCE_RE = /^\s+at \S*\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/[0-9a-f]+\/(crates\/\S+\.rs):(\d+)\s*$/;
+
 /**
  * Extract file path and line number from a log line.
  * Matches the pipe-delimited pattern: | path/to/file.rs:42 |
@@ -224,6 +230,15 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         lastEntry.continuationLines.push(line);
         // Extend rawText so search queries can match content in continuation lines.
         lastEntry.rawText = lastEntry.rawText + '\n' + line;
+        // matrix-sdk-crypto-wasm (Element Web) logs in tracing's pretty format: the
+        // source location is an `at …/crates/….rs:N` continuation line, not a `| … |` field.
+        if (lastEntry.filePath === undefined) {
+          const at = line.match(PRETTY_SOURCE_RE);
+          if (at) {
+            lastEntry.filePath = at[1];
+            lastEntry.sourceLineNumber = parseInt(at[2], 10);
+          }
+        }
       } else {
         // Orphaned continuation line: appears before any timestamped entry (e.g.
         // a malformed log that starts mid-message). Emit it as a standalone UNKNOWN

@@ -1147,4 +1147,25 @@ describe('Element Web logs', () => {
   it('lists web /sync requests as sync requests', () => {
     expect(parseLogFile(WEB_LOG).requests.map((r) => r.timeout)).toEqual([30000, 30000]);
   });
+
+  it('reads the source location of a crypto-wasm line from its pretty-format `at` line', () => {
+    const pretty = [
+    '2026-09-29T07:06:20.662Z D DEBUG matrix_sdk_crypto::session_manager::group_sessions::share_strategy: Rotating room key to protect room history',
+    '    device_removed=true visibility_changed=false algorithm_changed=false',
+    '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
+    '    in matrix_sdk_crypto::session_manager::group_sessions::share_strategy::collect_session_recipients',
+    '    in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room-af33e3161742:example.org" session_id="CCJQ"',
+  ].join('\n');
+    const [line] = parseLogFile(pretty).rawLogLines;
+    expect(line.filePath).toBe('crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs');
+    expect(line.sourceLineNumber).toBe(211);
+  });
+
+  it('ignores a pretty-format `at` line from another git dependency', () => {
+    const [line] = parseLogFile([
+      '2026-09-29T07:06:20.662Z D DEBUG ruma: hi',
+      '    at /home/runner/.cargo/git/checkouts/ruma-1a2b3c/abc1234/crates/ruma-events/src/x.rs:9',
+    ].join('\n')).rawLogLines;
+    expect(line.filePath).toBeUndefined();
+  });
 });
