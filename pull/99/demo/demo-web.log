@@ -47,12 +47,15 @@
 2026-01-15T10:00:06.710Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/members?not_membership=xxx&at=xxx [410ms 200]
 2026-01-15T10:00:06.800Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@alice:example.org"
 2026-01-15T10:00:06.810Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ab12Cd34?version=xxx
 2026-01-15T10:00:06.850Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@bob:example.org"
 2026-01-15T10:00:06.860Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ef56Gh78?version=xxx
 2026-01-15T10:00:06.900Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@bob:example.org"
 2026-01-15T10:00:06.910Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ij90Kl12?version=xxx
 2026-01-15T10:00:06.950Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ab12Cd34?version=xxx [140ms 404]
 2026-01-15T10:00:07.000Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ef56Gh78?version=xxx [140ms 404]
@@ -102,6 +105,7 @@
 onSelectionChange@https://app.example.org/bundles/1a2b3c/init.js:4410:21
 2026-01-15T10:00:52.000Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room3:example.org" sender="@carol:example.org"
 2026-01-15T10:00:52.010Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room3%3Aexample.org/Mn34Op56?version=xxx
 2026-01-15T10:00:52.150Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room3%3Aexample.org/Mn34Op56?version=xxx [140ms 404]
 2026-01-15T10:00:55.000Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/rooms/!room3%3Aexample.org/send/m.room.message/m1768471000003.0
