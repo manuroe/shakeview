@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { parseAllHttpRequests, parseLogFile } from '../logParser';
 import { ParsingError } from '../errorHandling';
+import { CRYPTO_WASM_PRETTY_ENTRY } from '../../test/fixtures';
 
 // Sample log line formats from real rageshake logs
 const SEND_LINE = '2026-01-26T17:02:25.042916Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > sync_once{conn_id="room-list"} > send{request_id="REQ-62" method=POST uri="https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/sync" request_size="5.9k"}';
@@ -1149,16 +1150,24 @@ describe('Element Web logs', () => {
   });
 
   it('reads the source location of a crypto-wasm line from its pretty-format `at` line', () => {
-    const pretty = [
-    '2026-09-29T07:06:20.662Z D DEBUG matrix_sdk_crypto::session_manager::group_sessions::share_strategy: Rotating room key to protect room history',
-    '    device_removed=true visibility_changed=false algorithm_changed=false',
-    '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
-    '    in matrix_sdk_crypto::session_manager::group_sessions::share_strategy::collect_session_recipients',
-    '    in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room-af33e3161742:example.org" session_id="CCJQ"',
-  ].join('\n');
-    const [line] = parseLogFile(pretty).rawLogLines;
+    const [line] = parseLogFile(CRYPTO_WASM_PRETTY_ENTRY).rawLogLines;
     expect(line.filePath).toBe('crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs');
     expect(line.sourceLineNumber).toBe(211);
+  });
+
+  it('maps a crates.io `at` path (release crypto-wasm builds) onto the repo crate path', () => {
+    const [line] = parseLogFile([
+      '2026-01-15T10:00:06.800Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
+      '    at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912',
+    ].join('\n')).rawLogLines;
+    expect(line.filePath).toBe('crates/matrix-sdk-crypto/src/machine/mod.rs');
+    expect(line.sourceLineNumber).toBe(1912);
+    // The bare `matrix-sdk` crate has no suffix before its version.
+    const [bare] = parseLogFile([
+      '2026-01-15T10:00:06.800Z D DEBUG matrix_sdk: hi',
+      '    at /r/.cargo/registry/src/index.crates.io-1949cf8c/matrix-sdk-0.18.0/src/client/mod.rs:7',
+    ].join('\n')).rawLogLines;
+    expect(bare.filePath).toBe('crates/matrix-sdk/src/client/mod.rs');
   });
 
   it('ignores a pretty-format `at` line from another git dependency', () => {

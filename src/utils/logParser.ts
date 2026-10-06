@@ -101,11 +101,26 @@ function stripMessagePrefix(message: string): string {
     .trim();
 }
 
-// Pretty-format source line: `    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/x/src/y.rs:211`.
-// Keeps the repo-relative `crates/…` part so the GitHub link resolves like a `| … |` one.
-// Anchored on the matrix-rust-sdk checkout: other git deps (ruma) also have `crates/`,
-// but every `.rs` link points at matrix-rust-sdk.
-const PRETTY_SOURCE_RE = /^\s+at \S*\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/[0-9a-f]+\/(crates\/\S+\.rs):(\d+)\s*$/;
+// Pretty-format source line, in one of two forms depending on how crypto-wasm pulled the SDK:
+//   develop builds (git dep):      `    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/x/src/y.rs:211`
+//   release builds (crates.io dep): `    at /home/runner/.cargo/registry/src/index.crates.io-<h>/matrix-sdk-crypto-0.18.0/src/y.rs:1912`
+// Both map to the repo-relative `crates/<crate>/…` path so the GitHub link resolves like a `| … |` one.
+// Both anchored on matrix-rust-sdk (its checkout, or a `matrix-sdk*` crate): other deps (ruma)
+// also have `crates/`, but every `.rs` link points at matrix-rust-sdk.
+const PRETTY_GIT_SOURCE_RE = /^\s+at \S*\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/[0-9a-f]+\/(crates\/\S+\.rs):(\d+)\s*$/;
+const PRETTY_REGISTRY_SOURCE_RE = /^\s+at \S*\/registry\/src\/[^/]+\/(matrix-sdk(?:-[a-z]+)*)-\d+\.\d+\.\d+[^/]*\/(\S+\.rs):(\d+)\s*$/;
+
+/**
+ * Source location from a pretty-format `at …` continuation line, as the
+ * matrix-rust-sdk repo-relative path, or null when the line is not one.
+ */
+function extractPrettySourceLocation(line: string): { filePath: string; sourceLineNumber: number } | null {
+  const git = line.match(PRETTY_GIT_SOURCE_RE);
+  if (git) return { filePath: git[1], sourceLineNumber: parseInt(git[2], 10) };
+  const registry = line.match(PRETTY_REGISTRY_SOURCE_RE);
+  if (registry) return { filePath: `crates/${registry[1]}/${registry[2]}`, sourceLineNumber: parseInt(registry[3], 10) };
+  return null;
+}
 
 /**
  * Extract file path and line number from a log line.
@@ -231,12 +246,12 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         // Extend rawText so search queries can match content in continuation lines.
         lastEntry.rawText = lastEntry.rawText + '\n' + line;
         // matrix-sdk-crypto-wasm (Element Web) logs in tracing's pretty format: the
-        // source location is an `at …/crates/….rs:N` continuation line, not a `| … |` field.
+        // source location is an `at ….rs:N` continuation line, not a `| … |` field.
         if (lastEntry.filePath === undefined) {
-          const at = line.match(PRETTY_SOURCE_RE);
+          const at = extractPrettySourceLocation(line);
           if (at) {
-            lastEntry.filePath = at[1];
-            lastEntry.sourceLineNumber = parseInt(at[2], 10);
+            lastEntry.filePath = at.filePath;
+            lastEntry.sourceLineNumber = at.sourceLineNumber;
           }
         }
       } else {

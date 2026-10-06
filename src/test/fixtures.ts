@@ -190,4 +190,17 @@ export function createLogsWithMatches(
 }
 
 // Re-export scale generators from performanceFixtures for convenience
+/**
+ * One matrix-sdk-crypto-wasm entry as Element Web logs it, in tracing's multi-line
+ * pretty format: fields, then the `at` source line (git-checkout form, carrying the
+ * matrix-rust-sdk commit `f333a32`), then the `in` span lines, innermost first.
+ */
+export const CRYPTO_WASM_PRETTY_ENTRY = [
+  '2026-09-29T07:06:20.662Z D DEBUG matrix_sdk_crypto::session_manager::group_sessions::share_strategy: Rotating room key to protect room history',
+  '    device_removed=true visibility_changed=false algorithm_changed=false',
+  '    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
+  '    in matrix_sdk_crypto::session_manager::group_sessions::share_strategy::collect_session_recipients',
+  '    in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room-af33e3161742:example.org" session_id="CCJQ"',
+].join('\n');
+
 export { generateLogLines, generateHttpRequests, generateSyncRequests } from './performanceFixtures';
