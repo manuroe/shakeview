@@ -157,6 +157,9 @@ const EMPTY_STATS: SummaryStats = Object.freeze({
 // which would split one warning into a group per payload.
 const JSON_PAYLOAD_RE = / \{".*$/s;
 
+/** Stands in for the payload `messageGroupKey` collapsed; it appears in no log line. */
+export const COLLAPSED_JSON_PAYLOAD = ' {…}';
+
 /**
  * Key that groups errors/warnings by type: the core message with any trailing
  * JSON payload collapsed to ` {…}`.
@@ -165,7 +168,21 @@ const JSON_PAYLOAD_RE = / \{".*$/s;
  * messageGroupKey('2026-01-01T00:00:00.000Z W Falling back {"roomId":"!a:b"}'); // 'Falling back {…}'
  */
 export function messageGroupKey(message: string): string {
-  return extractCoreMessage(message).replace(JSON_PAYLOAD_RE, ' {…}');
+  return extractCoreMessage(message).replace(JSON_PAYLOAD_RE, COLLAPSED_JSON_PAYLOAD);
+}
+
+/**
+ * Log filter text for a `messageGroupKey` group: the key without the collapsed
+ * payload placeholder, so the filter matches the lines the group counts.
+ *
+ * @example
+ * messageGroupFilter('Falling back {…}'); // 'Falling back'
+ * messageGroupFilter('Timeout');          // 'Timeout'
+ */
+export function messageGroupFilter(groupKey: string): string {
+  return groupKey.endsWith(COLLAPSED_JSON_PAYLOAD)
+    ? groupKey.slice(0, -COLLAPSED_JSON_PAYLOAD.length)
+    : groupKey;
 }
 
 /**

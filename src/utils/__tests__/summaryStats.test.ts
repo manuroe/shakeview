@@ -5,7 +5,7 @@
  * with simple fixture data and assert on concrete output values.
  */
 import { describe, it, expect } from 'vitest';
-import { computeSummaryStats } from '../summaryStats';
+import { computeSummaryStats, messageGroupFilter } from '../summaryStats';
 import {
   createParsedLogLine,
   createHttpRequest,
@@ -148,6 +148,11 @@ describe('computeSummaryStats — error / warning counts', () => {
     ];
     const result = computeSummaryStats(lines, [], [], [], [], null, null, null, buildIndex(lines));
     expect(result.warningsByType).toEqual([{ type: 'Falling back to unread room {…}', count: 2 }]);
+  });
+
+  it('filters a collapsed group by the text its lines share, without the placeholder', () => {
+    expect(messageGroupFilter('Falling back to unread room {…}')).toBe('Falling back to unread room');
+    expect(messageGroupFilter('Timeout')).toBe('Timeout');
   });
 
   it('caps errorsByType at 5 entries', () => {
