@@ -112,7 +112,8 @@ export function spanFilterValue(segment: string): string {
 
 // tracing's pretty format (matrix-sdk-crypto-wasm in Element Web) puts each span on its
 // own continuation line, leaf first: `    in matrix_sdk_crypto::machine::receive_sync_changes with since="…"`.
-const PRETTY_SPAN_RE = /^\s+in (\S+)(?: with (.+))?$/;
+// Trailing `\s*` absorbs the `\r` a CRLF log leaves after the `\n` split.
+const PRETTY_SPAN_RE = /^\s+in (\S+)(?: with (.+?))?\s*$/;
 
 /**
  * Span segments from pretty-format `in …` continuation lines, root first and
