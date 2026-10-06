@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { parseAllHttpRequests, parseLogFile } from '../logParser';
+import { locatePrettySourceRef, parseAllHttpRequests, parseLogFile } from '../logParser';
 import { ParsingError } from '../errorHandling';
 import { CRYPTO_WASM_PRETTY_ENTRY } from '../../test/fixtures';
 
@@ -1168,6 +1168,18 @@ describe('Element Web logs', () => {
       '    at /r/.cargo/registry/src/index.crates.io-1949cf8c/matrix-sdk-0.18.0/src/client/mod.rs:7',
     ].join('\n')).rawLogLines;
     expect(bare.filePath).toBe('crates/matrix-sdk/src/client/mod.rs');
+  });
+
+  it('locates the pretty-format source ref on its `at` line for the viewer to link', () => {
+    const [line] = parseLogFile(CRYPTO_WASM_PRETTY_ENTRY).rawLogLines;
+    const ref = locatePrettySourceRef(line.continuationLines!, line.filePath!, line.sourceLineNumber!);
+    expect(ref?.lineIndex).toBe(1);
+    const atLine = line.continuationLines![1];
+    expect(atLine.slice(ref!.start, ref!.end)).toBe(
+      '/home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
+    );
+    // A different location (e.g. from a `| … |` first line) is not on any continuation line.
+    expect(locatePrettySourceRef(line.continuationLines!, 'crates/x.rs', 1)).toBeNull();
   });
 
   it('ignores a pretty-format `at` line from another git dependency', () => {

@@ -123,6 +123,34 @@ function extractPrettySourceLocation(line: string): { filePath: string; sourceLi
 }
 
 /**
+ * Where an entry's pretty-format source reference sits in its continuation
+ * lines, so the viewer can link it: crypto-wasm puts the location on an
+ * `at …` line instead of the first line, where `| … |` references are linked.
+ * `start`/`end` bound the path:line text after `at ` on line `lineIndex`.
+ * Returns null when no continuation line names that location.
+ *
+ * @example
+ * locatePrettySourceRef(
+ *   ['    at /r/.cargo/git/checkouts/matrix-rust-sdk-5c/f333a32/crates/a/src/b.rs:7'],
+ *   'crates/a/src/b.rs', 7,
+ * ); // { lineIndex: 0, start: 7, end: 77 }
+ */
+export function locatePrettySourceRef(
+  continuationLines: readonly string[],
+  filePath: string,
+  sourceLineNumber: number,
+): { readonly lineIndex: number; readonly start: number; readonly end: number } | null {
+  for (let i = 0; i < continuationLines.length; i++) {
+    const line = continuationLines[i];
+    const loc = extractPrettySourceLocation(line);
+    if (loc && loc.filePath === filePath && loc.sourceLineNumber === sourceLineNumber) {
+      return { lineIndex: i, start: line.indexOf('at ') + 3, end: line.trimEnd().length };
+    }
+  }
+  return null;
+}
+
+/**
  * Extract file path and line number from a log line.
  * Matches the pipe-delimited pattern: | path/to/file.rs:42 |
  * Returns {filePath, sourceLineNumber} or {filePath: undefined, sourceLineNumber: undefined} if not found.
