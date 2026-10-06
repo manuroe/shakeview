@@ -83,6 +83,14 @@ describe('rustSdkShaFromLogs', () => {
     expect(rustSdkShaFromLogs([line])).toBe('f333a32');
   });
 
+  it('returns null when a newer crates.io build follows an older git build', () => {
+    const git = { rawText: 'x\n    at /r/.cargo/git/checkouts/matrix-rust-sdk-5cafb579/aaaaaaa/crates/a.rs:1' };
+    const registry = { rawText: 'x\n    at /r/.cargo/registry/src/index.crates.io-1949cf8c/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1' };
+    // The newest build names only a crate version: the older sha would be stale.
+    expect(rustSdkShaFromLogs([git, registry])).toBeNull();
+    expect(rustSdkShaFromLogs([registry, git])).toBe('aaaaaaa');
+  });
+
   it('returns null when no line names a checkout', () => {
     expect(rustSdkShaFromLogs([{ rawText: '2026-09-29T07:06:20.000Z I hello' }])).toBeNull();
   });

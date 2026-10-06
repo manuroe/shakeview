@@ -108,7 +108,13 @@ function stripMessagePrefix(message: string): string {
 // Both anchored on matrix-rust-sdk (its checkout, or a `matrix-sdk*` crate): other deps (ruma)
 // also have `crates/`, but every `.rs` link points at matrix-rust-sdk.
 const PRETTY_GIT_SOURCE_RE = /^\s+at \S*\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/[0-9a-f]+\/(crates\/\S+\.rs):(\d+)\s*$/;
-const PRETTY_REGISTRY_SOURCE_RE = /^\s+at \S*\/registry\/src\/[^/]+\/(matrix-sdk(?:-[a-z]+)*)-\d+\.\d+\.\d+[^/]*\/(\S+\.rs):(\d+)\s*$/;
+// `…/registry/src/<index>/matrix-sdk-crypto-0.18.0/`: a matrix-rust-sdk crate unpacked from
+// crates.io, capturing the crate name. Shared with `rustSdkShaFromLogs`, which must tell
+// these registry builds (no commit in the path) apart from git-checkout builds.
+const RUST_SDK_REGISTRY_CRATE = String.raw`\/registry\/src\/[^/]+\/(matrix-sdk(?:-[a-z]+)*)-\d+\.\d+\.\d+[^/]*\/`;
+/** Matches a crates.io matrix-rust-sdk crate path anywhere in a log entry. */
+export const RUST_SDK_REGISTRY_PATH_RE = new RegExp(RUST_SDK_REGISTRY_CRATE);
+const PRETTY_REGISTRY_SOURCE_RE = new RegExp(String.raw`^\s+at \S*` + RUST_SDK_REGISTRY_CRATE + String.raw`(\S+\.rs):(\d+)\s*$`);
 
 /**
  * Source location from a pretty-format `at …` continuation line, as the
