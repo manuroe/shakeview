@@ -404,7 +404,8 @@ export function SummaryView() {
                               onClick={() =>
                                 navigate(
                                   `/logs?filter=${encodeURIComponent(
-                                    error.type
+                                    // Drop the collapsed JSON placeholder: it is in no log line.
+                                    error.type.replace(/ \{…\}$/, '')
                                   )}`
                                 )
                               }
@@ -454,7 +455,8 @@ export function SummaryView() {
                               onClick={() =>
                                 navigate(
                                   `/logs?filter=${encodeURIComponent(
-                                    warning.type
+                                    // Drop the collapsed JSON placeholder: it is in no log line.
+                                    warning.type.replace(/ \{…\}$/, '')
                                   )}`
                                 )
                               }

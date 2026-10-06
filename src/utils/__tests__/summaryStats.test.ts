@@ -140,6 +140,16 @@ describe('computeSummaryStats — error / warning counts', () => {
     expect(result.errorsByType[1].type).toBe('Unique error');
   });
 
+  it('groups warnings that differ only by their trailing JSON payload (Element Web)', () => {
+    const msg = (room: string) => `2026-09-29T07:06:20.662Z W Falling back to unread room {"roomId":"${room}"}`;
+    const lines = [
+      createParsedLogLine({ lineNumber: 0, timestampUs: BASE_US, level: 'WARN', message: msg('!a:example.org') }),
+      createParsedLogLine({ lineNumber: 1, timestampUs: (BASE_US + STEP_US) as TimestampMicros, level: 'WARN', message: msg('!b:example.org') }),
+    ];
+    const result = computeSummaryStats(lines, [], [], [], [], null, null, null, buildIndex(lines));
+    expect(result.warningsByType).toEqual([{ type: 'Falling back to unread room {…}', count: 2 }]);
+  });
+
   it('caps errorsByType at 5 entries', () => {
     const lines = Array.from({ length: 10 }, (_, i) =>
       createParsedLogLine({

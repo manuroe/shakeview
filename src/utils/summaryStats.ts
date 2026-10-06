@@ -153,6 +153,21 @@ const EMPTY_STATS: SummaryStats = Object.freeze({
   httpRequestSpans: [] as readonly HttpRequestSpan[],
 });
 
+// Element Web loggers append their arguments as JSON (`… found {"roomId":"!a:b",…}`),
+// which would split one warning into a group per payload.
+const JSON_PAYLOAD_RE = / \{".*$/s;
+
+/**
+ * Key that groups errors/warnings by type: the core message with any trailing
+ * JSON payload collapsed to ` {…}`.
+ *
+ * @example
+ * messageGroupKey('2026-01-01T00:00:00.000Z W Falling back {"roomId":"!a:b"}'); // 'Falling back {…}'
+ */
+export function messageGroupKey(message: string): string {
+  return extractCoreMessage(message).replace(JSON_PAYLOAD_RE, ' {…}');
+}
+
 /**
  * Compute all statistics shown in `SummaryView`.
  *
@@ -247,10 +262,10 @@ export function computeSummaryStats(
   for (const line of filteredLogLines) {
     levelCounts[line.level]++;
     if (line.level === 'ERROR') {
-      const core = extractCoreMessage(line.message);
+      const core = messageGroupKey(line.message);
       errorMessages[core] = (errorMessages[core] ?? 0) + 1;
     } else if (line.level === 'WARN') {
-      const core = extractCoreMessage(line.message);
+      const core = messageGroupKey(line.message);
       warningMessages[core] = (warningMessages[core] ?? 0) + 1;
     }
   }
