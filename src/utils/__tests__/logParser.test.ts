@@ -4,8 +4,9 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { parseAllHttpRequests, parseLogFile } from '../logParser';
+import { locatePrettySourceRef, parseAllHttpRequests, parseLogFile } from '../logParser';
 import { ParsingError } from '../errorHandling';
+import { CRYPTO_WASM_PRETTY_ENTRY } from '../../test/fixtures';
 
 // Sample log line formats from real rageshake logs
 const SEND_LINE = '2026-01-26T17:02:25.042916Z DEBUG matrix_sdk::http_client::native: Sending request num_attempt=1 | crates/matrix-sdk/src/http_client/native.rs:78 | spans: root > sync_once{conn_id="room-list"} > send{request_id="REQ-62" method=POST uri="https://matrix-client.matrix.org/_matrix/client/unstable/org.matrix.simplified_msc3575/sync" request_size="5.9k"}';
@@ -1146,5 +1147,46 @@ describe('Element Web logs', () => {
 
   it('lists web /sync requests as sync requests', () => {
     expect(parseLogFile(WEB_LOG).requests.map((r) => r.timeout)).toEqual([30000, 30000]);
+  });
+
+  it('reads the source location of a crypto-wasm line from its pretty-format `at` line', () => {
+    const [line] = parseLogFile(CRYPTO_WASM_PRETTY_ENTRY).rawLogLines;
+    expect(line.filePath).toBe('crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs');
+    expect(line.sourceLineNumber).toBe(211);
+  });
+
+  it('maps a crates.io `at` path (release crypto-wasm builds) onto the repo crate path', () => {
+    const [line] = parseLogFile([
+      '2026-01-15T10:00:06.800Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
+      '    at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912',
+    ].join('\n')).rawLogLines;
+    expect(line.filePath).toBe('crates/matrix-sdk-crypto/src/machine/mod.rs');
+    expect(line.sourceLineNumber).toBe(1912);
+    // The bare `matrix-sdk` crate has no suffix before its version.
+    const [bare] = parseLogFile([
+      '2026-01-15T10:00:06.800Z D DEBUG matrix_sdk: hi',
+      '    at /r/.cargo/registry/src/index.crates.io-1949cf8c/matrix-sdk-0.18.0/src/client/mod.rs:7',
+    ].join('\n')).rawLogLines;
+    expect(bare.filePath).toBe('crates/matrix-sdk/src/client/mod.rs');
+  });
+
+  it('locates the pretty-format source ref on its `at` line for the viewer to link', () => {
+    const [line] = parseLogFile(CRYPTO_WASM_PRETTY_ENTRY).rawLogLines;
+    const ref = locatePrettySourceRef(line.continuationLines!, line.filePath!, line.sourceLineNumber!);
+    expect(ref?.lineIndex).toBe(1);
+    const atLine = line.continuationLines![1];
+    expect(atLine.slice(ref!.start, ref!.end)).toBe(
+      '/home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb5792f78b8d1/f333a32/crates/matrix-sdk-crypto/src/session_manager/group_sessions/share_strategy.rs:211',
+    );
+    // A different location (e.g. from a `| … |` first line) is not on any continuation line.
+    expect(locatePrettySourceRef(line.continuationLines!, 'crates/x.rs', 1)).toBeNull();
+  });
+
+  it('ignores a pretty-format `at` line from another git dependency', () => {
+    const [line] = parseLogFile([
+      '2026-09-29T07:06:20.662Z D DEBUG ruma: hi',
+      '    at /home/runner/.cargo/git/checkouts/ruma-1a2b3c/abc1234/crates/ruma-events/src/x.rs:9',
+    ].join('\n')).rawLogLines;
+    expect(line.filePath).toBeUndefined();
   });
 });

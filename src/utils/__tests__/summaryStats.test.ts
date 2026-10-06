@@ -5,7 +5,7 @@
  * with simple fixture data and assert on concrete output values.
  */
 import { describe, it, expect } from 'vitest';
-import { computeSummaryStats } from '../summaryStats';
+import { computeSummaryStats, messageGroupFilter, messageGroupKey } from '../summaryStats';
 import {
   createParsedLogLine,
   createHttpRequest,
@@ -138,6 +138,32 @@ describe('computeSummaryStats — error / warning counts', () => {
     expect(result.errorsByType[0].type).toBe('Timeout');
     expect(result.errorsByType[0].count).toBe(2);
     expect(result.errorsByType[1].type).toBe('Unique error');
+  });
+
+  it('groups warnings that differ only by their trailing JSON payload (Element Web)', () => {
+    const msg = (room: string) => `2026-09-29T07:06:20.662Z W Falling back to unread room {"roomId":"${room}"}`;
+    const lines = [
+      createParsedLogLine({ lineNumber: 0, timestampUs: BASE_US, level: 'WARN', message: msg('!a:example.org') }),
+      createParsedLogLine({ lineNumber: 1, timestampUs: (BASE_US + STEP_US) as TimestampMicros, level: 'WARN', message: msg('!b:example.org') }),
+    ];
+    const result = computeSummaryStats(lines, [], [], [], [], null, null, null, buildIndex(lines));
+    expect(result.warningsByType).toEqual([{ type: 'Falling back to unread room {…}', count: 2 }]);
+  });
+
+  it('keeps the diagnostic text after an inline JSON object, and collapses nested or escaped payloads', () => {
+    const at = '2026-09-29T07:06:20.662Z E ';
+    // Text after the object is the reason: two different failures stay two groups.
+    expect(messageGroupKey(`${at}Failed to process event {"type":"m.room.message"}: missing body`))
+      .toBe('Failed to process event {"type":"m.room.message"}: missing body');
+    expect(messageGroupKey(`${at}Failed to process event {"type":"m.room.message"}: missing sender`))
+      .toBe('Failed to process event {"type":"m.room.message"}: missing sender');
+    expect(messageGroupKey(`${at}Sync {"room":{"id":"!a:example.org","n":[1,2]}}`)).toBe('Sync {…}');
+    expect(messageGroupKey(`${at}Bad name {"name":"say \\"hi\\" {\\"x\\"}"}`)).toBe('Bad name {…}');
+  });
+
+  it('filters a collapsed group by the text its lines share, without the placeholder', () => {
+    expect(messageGroupFilter('Falling back to unread room {…}')).toBe('Falling back to unread room');
+    expect(messageGroupFilter('Timeout')).toBe('Timeout');
   });
 
   it('caps errorsByType at 5 entries', () => {

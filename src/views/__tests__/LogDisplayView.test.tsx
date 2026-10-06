@@ -306,6 +306,33 @@ describe('LogDisplayView gap arrows & expansion', () => {
       await waitFor(() => expect(swiftLink.className).toMatch(/sourceLink(?!Inactive)/));
     });
 
+    it('links the `at` line of Element Web crypto-wasm entries, git and crates.io paths', () => {
+      const gitAt = '/home/runner/.cargo/git/checkouts/matrix-rust-sdk-5cafb579/f333a32/crates/matrix-sdk-crypto/src/olm/session.rs:42';
+      const registryAt = '/home/runner/.cargo/registry/src/index.crates.io-1949cf8c/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912';
+      const parsed = parseAllHttpRequests([
+        '2026-09-29T07:06:20.662Z D DEBUG matrix_sdk_crypto::olm: Decrypted an Olm message',
+        `    at ${gitAt}`,
+        '2026-09-29T07:06:21.000Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event',
+        `    at ${registryAt}`,
+        '    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!r:example.org"',
+      ].join('\n'));
+      useLogStore.setState({ rawLogLines: parsed.rawLogLines });
+
+      render(<LogDisplayView />);
+
+      expect(screen.getByRole('link', { name: gitAt })).toHaveAttribute(
+        'href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk-crypto/src/olm/session.rs#L42',
+      );
+      // crates.io paths are mapped onto the repo crate, not linked verbatim.
+      const registryLink = screen.getByRole('link', { name: registryAt });
+      expect(registryLink).toHaveAttribute(
+        'href', 'https://github.com/matrix-org/matrix-rust-sdk/blob/main/crates/matrix-sdk-crypto/src/machine/mod.rs#L1912',
+      );
+      expect(registryLink.className).toMatch(/sourceLinkInactive/);
+      // The rest of the continuation stays plain text.
+      expect(screen.getByText(/in matrix_sdk_crypto::machine::decrypt_room_event/)).toBeInTheDocument();
+    });
+
     it('shows active link styling on keyboard focus and restores inactive on blur', async () => {
       const parsed = parseAllHttpRequests(RUST_LINE);
       useLogStore.setState({ rawLogLines: parsed.rawLogLines });

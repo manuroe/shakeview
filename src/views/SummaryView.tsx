@@ -11,7 +11,7 @@ import { calculateTimeRangeMicros, formatTimestamp, formatDuration, getMinMaxTim
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import { stripMatrixClientPath } from '../utils/uriUtils';
-import { computeSummaryStats } from '../utils/summaryStats';
+import { computeSummaryStats, messageGroupFilter } from '../utils/summaryStats';
 import type { TimestampMicros } from '../types/time.types';
 import type { SelectionRange } from '../hooks/useChartInteraction';
 import styles from './SummaryView.module.css';
@@ -404,7 +404,7 @@ export function SummaryView() {
                               onClick={() =>
                                 navigate(
                                   `/logs?filter=${encodeURIComponent(
-                                    error.type
+                                    messageGroupFilter(error.type)
                                   )}`
                                 )
                               }
@@ -454,7 +454,7 @@ export function SummaryView() {
                               onClick={() =>
                                 navigate(
                                   `/logs?filter=${encodeURIComponent(
-                                    warning.type
+                                    messageGroupFilter(warning.type)
                                   )}`
                                 )
                               }

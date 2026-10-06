@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseSpans, spanSegments, spanFilterValue } from '../spansParser';
+import { CRYPTO_WASM_PRETTY_ENTRY } from '../../test/fixtures';
 
 // Real lines shaped like ../sample.log.
 const line = (tail: string) =>
@@ -115,5 +116,29 @@ describe('spanFilterValue', () => {
 
   it('falls back to the name for an empty field body', () => {
     expect(spanFilterValue('op{}')).toBe('op');
+  });
+});
+
+describe('spanSegments — tracing pretty format (Element Web crypto-wasm)', () => {
+  it('reads the `in …` lines root first, keeping the last path segment as the name', () => {
+    expect(spanSegments(CRYPTO_WASM_PRETTY_ENTRY)).toEqual([
+      'share_room_key{room_id="!room-af33e3161742:example.org" session_id="CCJQ"}',
+      'collect_session_recipients',
+    ]);
+    expect(parseSpans(CRYPTO_WASM_PRETTY_ENTRY)[0]).toEqual({
+      name: 'share_room_key',
+      fields: { room_id: '!room-af33e3161742:example.org', session_id: 'CCJQ' },
+    });
+  });
+
+  it('keeps every span of a CRLF log', () => {
+    expect(spanSegments(CRYPTO_WASM_PRETTY_ENTRY.replace(/\n/g, '\r\n') + '\r')).toEqual([
+      'share_room_key{room_id="!room-af33e3161742:example.org" session_id="CCJQ"}',
+      'collect_session_recipients',
+    ]);
+  });
+
+  it('returns [] for a multi-line entry with no `in …` line', () => {
+    expect(spanSegments('2026-09-29T07:06:20.662Z W Failed\n    at Object.foo (bundle.js:1:2)')).toEqual([]);
   });
 });

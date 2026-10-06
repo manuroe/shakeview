@@ -110,9 +110,32 @@ export function spanFilterValue(segment: string): string {
   return first ? `${name}{${first}` : name;
 }
 
+// tracing's pretty format (matrix-sdk-crypto-wasm in Element Web) puts each span on its
+// own continuation line, leaf first: `    in matrix_sdk_crypto::machine::receive_sync_changes with since="…"`.
+// Trailing `\s*` absorbs the `\r` a CRLF log leaves after the `\n` split.
+const PRETTY_SPAN_RE = /^\s+in (\S+)(?: with (.+?))?\s*$/;
+
+/**
+ * Span segments from pretty-format `in …` continuation lines, root first and
+ * rendered `name{fields}` like the compact chain. The name keeps only the last
+ * `::` segment, as compact spans name the function alone.
+ */
+function prettySpanSegments(body: string): string[] {
+  const segments: string[] = [];
+  for (const line of body.split('\n')) {
+    const m = line.match(PRETTY_SPAN_RE);
+    if (!m) continue;
+    const sep = m[1].lastIndexOf('::');
+    const name = sep === -1 ? m[1] : m[1].slice(sep + 2);
+    segments.push(m[2] ? `${name}{${m[2].trim()}}` : name);
+  }
+  return segments.reverse();
+}
+
 /**
  * Return the raw span-chain segments (the whole span, still quoted/braced, as
- * it appears in the line), or [] when there is no `spans:` suffix. In `/logs`
+ * it appears in the line), or [] when there is neither a `spans:` suffix nor
+ * pretty-format `in …` continuation lines. In `/logs`
  * each segment is the clickable chip's text; the value it actually filters by
  * is derived separately via `spanFilterValue` (the stable name+first-field
  * prefix, so it survives a span's progressively-recorded fields).
@@ -128,7 +151,7 @@ export function spanSegments(rawText: ParsedLogLine['rawText']): string[] {
   const firstLine = nl === -1 ? rawText : rawText.slice(0, nl);
 
   const idx = firstLine.lastIndexOf(SPANS_MARKER);
-  if (idx === -1) return [];
+  if (idx === -1) return nl === -1 ? [] : prettySpanSegments(rawText.slice(nl + 1));
 
   const chain = firstLine.slice(idx + SPANS_MARKER.length).trim();
   if (!chain) return [];

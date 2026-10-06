@@ -101,6 +101,61 @@ function stripMessagePrefix(message: string): string {
     .trim();
 }
 
+// Pretty-format source line, in one of two forms depending on how crypto-wasm pulled the SDK:
+//   develop builds (git dep):      `    at /home/runner/.cargo/git/checkouts/matrix-rust-sdk-<h>/<sha>/crates/x/src/y.rs:211`
+//   release builds (crates.io dep): `    at /home/runner/.cargo/registry/src/index.crates.io-<h>/matrix-sdk-crypto-0.18.0/src/y.rs:1912`
+// Both map to the repo-relative `crates/<crate>/…` path so the GitHub link resolves like a `| … |` one.
+// Both anchored on matrix-rust-sdk (its checkout, or a `matrix-sdk*` crate): other deps (ruma)
+// also have `crates/`, but every `.rs` link points at matrix-rust-sdk.
+const PRETTY_GIT_SOURCE_RE = /^\s+at \S*\/checkouts\/matrix-rust-sdk-[0-9a-f]+\/[0-9a-f]+\/(crates\/\S+\.rs):(\d+)\s*$/;
+// `…/registry/src/<index>/matrix-sdk-crypto-0.18.0/`: a matrix-rust-sdk crate unpacked from
+// crates.io, capturing the crate name. Shared with `rustSdkShaFromLogs`, which must tell
+// these registry builds (no commit in the path) apart from git-checkout builds.
+const RUST_SDK_REGISTRY_CRATE = String.raw`\/registry\/src\/[^/]+\/(matrix-sdk(?:-[a-z]+)*)-\d+\.\d+\.\d+[^/]*\/`;
+/** Matches a crates.io matrix-rust-sdk crate path anywhere in a log entry. */
+export const RUST_SDK_REGISTRY_PATH_RE = new RegExp(RUST_SDK_REGISTRY_CRATE);
+const PRETTY_REGISTRY_SOURCE_RE = new RegExp(String.raw`^\s+at \S*` + RUST_SDK_REGISTRY_CRATE + String.raw`(\S+\.rs):(\d+)\s*$`);
+
+/**
+ * Source location from a pretty-format `at …` continuation line, as the
+ * matrix-rust-sdk repo-relative path, or null when the line is not one.
+ */
+function extractPrettySourceLocation(line: string): { filePath: string; sourceLineNumber: number } | null {
+  const git = line.match(PRETTY_GIT_SOURCE_RE);
+  if (git) return { filePath: git[1], sourceLineNumber: parseInt(git[2], 10) };
+  const registry = line.match(PRETTY_REGISTRY_SOURCE_RE);
+  if (registry) return { filePath: `crates/${registry[1]}/${registry[2]}`, sourceLineNumber: parseInt(registry[3], 10) };
+  return null;
+}
+
+/**
+ * Where an entry's pretty-format source reference sits in its continuation
+ * lines, so the viewer can link it: crypto-wasm puts the location on an
+ * `at …` line instead of the first line, where `| … |` references are linked.
+ * `start`/`end` bound the path:line text after `at ` on line `lineIndex`.
+ * Returns null when no continuation line names that location.
+ *
+ * @example
+ * locatePrettySourceRef(
+ *   ['    at /r/.cargo/git/checkouts/matrix-rust-sdk-5c/f333a32/crates/a/src/b.rs:7'],
+ *   'crates/a/src/b.rs', 7,
+ * ); // { lineIndex: 0, start: 7, end: 77 }
+ */
+export function locatePrettySourceRef(
+  continuationLines: readonly string[],
+  filePath: string,
+  sourceLineNumber: number,
+): { readonly lineIndex: number; readonly start: number; readonly end: number } | null {
+  for (let i = 0; i < continuationLines.length; i++) {
+    const line = continuationLines[i];
+    const loc = extractPrettySourceLocation(line);
+    if (loc && loc.filePath === filePath && loc.sourceLineNumber === sourceLineNumber) {
+      return { lineIndex: i, start: line.indexOf('at ') + 3, end: line.trimEnd().length };
+    }
+  }
+  return null;
+}
+
 /**
  * Extract file path and line number from a log line.
  * Matches the pipe-delimited pattern: | path/to/file.rs:42 |
@@ -224,6 +279,15 @@ export function parseAllHttpRequests(logContent: string): AllHttpRequestsResult 
         lastEntry.continuationLines.push(line);
         // Extend rawText so search queries can match content in continuation lines.
         lastEntry.rawText = lastEntry.rawText + '\n' + line;
+        // matrix-sdk-crypto-wasm (Element Web) logs in tracing's pretty format: the
+        // source location is an `at ….rs:N` continuation line, not a `| … |` field.
+        if (lastEntry.filePath === undefined) {
+          const at = extractPrettySourceLocation(line);
+          if (at) {
+            lastEntry.filePath = at.filePath;
+            lastEntry.sourceLineNumber = at.sourceLineNumber;
+          }
+        }
       } else {
         // Orphaned continuation line: appears before any timestamped entry (e.g.
         // a malformed log that starts mid-message). Emit it as a standalone UNKNOWN

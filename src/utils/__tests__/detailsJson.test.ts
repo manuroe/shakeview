@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseDetailsJson } from '../detailsJson';
+import { parseDetailsJson, rustSdkShaFromLogs } from '../detailsJson';
 import { isValidPublicHomeserver, mxcToThumbnailUrl, userInitial } from '../matrixProfile';
+import { CRYPTO_WASM_PRETTY_ENTRY } from '../../test/fixtures';
 
 describe('parseDetailsJson', () => {
   it('extracts the fields shown by the archive-style details panel', () => {
@@ -63,5 +64,34 @@ describe('matrixProfile helpers', () => {
   it('accepts public domains and rejects localhost-style hosts', () => {
     expect(isValidPublicHomeserver('matrix.org')).toBe(true);
     expect(isValidPublicHomeserver('localhost')).toBe(false);
+  });
+});
+
+describe('rustSdkShaFromLogs', () => {
+  it('reads the matrix-rust-sdk commit from a crypto-wasm checkout path', () => {
+    const lines = [{ rawText: '2026-09-29T07:06:20.000Z I no path here' }, { rawText: CRYPTO_WASM_PRETTY_ENTRY }];
+    expect(rustSdkShaFromLogs(lines)).toBe('f333a32');
+  });
+
+  it('prefers the newest line when the archive spans builds', () => {
+    const at = (sha: string) => ({ rawText: `x\n    at /r/.cargo/git/checkouts/matrix-rust-sdk-5cafb579/${sha}/crates/a.rs:1` });
+    expect(rustSdkShaFromLogs([at('aaaaaaa'), at('bbbbbbb')])).toBe('bbbbbbb');
+  });
+
+  it('reads the commit under a custom CARGO_HOME', () => {
+    const line = { rawText: 'x\n    at /usr/local/cargo/git/checkouts/matrix-rust-sdk-5cafb579/f333a32/crates/matrix-sdk-crypto/src/olm/session.rs:42' };
+    expect(rustSdkShaFromLogs([line])).toBe('f333a32');
+  });
+
+  it('returns null when a newer crates.io build follows an older git build', () => {
+    const git = { rawText: 'x\n    at /r/.cargo/git/checkouts/matrix-rust-sdk-5cafb579/aaaaaaa/crates/a.rs:1' };
+    const registry = { rawText: 'x\n    at /r/.cargo/registry/src/index.crates.io-1949cf8c/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1' };
+    // The newest build names only a crate version: the older sha would be stale.
+    expect(rustSdkShaFromLogs([git, registry])).toBeNull();
+    expect(rustSdkShaFromLogs([registry, git])).toBe('aaaaaaa');
+  });
+
+  it('returns null when no line names a checkout', () => {
+    expect(rustSdkShaFromLogs([{ rawText: '2026-09-29T07:06:20.000Z I hello' }])).toBeNull();
   });
 });

@@ -14,8 +14,8 @@ Try both with the **"Try with demo logs: Mobile · Web"** buttons on the landing
 | Timestamps | microseconds | milliseconds |
 | Log files | one per hour and per process (`console.…`, `nse.…`, `shareextension.…`) | one per page load (`logs-0000` is the newest, `logs-0001` the one before, …) |
 | **By target** view | Rust module path (`matrix_sdk::send_queue`) or `[matrix-rust-sdk]` | logger name (`FetchHttpApi`, `MatrixClientPeg`, `Presence`) or Rust module path for crypto lines |
-| **By span** view | yes | hidden: web logs have no spans |
-| Source links | GitHub links for `.rs` / `.swift` file references | none: web lines name no source file |
+| **By span** view | yes | crypto lines only (the `in …` lines matrix-sdk-crypto-wasm writes); hidden when there are none |
+| Source links | GitHub links for `.rs` / `.swift` file references | crypto lines only, from their `at …/matrix-sdk-crypto…/src/….rs:N` line; other web lines name no source file |
 | **HTTP Requests** | method, URL, status, duration, sizes, retries | method, URL, status, duration. No sizes, no retries (see below) |
 | Request ids | as logged by the SDK | numbered `1`, `2`, `3`… in time order |
 | Focus a request | all lines with that request id | exactly its 2 lines: the request and the response |
@@ -26,7 +26,7 @@ Try both with the **"Try with demo logs: Mobile · Web"** buttons on the landing
 | Background refresh band | iOS | — |
 | Crash marker | iOS (next launch), Android (`FATAL EXCEPTION`) | — |
 | Sentry reports | iOS, Android | — |
-| Details panel (archive) | app, version, linked Rust SDK commit | app, version. No SDK commit: web reports a crypto version instead, shown by the CLI only for now |
+| Details panel (archive) | app, version, linked Rust SDK commit | app, version. No SDK commit: web reports a crypto version instead, shown by the CLI only for now (see below) |
 | Anonymisation | yes | yes, including `matrix.to` and `app.element.io/#/room/…` links |
 
 ## Element Web specifics
@@ -62,6 +62,17 @@ As a result:
 - a request with no response line shows as **incomplete**, as on Element X;
 - network failures show their error text (`TypeError: NetworkError when attempting to fetch resource.`)
   instead of a status code.
+
+**Crypto lines are the Rust SDK's own.** matrix-sdk-crypto-wasm logs in tracing's multi-line format: the source
+file on an `at …` line, then one `in …` line per span, innermost first. Shakeview reads both, so these lines get
+source links and fill the **By span** view. The `at` path also tells which matrix-rust-sdk the build used:
+- a develop build pulls it from git, `…/checkouts/matrix-rust-sdk-<hash>/f333a32/crates/…`, and the CLI `summary`
+  reports that commit (`f333a32`) as `sdkSha`;
+- a release build pulls it from crates.io, `…/registry/src/…/matrix-sdk-crypto-0.18.0/src/…`, which names only
+  the crate version: `sdkSha` stays empty, and the matching tag is `matrix-sdk-crypto-0.18.0`.
+
+**Errors and warnings are grouped without their JSON.** Element Web appends logger arguments as JSON
+(`… found {"roomId":"!a:example.org"}`). The summary groups such lines as `… found {…}`, so one warning is not split per room.
 
 **URL query values are hidden.** Element Web replaces every query value with `xxx` before logging
 (`/sync?filter=xxx&timeout=xxx&since=xxx`). That is why the Sync view cannot tell catch-up syncs from long-polls.

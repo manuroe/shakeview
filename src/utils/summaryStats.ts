@@ -153,6 +153,49 @@ const EMPTY_STATS: SummaryStats = Object.freeze({
   httpRequestSpans: [] as readonly HttpRequestSpan[],
 });
 
+// Element Web loggers append their arguments as JSON (`… found {"roomId":"!a:b",…}`),
+// which would split one warning into a group per payload.
+const JSON_PAYLOAD_START = ' {"';
+
+/** Stands in for the payload `messageGroupKey` collapsed; it appears in no log line. */
+export const COLLAPSED_JSON_PAYLOAD = ' {…}';
+
+/**
+ * Key that groups errors/warnings by type: the core message with a trailing
+ * JSON payload collapsed to ` {…}`. Only a payload that is complete JSON up to
+ * the end of the message collapses: text after an inline object
+ * (`… {"type":"x"}: missing body`) is the diagnostic, so that message is kept whole.
+ *
+ * @example
+ * messageGroupKey('2026-01-01T00:00:00.000Z W Falling back {"roomId":"!a:b"}'); // 'Falling back {…}'
+ * messageGroupKey('2026-01-01T00:00:00.000Z E Failed {"type":"x"}: missing body'); // unchanged core
+ */
+export function messageGroupKey(message: string): string {
+  const core = extractCoreMessage(message);
+  const at = core.indexOf(JSON_PAYLOAD_START);
+  if (at === -1) return core;
+  try {
+    JSON.parse(core.slice(at + 1));
+  } catch {
+    return core; // not a complete trailing payload: inline JSON followed by text
+  }
+  return core.slice(0, at) + COLLAPSED_JSON_PAYLOAD;
+}
+
+/**
+ * Log filter text for a `messageGroupKey` group: the key without the collapsed
+ * payload placeholder, so the filter matches the lines the group counts.
+ *
+ * @example
+ * messageGroupFilter('Falling back {…}'); // 'Falling back'
+ * messageGroupFilter('Timeout');          // 'Timeout'
+ */
+export function messageGroupFilter(groupKey: string): string {
+  return groupKey.endsWith(COLLAPSED_JSON_PAYLOAD)
+    ? groupKey.slice(0, -COLLAPSED_JSON_PAYLOAD.length)
+    : groupKey;
+}
+
 /**
  * Compute all statistics shown in `SummaryView`.
  *
@@ -247,10 +290,10 @@ export function computeSummaryStats(
   for (const line of filteredLogLines) {
     levelCounts[line.level]++;
     if (line.level === 'ERROR') {
-      const core = extractCoreMessage(line.message);
+      const core = messageGroupKey(line.message);
       errorMessages[core] = (errorMessages[core] ?? 0) + 1;
     } else if (line.level === 'WARN') {
-      const core = extractCoreMessage(line.message);
+      const core = messageGroupKey(line.message);
       warningMessages[core] = (warningMessages[core] ?? 0) + 1;
     }
   }

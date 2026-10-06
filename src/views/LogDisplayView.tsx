@@ -14,7 +14,7 @@ import { isInputFocused, metaKey } from '../utils/shortcuts';
 import { generateGitHubSourceUrl, resolveSwiftFilenameToBlobUrl } from '../utils/githubLinkGenerator';
 import { detectCollapseGroups, type CollapseGroupInfo } from '../utils/logCollapsingUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
-import { HTTP_CLIENT_ERROR_RE } from '../utils/logParser';
+import { HTTP_CLIENT_ERROR_RE, locatePrettySourceRef } from '../utils/logParser';
 import { buildProcessColorMap } from '../utils/processColors';
 import { deriveAppStateSegments } from '../utils/lifecycleEvents';
 import { makeRowStripeColorer } from '../utils/laneStripe';
@@ -629,19 +629,14 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
             </button>
           );
         } else {
-          renderedParts.push(
-            <a
-              key={`line-${originalIndex}-${spec.keyPrefix}-link-${i}`}
-              href={spec.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={isHovered ? styles.sourceLink : styles.sourceLinkInactive}
-              title={isHovered ? spec.title : undefined}
-              onClick={spec.onClick}
-            >
-              {renderWithSearchHighlights(linkedText, `${spec.keyPrefix}-text-${i}`)}
-            </a>
-          );
+          renderedParts.push(renderHoverLink(
+            `line-${originalIndex}-${spec.keyPrefix}-link-${i}`,
+            spec.href,
+            spec.title,
+            isHovered,
+            renderWithSearchHighlights(linkedText, `${spec.keyPrefix}-text-${i}`),
+            spec.onClick,
+          ));
         }
 
         cursor = spec.end;
@@ -678,6 +673,50 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
       error: styles.levelError,
     };
     return levelMap[level.toLowerCase()] || styles.levelUnknown;
+  };
+
+  // External link (GitHub source, Sentry) that reads as plain text until its row
+  // is hovered or focused, so log rows don't turn into a wall of link styling.
+  const renderHoverLink = (
+    key: string,
+    href: string,
+    title: string,
+    isHovered: boolean,
+    content: React.ReactNode,
+    onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void,
+  ): React.ReactNode => (
+    <a
+      key={key}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={isHovered ? styles.sourceLink : styles.sourceLinkInactive}
+      title={isHovered ? title : undefined}
+      onClick={onClick}
+    >
+      {content}
+    </a>
+  );
+
+  // Continuation lines render as plain text, except a pretty-format `at …` line
+  // (crypto-wasm, Element Web) carrying the entry's source location: there is no
+  // `| … |` reference on the first line to link, so its path is linked here.
+  const renderContinuation = (line: ParsedLogLine, originalIndex: number): React.ReactNode => {
+    const lines = line.continuationLines ?? [];
+    const text = lines.join('\n');
+    if (!line.filePath || !line.sourceLineNumber) return text;
+    const githubUrl = generateGitHubSourceUrl(line.filePath, line.sourceLineNumber);
+    const ref = githubUrl ? locatePrettySourceRef(lines, line.filePath, line.sourceLineNumber) : null;
+    if (!githubUrl || !ref) return text;
+    const refLine = lines[ref.lineIndex];
+    const isHovered = hoveredLineIndex === originalIndex;
+    return (
+      <>
+        {[...lines.slice(0, ref.lineIndex), refLine.slice(0, ref.start)].join('\n')}
+        {renderHoverLink(`line-${originalIndex}-source-continuation`, githubUrl, 'View on GitHub', isHovered, refLine.slice(ref.start, ref.end))}
+        {[refLine.slice(ref.end), ...lines.slice(ref.lineIndex + 1)].join('\n')}
+      </>
+    );
   };
 
   const getDisplayText = (line: ParsedLogLine): string => {
@@ -1101,7 +1140,7 @@ export function LogDisplayView({ requestFilter = '', defaultShowOnlyMatching: _d
                 </span>
                 {(line.continuationLines?.length ?? 0) > 0 && (
                   <div className={styles.logLineContinuation}>
-                    {line.continuationLines!.join('\n')}
+                    {renderContinuation(line, index)}
                   </div>
                 )}
                 {collapseInfo && gapBelow && (
