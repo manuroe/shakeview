@@ -380,7 +380,9 @@ function isBareKey(k: string): boolean {
  *
  * Bare domains are few (< 20), so their alternation stays cheap; longest first
  * so a shorter key never consumes a longer overlapping one. An identifier
- * missing from `map` keeps its text but still has its domains replaced.
+ * missing from `map` is not consumed: the scan resumes one character in, so a
+ * domain inside it, or straddling its end (`admin@domain-<hash>.org`, where the
+ * alias pattern stops at the `.`), is still replaced.
  */
 function compileReplacer(map: Record<string, string>, idSource: string): (text: string) => string {
   const domainSource = Object.keys(map)
@@ -388,11 +390,24 @@ function compileReplacer(map: Record<string, string>, idSource: string): (text: 
     .sort((a, b) => b.length - a.length)
     .map(escapeRegExp)
     .join('|') || '(?!)';
-  const domainRe = new RegExp(domainSource, 'g');
   // Fresh regex instance per compiled replacer so each closure owns its own
   // lastIndex state and they don't interfere with each other.
   const re = new RegExp(`${idSource}|${domainSource}`, 'g');
-  return (text) => text.replace(re, (m) => map[m] ?? m.replace(domainRe, (d) => map[d]));
+  return (text) => {
+    let out = '';
+    let last = 0;
+    re.lastIndex = 0;
+    for (let m = re.exec(text); m !== null; m = re.exec(text)) {
+      const alias = map[m[0]];
+      if (alias === undefined) {
+        re.lastIndex = m.index + 1;
+        continue;
+      }
+      out += text.slice(last, m.index) + alias;
+      last = re.lastIndex;
+    }
+    return out + text.slice(last);
+  };
 }
 
 /**

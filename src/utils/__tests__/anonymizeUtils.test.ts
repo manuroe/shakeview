@@ -625,6 +625,14 @@ describe('round-trip anonymization', () => {
     expect(applyUnanonymization(out, dict)).toBe(text);
   });
 
+  it('restores a domain alias right after a sigil (email, URL fragment)', async () => {
+    // `@domain-<hash>` matches the alias pattern up to the `.`; it is no alias,
+    // so the domain alias straddling its end must still be restored.
+    const text = '@a:example.org mail admin@example.org, see https://x/#example.org';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(applyUnanonymization(applyAnonymization(text, dict), dict)).toBe(text);
+  });
+
   it('different domains get different aliases', async () => {
     const lines = [
       makeLine(0, '@alice:server-a.org and @bob:server-b.org'),
