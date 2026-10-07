@@ -611,6 +611,20 @@ describe('round-trip anonymization', () => {
     });
   });
 
+  it('keeps domain aliases stable when the input already holds an alias as a server name', async () => {
+    // An anonymized ID pasted back into the app being logged (e.g. a shakeview
+    // permalink opened in Element) puts `domain-<hash>.org` in the raw text as a
+    // server name. Bare domains must not be replaced inside aliases already
+    // written, or every ID on example.org gets that alias's alias instead.
+    const alias = (await buildAnonymizationDictionaryFromTexts(['@a:example.org'], SALT)).forward['example.org'];
+    const text = `!abc:example.org on matrix-client.example.org, pasted !xyz:${alias}`;
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const out = applyAnonymization(text, dict);
+    expect(out).toContain(`${dict.forward['!abc:example.org']} on matrix-client.${alias}`);
+    expect(dict.forward['!abc:example.org'].split(':')[1]).toBe(alias);
+    expect(applyUnanonymization(out, dict)).toBe(text);
+  });
+
   it('different domains get different aliases', async () => {
     const lines = [
       makeLine(0, '@alice:server-a.org and @bob:server-b.org'),

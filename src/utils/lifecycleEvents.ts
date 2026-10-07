@@ -160,7 +160,7 @@ const RULES: readonly LifecycleRule[] = [
 ];
 
 /** Escape regex metacharacters so a literal substring can go in an alternation. */
-function escapeRegExp(s: string): string {
+export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
