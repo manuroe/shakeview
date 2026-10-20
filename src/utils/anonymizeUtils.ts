@@ -109,6 +109,40 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
 );
 
 /**
+ * Matches the host of a URL, plain (`https://host`) or percent-encoded inside
+ * another URL (`https%3A%2F%2Fhost`); group 1 is the host, without its port.
+ *
+ * A homeserver's URL host is often not its server name (`.well-known`
+ * delegation: `example.org` served from `matrix.hosting.example`), so hosts
+ * never seen inside a Matrix identifier would otherwise stay in clear. Every
+ * URL host is aliased like a domain, whatever it is.
+ *
+ * Exported for the CLI `precheck` command, which fails on any URL host that is
+ * not a domain alias.
+ *
+ * @example
+ * ```ts
+ * [...'GET https://matrix.hosting.example:443/_matrix'.matchAll(URL_HOST_RE)][0][1];
+ * // 'matrix.hosting.example'
+ * ```
+ */
+export const URL_HOST_RE = new RegExp(`(?:://|${ENC_COLON}(?:${ESC}2[Ff]){2})(${HOST_PAT})`, 'g');
+
+/**
+ * True for a domain alias as written by the anonymizer (`domain-<hash8>.org`).
+ * Lets `precheck` tell an anonymized URL host from a raw one.
+ *
+ * @example
+ * ```ts
+ * isDomainAlias('domain-0123abcd.org'); // true
+ * isDomainAlias('matrix.domain-0123abcd.org'); // false
+ * ```
+ */
+export function isDomainAlias(host: string): boolean {
+  return /^domain-[0-9a-f]{8}\.org$/.test(host);
+}
+
+/**
  * Decode a percent-encoded identifier (`%21abc%3Aexample.org` → `!abc:example.org`),
  * as many times as it was encoded. `levels` is that count; plain identifiers
  * come back unchanged with `levels` 0.
@@ -190,9 +224,10 @@ export async function sha256Hex(input: string, len: number): Promise<string> {
  * users on one server share one domain alias (preserves "same server" debugging
  * info) without revealing that two accounts share a username across servers.
  *
- * Domains encountered inside Matrix identifiers are registered in the `forward`
- * map so that standalone occurrences of the same domain string in log text are
- * also replaced by `applyAnonymization` without a second scan pass.
+ * Domains encountered inside Matrix identifiers, and every URL host (see
+ * `URL_HOST_RE`), are registered in the `forward` map so that standalone
+ * occurrences of the same domain string in log text are also replaced by
+ * `applyAnonymization` without a second scan pass.
  *
  * @param salt Shared secret folded into every hash (see `anonSaltStore`). An
  *   empty salt yields reproducible-but-guessable pseudonymisation.
@@ -318,8 +353,10 @@ export async function buildAnonymizationDictionaryFromTexts(
   // (there are far more occurrences than unique ids) — we only await once per
   // unique identifier in phase 2. Fresh regex instance so its lastIndex is ours.
   const scanRe = new RegExp(MATRIX_IDENTIFIER_RE.source, 'g');
+  const hostRe = new RegExp(URL_HOST_RE.source, 'g');
   const uniqueIds: string[] = [];
   const seen = new Set<string>();
+  const uniqueHosts = new Set<string>();
   for (const text of texts) {
     scanRe.lastIndex = 0;
     let m: RegExpExecArray | null;
@@ -329,11 +366,18 @@ export async function buildAnonymizationDictionaryFromTexts(
         uniqueIds.push(m[0]);
       }
     }
+    hostRe.lastIndex = 0;
+    while ((m = hostRe.exec(text)) !== null) uniqueHosts.add(m[1]);
   }
 
   // Phase 2 — hash each unique identifier (order-independent, so dedup is safe).
   for (const id of uniqueIds) {
     await processIdentifier(id);
+  }
+  // URL hosts are registered as bare domains, so every standalone occurrence is
+  // replaced too. A host that is also a server name keeps that server's alias.
+  for (const host of uniqueHosts) {
+    await getOrCreateDomainAlias(host);
   }
 
   return { forward, reverse };

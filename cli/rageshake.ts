@@ -18,7 +18,7 @@ import { mergeLogParserResults, maxLineNumber, type NamedLogParserResult } from 
 import { parseDetailsJson, rustSdkShaFromLogs } from '../src/utils/detailsJson.ts';
 import { isAnalyzableEntry } from '../src/utils/archiveSummary.ts';
 import { isValidGzipHeader, isValidTextContent, decodeTextBytes } from '../src/utils/fileValidator.ts';
-import { decodeIdentifier, detectAnonymizedLog, MATRIX_IDENTIFIER_RE } from '../src/utils/anonymizeUtils.ts';
+import { decodeIdentifier, detectAnonymizedLog, isDomainAlias, MATRIX_IDENTIFIER_RE, URL_HOST_RE } from '../src/utils/anonymizeUtils.ts';
 import { computeSummaryStats } from '../src/utils/summaryStats.ts';
 import { lastColdStartUs, lastForegroundUs, deriveAppStateSegments, MARKER_KINDS, type AppStateSegment } from '../src/utils/lifecycleEvents.ts';
 import { buildLogOverview, extractTarget, type OverviewNode } from '../src/utils/logOverview.ts';
@@ -609,11 +609,19 @@ export function cmdPrecheck(ing: Ingest): { ok: boolean; report: string } {
       const kind = id[0] === '@' ? 'user-id' : id[0] === '#' ? 'room-alias' : id[0] === '!' ? 'room-id' : 'event-id';
       rawByKind.set(kind, (rawByKind.get(kind) ?? 0) + 1);
     }
+    // Every URL host must be a domain alias: the anonymizer aliases them all. The
+    // host itself is never printed, it is the value being kept out of the report.
+    const hostRe = new RegExp(URL_HOST_RE.source, 'g');
+    while ((m = hostRe.exec(text)) !== null) {
+      if (isDomainAlias(m[1])) continue;
+      rawByFile.set(name, (rawByFile.get(name) ?? 0) + 1);
+      rawByKind.set('url-host', (rawByKind.get('url-host') ?? 0) + 1);
+    }
   }
 
   const lines: string[] = [];
   if (rawByFile.size > 0) {
-    lines.push('FAIL: raw (non-anonymized) Matrix identifiers found — do NOT analyse this file.');
+    lines.push('FAIL: raw (non-anonymized) Matrix identifiers or URL hosts found — do NOT analyse this file.');
     lines.push('Anonymize it with shakeview first, then re-run precheck.');
     for (const [kind, count] of rawByKind) lines.push(`  ${kind}: ${count} occurrence(s)`);
     for (const [file, count] of rawByFile) lines.push(`  in ${file}: ${count}`);
@@ -624,7 +632,7 @@ export function cmdPrecheck(ing: Ingest): { ok: boolean; report: string } {
     lines.push('Either the file was never anonymized or it contains no Matrix identifiers at all. Verify before analysing.');
     return { ok: false, report: lines.join('\n') };
   }
-  lines.push(`PASS: anonymized (${markerCount} marker(s), ${aliasCount} alias signal(s), 0 raw identifiers).`);
+  lines.push(`PASS: anonymized (${markerCount} marker(s), ${aliasCount} alias signal(s), 0 raw identifiers, 0 raw URL hosts).`);
   // A log the anonymizer had to drop is gone before ingest sees it, so the
   // fail-loud guard there can't fire. Say it here: the analysis is a partial view.
   const droppedLogs = ing.removedEntries.filter(isAnalyzableEntry);
