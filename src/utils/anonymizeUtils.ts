@@ -424,7 +424,10 @@ function isBareKey(k: string): boolean {
  * pasted into the logged app, `!x:domain-<hash>.org`) makes that alias a bare
  * key, which then rewrote the alias in every ID of the domain it stands for.
  *
- * Bare domains are few (< 20), so their alternation stays cheap; longest first
+ * Bare domains (server names plus URL hosts) are usually a few dozen, so their
+ * alternation stays cheap. ponytail: a log with hundreds of hosts (link
+ * previews, widgets) grows it linearly; switch to a host scan + Map lookup if
+ * that shows up in the benchmarks. Longest first
  * so a shorter key never consumes a longer overlapping one. An identifier
  * missing from `map` is not consumed: the scan resumes one character in, so a
  * domain inside it, or straddling its end (`admin@domain-<hash>.org`, where the
