@@ -208,9 +208,46 @@ describe('buildAnonymizationDictionary', () => {
       'https://app.element.io/#/room/!room1:example.org',
       'element-call/index.html#?roomId=!room1:example.org',
     ], SALT);
-    expect(Object.keys(dict.forward).sort()).toEqual(['!room1:example.org', '#lobby:example.org', 'example.org']);
+    expect(Object.keys(dict.forward).sort())
+      .toEqual(['!room1:example.org', '#lobby:example.org', 'app.element.io', 'example.org', 'matrix.to']);
     expect(applyAnonymization('https://matrix.to/#/!room1:example.org', dict))
-      .toBe(`https://matrix.to/#/${dict.forward['!room1:example.org']}`);
+      .toBe(`https://${dict.forward['matrix.to']}/#/${dict.forward['!room1:example.org']}`);
+  });
+});
+
+describe('buildAnonymizationDictionary — URL hosts', () => {
+  it('aliases a URL host that is no server name (delegated homeserver)', async () => {
+    const text = '@alice:example.org send{uri="https://matrix.hosting.example:443/_matrix/client/v3/sync"}';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const alias = dict.forward['matrix.hosting.example'];
+    expect(alias).toMatch(DOMAIN_RE);
+    const anonymized = applyAnonymization(text, dict);
+    expect(anonymized).toContain(`https://${alias}:443/_matrix/client/v3/sync`);
+    expect(anonymized).not.toContain('hosting.example');
+    expect(applyUnanonymization(anonymized, dict)).toBe(text);
+  });
+
+  it('gives a URL host that is also a server name the server alias', async () => {
+    const dict = await buildAnonymizationDictionaryFromTexts(['@alice:example.org mxc://example.org/abc'], SALT);
+    expect(Object.keys(dict.forward).sort()).toEqual(['@alice:example.org', 'example.org']);
+  });
+
+  it('aliases the host of a percent-encoded URL inside a URL', async () => {
+    const text = 'widget?url=https%3A%2F%2Fcall.example.net%2Froom';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(applyAnonymization(text, dict)).toBe(`widget?url=https%3A%2F%2F${dict.forward['call.example.net']}%2Froom`);
+  });
+
+  it('aliases the host of a JSON-escaped URL', async () => {
+    const text = '{"base_url":"https:\\/\\/matrix.hosting.example"}';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(applyAnonymization(text, dict)).toBe(`{"base_url":"https:\\/\\/${dict.forward['matrix.hosting.example']}"}`);
+  });
+
+  it('aliases the host after a userinfo, not the userinfo', async () => {
+    const text = 'proxy http://user:pw@proxy.corp.example:8080/ and https://john.doe@mail.example.com/x';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(Object.keys(dict.forward).sort()).toEqual(['mail.example.com', 'proxy.corp.example']);
   });
 });
 

@@ -49,7 +49,7 @@ const CYCLE_LOG = [
 
 const DETAILS = JSON.stringify({
   user_text: 'App crashed on launch',
-  report_url: 'https://github.com/element-hq/element-ios/issues/1234',
+  report_url: 'https://domain-0a0b0c0d.org/element-hq/element-ios/issues/1234',
   data: { user_id: '@user-0123456789ab:domain-01234567.org', Version: '25.1.0', sdk_sha: 'abc1234' },
 });
 
@@ -106,10 +106,20 @@ describe('rageshake CLI', () => {
   it('precheck passes anonymized permalinks (the #/ fragment is not a room alias)', () => {
     const bytes = strToU8([
       '# [shakeview-anonymized]',
-      '2026-09-29T15:36:15.377Z I The message is https://matrix.to/#/!room-56b8a38cf0f0:domain-d40e97c9.org/$event-dd06b04bbd34?via=domain-60fc0bb7.org',
-      '2026-09-29T15:36:16.000Z I Switching to https://app.element.io/#/room/!room-56b8a38cf0f0:domain-d40e97c9.org',
+      '2026-09-29T15:36:15.377Z I The message is https://domain-0a1b2c3d.org/#/!room-56b8a38cf0f0:domain-d40e97c9.org/$event-dd06b04bbd34?via=domain-60fc0bb7.org',
+      '2026-09-29T15:36:16.000Z I Switching to https://domain-4e5f6a7b.org/#/room/!room-56b8a38cf0f0:domain-d40e97c9.org',
     ].join('\n'));
     expect(cmdPrecheck(ingest(bytes, 'web.log')).report).toMatch(/^PASS/);
+  });
+
+  it('precheck fails on a raw URL host without printing it, and passes an aliased one', () => {
+    const line = (host: string) => `2026-01-15T10:00:00.000000Z INFO @user-0123456789ab:domain-01234567.org send{uri="https://${host}/_matrix/client/v3/sync"}`;
+    const raw = cmdPrecheck(ingest(strToU8(line('matrix.hosting.example')), 'raw.log'));
+    expect(raw.ok).toBe(false);
+    expect(raw.report).toContain('url-host: 1');
+    expect(raw.report).not.toContain('hosting.example');
+
+    expect(cmdPrecheck(ingest(strToU8(line('domain-89abcdef.org')), 'anon.log')).ok).toBe(true);
   });
 
   it('precheck fails when no anonymization evidence exists', () => {
@@ -136,7 +146,7 @@ describe('rageshake CLI', () => {
     expect(summary.details.userText).toBe('App crashed on launch');
     expect(summary.details.version).toBe('25.1.0');
     expect(summary.details.sdkSha).toBe('abc1234');
-    expect(summary.details.reportUrl).toBe('https://github.com/element-hq/element-ios/issues/1234');
+    expect(summary.details.reportUrl).toBe('https://domain-0a0b0c0d.org/element-hq/element-ios/issues/1234');
     expect(summary.files).toHaveLength(1);
     expect(summary.files[0].name).toBe('console.2026-01-15-10.log.gz');
     expect(summary.files[0].errors).toBe(1);
