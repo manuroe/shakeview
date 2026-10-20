@@ -111,6 +111,8 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
 /**
  * Matches the host of a URL, plain (`https://host`) or percent-encoded inside
  * another URL (`https%3A%2F%2Fhost`); group 1 is the host, without its port.
+ * A JSON-escaped `:\/\/` counts as `://`, and a plain URL's userinfo
+ * (`user:pw@`) is skipped so the host after it is the one matched.
  *
  * A homeserver's URL host is often not its server name (`.well-known`
  * delegation: `example.org` served from `matrix.hosting.example`), so hosts
@@ -126,7 +128,7 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
  * // 'matrix.hosting.example'
  * ```
  */
-export const URL_HOST_RE = new RegExp(`(?:://|${ENC_COLON}(?:${ESC}2[Ff]){2})(${HOST_PAT})`, 'g');
+export const URL_HOST_RE = new RegExp(`(?::(?:\\\\?/){2}(?:[\\w.~%!$&*+=:-]*@)?|${ENC_COLON}(?:${ESC}2[Ff]){2})(${HOST_PAT})`, 'g');
 
 /**
  * True for a domain alias as written by the anonymizer (`domain-<hash8>.org`).

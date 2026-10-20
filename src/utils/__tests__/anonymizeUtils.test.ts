@@ -237,6 +237,18 @@ describe('buildAnonymizationDictionary — URL hosts', () => {
     const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
     expect(applyAnonymization(text, dict)).toBe(`widget?url=https%3A%2F%2F${dict.forward['call.example.net']}%2Froom`);
   });
+
+  it('aliases the host of a JSON-escaped URL', async () => {
+    const text = '{"base_url":"https:\\/\\/matrix.hosting.example"}';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(applyAnonymization(text, dict)).toBe(`{"base_url":"https:\\/\\/${dict.forward['matrix.hosting.example']}"}`);
+  });
+
+  it('aliases the host after a userinfo, not the userinfo', async () => {
+    const text = 'proxy http://user:pw@proxy.corp.example:8080/ and https://john.doe@mail.example.com/x';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(Object.keys(dict.forward).sort()).toEqual(['mail.example.com', 'proxy.corp.example']);
+  });
 });
 
 describe('buildAnonymizationDictionary — percent-encoded identifiers', () => {
