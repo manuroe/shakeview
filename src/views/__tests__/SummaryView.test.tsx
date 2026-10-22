@@ -14,6 +14,8 @@ import {
   createSyncRequest,
 } from '../../test/fixtures';
 import type { ParsedLogLine } from '../../types/log.types';
+import { parseLogFile } from '../../utils/logParser';
+import { RECEIVER_LOG } from '../../utils/crypto/__tests__/fixtures';
 import type { TimestampMicros } from '../../types/time.types';
 
 // ─── Captured callback registry (refreshed each render) ────────────────────
@@ -241,6 +243,18 @@ describe('SummaryView', () => {
       // but REQ-1 should (if section appears)
       // Just verify the view renders without error
       expect(screen.getByText('Summary')).toBeInTheDocument();
+    });
+
+    it('places the keys card, then the UTDs card, after the errors and warnings', () => {
+      useLogStore.getState().setHttpRequests([], [...parseLogFile(RECEIVER_LOG).rawLogLines]);
+      renderSummaryView();
+      const keys = screen.getByRole('heading', { name: /^New megolm keys/ });
+      const utd = screen.getByRole('heading', { name: /^UTDs/ });
+      const logs = screen.getByRole('heading', { name: /^Logs:/ });
+      const warningsTable = screen.getAllByRole('table')[0];
+      expect(logs.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(warningsTable.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(keys.compareDocumentPosition(utd) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('displays log line count', () => {
