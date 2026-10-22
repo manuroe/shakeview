@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { DecryptionView } from '../DecryptionView';
@@ -197,6 +198,19 @@ describe('DecryptionView', () => {
     renderView();
     fireEvent.click(screen.getByRole('button', { name: /key step/ }));
     expect(screen.getByTestId('log-panel')).toHaveTextContent('Received a new megolm room key');
+  });
+
+  it('adds the other demo log as the sender rageshake of a demo', async () => {
+    const demo = (name: string) => readFileSync(`public/demo/${name}`, 'utf8');
+    const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(async (url) => new Response(demo(String(url).split('/').pop()!)));
+    onTestFinished(() => fetchSpy.mockRestore());
+    useLogStore.getState().loadMergedLogParserResults([{ name: 'demo.log', result: parseLogFile(demo('demo.log')) }]);
+    useCryptoStore.setState({ caseKey: 'demo.log' });
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'Add sender rageshake' }));
+    await waitFor(() => expect(useCryptoStore.getState().devices.map((d) => d.id)).toEqual(['demo-web.log']));
+    expect(fetchSpy.mock.calls.map(([url]) => String(url))).toContainEqual(expect.stringMatching(/demo\/demo-web\.log$/));
+    expect(screen.queryByRole('button', { name: 'Add sender rageshake' })).toBeNull();
   });
 
   it('adds a sender rageshake from the unloaded sender column only, by drop or its button', async () => {

@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileUpload } from '../components/FileUpload';
 import { parseLogFile } from '../utils/logParser';
 import { useLogStore } from '../stores/logStore';
+import { fetchDemoLog } from '../utils/demoLogs';
+import { decodeTextBytes } from '../utils/fileValidator';
 import { wrapError } from '../utils/errorHandling';
 import type { AppError } from '../utils/errorHandling';
 import ErrorDisplay from '../components/ErrorDisplay';
@@ -61,12 +63,7 @@ export function LandingPage() {
     setDemoError(null);
     setDemoLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.BASE_URL}demo/${fileName}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const content = await response.text();
-      const result = parseLogFile(content);
+      const result = parseLogFile(decodeTextBytes(await fetchDemoLog(fileName)));
       loadMergedLogParserResults([{ name: fileName, result }]);
       void navigate('/summary');
     } catch (error) {

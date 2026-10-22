@@ -18,6 +18,7 @@ import { useCryptoStore, loadCryptoDevice, loadedArchive, caseKeyOf, startCase }
 import { useArchiveStore } from '../stores/archiveStore';
 import { useLogStore } from '../stores/logStore';
 import { useMatrixProfile } from '../hooks/useMatrixProfile';
+import { DEMO_PEER, fetchDemoLog } from '../utils/demoLogs';
 import { calculateTimeRangeMicros, formatTimestamp, getMinMaxTimestamps } from '../utils/timeUtils';
 import { buildCryptoModel } from '../utils/crypto/buildCryptoModel';
 import { scopeSessions } from '../utils/crypto/scope';
@@ -30,7 +31,7 @@ import { describeStep, stepTone, utdStepNote } from '../utils/crypto/describeSte
 import { formatUs, plural, short, utcText } from '../utils/crypto/format';
 import { isIdentifierAlias } from '../utils/anonymizeUtils';
 import { findMatchingIndices } from '../utils/textMatching';
-import { allLinesOf, detailsFromEntries, deviceFromDroppedFile, deviceFromEntries, deviceFromLoadedLogs, linesOfFile } from '../utils/crypto/loadDevice';
+import { allLinesOf, detailsFromEntries, deviceFromDroppedFile, deviceFromEntries, deviceFromFile, deviceFromLoadedLogs, linesOfFile } from '../utils/crypto/loadDevice';
 import type { ParsedLogLine } from '../types/log.types';
 import { LogDisplayView } from './LogDisplayView';
 import type { CryptoDevice, CryptoStep, DeviceRef, LineRef, MegolmSession } from '../utils/crypto/types';
@@ -371,9 +372,11 @@ function SharedWith({ steps, receiver, mainUserId }: { steps: readonly CryptoSte
 }
 
 /** A lane's header: role, identity, and what the lane can or cannot show. */
-function LaneHeader({ lane, deviceRef, device, session, receiver, mainUserId, onAddFiles }: {
+function LaneHeader({ lane, deviceRef, device, session, receiver, mainUserId, onAddFiles, onAddDemo }: {
   lane: Lane; deviceRef: DeviceRef | undefined; device: CryptoDevice | undefined; session: MegolmSession;
   receiver: CryptoDevice | undefined; mainUserId: string | undefined; onAddFiles: (files: FileList | null) => void;
+  /** Set when the loaded logs are a demo: adds the other side of the demo conversation instead of asking for a file. */
+  onAddDemo?: () => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const isAnonymized = useLogStore((s) => s.isAnonymized);
@@ -402,7 +405,7 @@ function LaneHeader({ lane, deviceRef, device, session, receiver, mainUserId, on
           <span className={styles.muted}>sender device not loaded{deviceRef?.senderKey ? ` · curve ${short(deviceRef.senderKey)}` : ''}</span>
           {canAdd && (
             <>
-              <button type="button" className={`btn-secondary ${styles.addButton}`} onClick={() => fileInput.current?.click()}>
+              <button type="button" className={`btn-secondary ${styles.addButton}`} onClick={onAddDemo ?? (() => fileInput.current?.click())}>
                 Add sender rageshake
               </button>
               <input
@@ -647,6 +650,10 @@ export function DecryptionView() {
       void loadCryptoDevice(f.name, () => deviceFromDroppedFile(f));
     }
   };
+  const demoPeer = loadedEntryNames.length === 1 ? DEMO_PEER[loadedEntryNames[0]] : undefined;
+  const addDemoPeer = demoPeer
+    ? () => { void loadCryptoDevice(demoPeer, async () => deviceFromFile(demoPeer, await fetchDemoLog(demoPeer))); }
+    : undefined;
   // setSearchParams changes identity with every URL change: a ref keeps the list's callback stable.
   const setParams = useRef(setSearchParams);
   useLayoutEffect(() => {
@@ -738,7 +745,7 @@ export function DecryptionView() {
                 <div role="row" className={`${styles.tlRow} ${styles.tlHead}`}>
                   <div role="columnheader" />
                   <div role="columnheader" />
-                  <LaneHeader lane="sender" deviceRef={session.sender} device={sender} session={session} receiver={receiver} mainUserId={main.identity.userId} onAddFiles={addFiles} />
+                  <LaneHeader lane="sender" deviceRef={session.sender} device={sender} session={session} receiver={receiver} mainUserId={main.identity.userId} onAddFiles={addFiles} onAddDemo={addDemoPeer} />
                   <div role="columnheader" />
                   <LaneHeader lane="receiver" deviceRef={receiverRef} device={receiver} session={session} receiver={receiver} mainUserId={main.identity.userId} onAddFiles={addFiles} />
                 </div>
