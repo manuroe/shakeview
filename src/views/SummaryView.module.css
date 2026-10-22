@@ -116,6 +116,10 @@
     letter-spacing: 0.5px;
 }
 
+.summaryTable th.alignRight {
+    text-align: right;
+}
+
 .summaryTable td {
     padding: 4px 8px;
     border-bottom: 1px solid var(--border-light);
