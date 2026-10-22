@@ -165,7 +165,7 @@ function findPrevMatch(anchor: number, gapStart: number, matchingIndices?: Set<n
  */
 export function buildDisplayItems(
   filteredLines: FilteredLine[],
-  rawLogLines: ParsedLogLine[],
+  rawLogLines: readonly ParsedLogLine[],
   forcedRanges: ForcedRange[]
 ): DisplayItem[] {
   const items: DisplayItem[] = [];

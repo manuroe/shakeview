@@ -11,6 +11,7 @@ import {
   stripAnonymizedMarker,
   buildCompiledUnanonymizer,
   decodeIdentifier,
+  isIdentifierAlias,
 } from '../anonymizeUtils';
 import type { AnonymizationDictionary } from '../../types/log.types';
 import { createParsedLogLine } from '../../test/fixtures';
@@ -596,6 +597,23 @@ describe('detectAnonymizedLog', () => {
   it('still recognises the legacy pre-rename marker', () => {
     const content = '# [rageshake-viewer-anonymized]\n2024-01-15T10:00:00Z INFO hello';
     expect(detectAnonymizedLog(content)).toBe(true);
+  });
+});
+
+describe('isIdentifierAlias', () => {
+  it('accepts every identifier alias the dictionary writes, modern room ids included', async () => {
+    const lines = [makeLine(0, '@alice:matrix.org in !room1:matrix.org:8448 via #general:matrix.org sent $abcdefghij0123 in !abcdefghij0123 and $ev:matrix.org')];
+    const dict = await buildAnonymizationDictionary(lines, SALT);
+    const aliases = Object.entries(dict.forward).filter(([k]) => /^[@#!$]/.test(k)).map(([, v]) => v);
+    expect(aliases).toHaveLength(6);
+    expect(aliases.filter((a) => !isIdentifierAlias(a))).toEqual([]);
+  });
+
+  it('rejects real ids, bare domains and look-alikes', () => {
+    expect(isIdentifierAlias('!abc:matrix.org')).toBe(false);
+    expect(isIdentifierAlias('$event-fd3e')).toBe(false);
+    expect(isIdentifierAlias('domain-60fc0bb7.org')).toBe(false);
+    expect(isIdentifierAlias('!room-0c9231edecda:matrix.org')).toBe(false);
   });
 });
 

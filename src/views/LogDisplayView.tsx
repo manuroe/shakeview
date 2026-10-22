@@ -95,7 +95,7 @@ interface LogDisplayViewProps {
   prevRequestLineRange?: { start: number; end: number };
   nextRequestLineRange?: { start: number; end: number };
   /** Override the line source; when absent, falls back to `rawLogLines` from the store. */
-  logLines?: ParsedLogLine[];
+  logLines?: readonly ParsedLogLine[];
   /**
    * Inclusive line-number range `{ start, end }`. When set, the initial
    * rendered set is restricted to lines whose `lineNumber` falls within

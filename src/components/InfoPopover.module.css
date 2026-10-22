@@ -1,0 +1,17 @@
+.help { composes: container from './Dropdown.module.css'; display: inline-block; vertical-align: baseline; }
+.helpButton { padding: 0 2px; border: none; background: none; color: var(--text-tertiary); font-size: var(--font-size-md); cursor: pointer; }
+.helpButton:hover, .helpButton[aria-expanded='true'] { color: var(--color-primary); }
+/* Reset what a host (e.g. an uppercase, right-aligned table header) would pass down. */
+.helpPanel { composes: dropdown from './Dropdown.module.css'; left: 0; right: auto; width: max-content; max-width: 420px; font-size: var(--font-size-base); font-weight: 400; line-height: 1.45; color: var(--text-primary); white-space: normal; text-align: left; text-transform: none; letter-spacing: normal; }
+/* .dropdown sets padding too: win on specificity, not on stylesheet order. */
+.help .helpPanel { padding: 10px 14px; }
+.helpPanel.alignEnd { left: auto; right: 0; }
+/* Defaults with no specificity, so the view filling the panel can lay out its own content. */
+:where(.helpPanel) :where(p, ul) { margin: 0 0 6px; }
+:where(.helpPanel) :where(ul) { padding-left: 16px; }
+.section { margin-bottom: 10px; }
+.section:last-child { margin-bottom: 0; }
+.section h4 { margin: 0 0 2px; font-size: inherit; font-weight: 600; }
+.section p, .section ul { margin: 0; }
+.section ul { padding-left: 14px; }
+.section li + li { margin-top: 2px; }

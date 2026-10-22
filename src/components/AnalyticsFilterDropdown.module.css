@@ -1,0 +1,43 @@
+.container {
+    composes: container from './StatusFilterDropdown.module.css';
+}
+
+.button {
+    composes: button from './StatusFilterDropdown.module.css';
+}
+
+.dropdown {
+    composes: dropdown from './StatusFilterDropdown.module.css';
+    min-width: 280px;
+    max-height: none;
+}
+
+.divider {
+    composes: divider from './StatusFilterDropdown.module.css';
+}
+
+.option {
+    composes: option from './StatusFilterDropdown.module.css';
+    align-items: flex-start;
+}
+
+.text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.hint,
+.note {
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.note {
+    padding: 8px 12px;
+}
+
+.count {
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}

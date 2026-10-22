@@ -13,8 +13,13 @@ This document describes the routing architecture: **URL as single source of trut
 | `/logs` | LogsView | ✓ | ✓ | - | - | ✓ | - | - |
 | `/http_requests` | HttpRequestsView | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
 | `/http_requests/sync` | SyncView | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ |
+| `/decryption` | DecryptionView | ✓ | ✓ | - | - | - | - | - |
 
 **Legend**: ✓ = used, - = not used
+
+`/decryption` also reads its list filters `q` (id search), `outcome` (comma-separated outcome
+keys), `analytics` and the selected `session`, and a repeatable `archive` link (see
+[Opening several archives on /decryption](#opening-several-archives-on-decryption)).
 
 **Notes**:
 - `filter`: Live text filter, synced to store via URL. Same behavior on `/logs` and `/http_requests`.
@@ -57,6 +62,14 @@ listing's "open all") — for exploring an archive rather than pointing at a lin
 into the archive still in memory re-opens from the store with no new download; one into an
 archive since replaced by a hand-dropped file re-fetches, since `file` would otherwise resolve
 against the wrong rageshake.
+
+### Opening several archives on /decryption
+
+`/#/decryption?archive=<a>&archive=<b>…` is how a shakedown report links a paired decryption view. The first
+archive opens like any `archive=` link (merged, or one log with `file=`) and becomes the loaded
+logs; every further archive is added as a device on `/decryption` — typically the sender's rageshake.
+All `archive` params are then dropped and the view stays on `/decryption`, so a reload lands on the
+landing page like every other view. `&session=<megolm session id>` preselects a session.
 
 ### Time Filter Formats
 

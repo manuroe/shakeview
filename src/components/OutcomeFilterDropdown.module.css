@@ -1,0 +1,50 @@
+.container {
+    composes: container from './StatusFilterDropdown.module.css';
+}
+
+.button {
+    composes: button from './StatusFilterDropdown.module.css';
+}
+
+.dropdown {
+    composes: dropdown from './StatusFilterDropdown.module.css';
+    min-width: 260px;
+    max-height: 400px;
+}
+
+.selectAll {
+    composes: selectAll from './StatusFilterDropdown.module.css';
+}
+
+.divider {
+    composes: divider from './StatusFilterDropdown.module.css';
+}
+
+.group {
+    padding: 4px 12px;
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.option {
+    composes: option from './StatusFilterDropdown.module.css';
+    /* A double click selects one outcome, not the label's text. */
+    user-select: none;
+}
+
+.label {
+    composes: statusCodeLabel from './StatusFilterDropdown.module.css';
+    flex: 1;
+}
+
+.count {
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+/* Selected, but the other filter leaves no session: kept so it can be unticked. */
+.empty {
+    opacity: 0.5;
+}

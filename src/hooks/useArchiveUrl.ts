@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useArchiveStore } from '../stores/archiveStore';
 import { parseTarGzArchive } from '../utils/tarGzArchive';
 import { isAnalyzableEntry } from '../utils/archiveSummary';
 import { openMergedEntries } from '../utils/openMergedLogs';
+import { loadCryptoDevice, startCase } from '../stores/cryptoStore';
+import { deviceFromFile } from '../utils/crypto/loadDevice';
+import { fetchBytes } from '../utils/fileValidator';
 
 /** URL search-param key carrying the URL of a `.tar.gz` rageshake archive to open. */
 export const ARCHIVE_URL_PARAM = 'archive';
@@ -62,6 +65,7 @@ function entryNamesFor(entries: readonly { name: string }[], file: string | null
 export function useArchiveUrl(): void {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   // The archive being opened right now, and the `archive` + `file` opened last.
   // Two refs, not one: an in-flight archive must be left alone, while an
@@ -84,6 +88,11 @@ export function useArchiveUrl(): void {
     const archiveUrl = searchParams.get(ARCHIVE_URL_PARAM);
     if (archiveUrl === null) return;
 
+    // /decryption links: the first archive becomes the loaded logs, the others added
+    // devices (typically the sender's rageshake), and the view stays /decryption.
+    const landing = pathname === '/decryption' ? '/decryption' : '/logs';
+    const extraUrls = pathname === '/decryption' ? searchParams.getAll(ARCHIVE_URL_PARAM).slice(1) : [];
+
     // Drop the param so a refresh doesn't re-fetch, keeping line/filter/start/end.
     const stripParam = (route: string) => {
       const nextParams = new URLSearchParams(latestParams.current);
@@ -105,9 +114,15 @@ export function useArchiveUrl(): void {
 
     // The very same link again — a report cites many lines in one file. Nothing
     // to do, but the param still has to go, or `archivePending` in App.tsx keeps
-    // the loading screen up forever.
-    if (loaded.current?.url === archiveUrl && loaded.current.file === searchParams.get(ARCHIVE_FILE_PARAM)) {
-      stripParam('/logs');
+    // the loading screen up forever. Not when it adds devices: those still load.
+    if (
+      extraUrls.length === 0
+      && loaded.current?.url === archiveUrl
+      && loaded.current.file === searchParams.get(ARCHIVE_FILE_PARAM)
+      // …and still in memory: a /decryption step link may have opened another archive since.
+      && useArchiveStore.getState().archiveName === archiveNameFromUrl(archiveUrl)
+    ) {
+      stripParam(landing);
       return;
     }
 
@@ -129,10 +144,7 @@ export function useArchiveUrl(): void {
         const archiveName = archiveNameFromUrl(archiveUrl);
         let entries = useArchiveStore.getState().archiveEntries;
         if (useArchiveStore.getState().archiveName !== archiveName) {
-          const response = await fetch(archiveUrl);
-          if (!response.ok) throw new Error(`fetch failed with HTTP ${response.status}`);
-          const bytes = new Uint8Array(await response.arrayBuffer());
-          entries = parseTarGzArchive(bytes);
+          entries = parseTarGzArchive(await fetchBytes(archiveUrl));
           useArchiveStore.getState().loadArchive(archiveName, entries);
         }
 
@@ -152,12 +164,19 @@ export function useArchiveUrl(): void {
           }
         } while (file !== latestParams.current.get(ARCHIVE_FILE_PARAM));
         loaded.current = { url: archiveUrl, file };
-        route = '/logs';
+        route = landing;
+        if (landing === '/decryption') {
+          startCase();
+          for (const url of extraUrls) {
+            const name = archiveNameFromUrl(url);
+            void loadCryptoDevice(name, async () => deviceFromFile(name, await fetchBytes(url)));
+          }
+        }
       } catch (err) {
         console.error('[useArchiveUrl] failed to open archive from URL:', archiveUrl, err);
       }
       inFlight.current = null;
       stripParam(route);
     })();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, pathname]);
 }
