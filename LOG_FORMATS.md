@@ -76,3 +76,21 @@ source links and fill the **By span** view. The `at` path also tells which matri
 
 **URL query values are hidden.** Element Web replaces every query value with `xxx` before logging
 (`/sync?filter=xxx&timeout=xxx&since=xxx`). That is why the Sync view cannot tell catch-up syncs from long-polls.
+
+## UTD (crypto) lines
+
+The `/decryption` view, the `/summary` decryption card and the `/archive` UTDs column read crypto
+lines through one step table (`src/utils/crypto/steps.ts`). Both platforms log the
+matrix-rust-sdk crypto wording (Element Web through crypto-wasm, in tracing's pretty
+format); Element Web adds a few matrix-js-sdk lines.
+
+| Step | Element X | Element Web |
+|---|---|---|
+| Room-key share (`Trying to encrypt a room key`, `Created batch of to-device messages`) | ✓ | ✓ |
+| `/sendToDevice` result | ✓ (`Got response`) | ✓ (`FetchHttpApi <-- PUT`) |
+| Sent event → session (`send_raw{transaction_id}`) | ✓ | event id only |
+| UTD (`Failed to decrypt a room event`) | ✓ | ✓, plus js-sdk `Error decrypting event` |
+| Key received (`Received a new megolm room key`, direct vs forwarded) | ✓ | ✓ |
+| Key backup lookup / import | `Performing backup download`, per-session `GET /room_keys/keys/<room>/<session>` (200 found, 404 not in backup), `Successfully imported room keys` | `[PerSessionKeyBackupDownloader] …`, `Successfully imported room keys` |
+| Re-decryption success | trace only, so resolutions are "inferred" | `Decrypted event on retry`, so "confirmed" |
+| Device identity | `details.json` | `details.json`, else `setLoggedIn: mxid: … deviceId: …` |

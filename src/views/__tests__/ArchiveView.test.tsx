@@ -45,6 +45,7 @@ vi.mock('../../utils/logParser', () => ({
 
 vi.mock('../../utils/archiveSummary', () => ({
   isAnalyzableEntry: (name: string) => name.endsWith('.log.gz') || name.endsWith('.log'),
+  utdsByFile: vi.fn(() => new Map([['dir/logs.2026-04-14-09.log.gz', { count: 42, reported: 3, byReason: { missing_key: 40, unknown_index: 2 } }]])),
   computeArchiveSummary: vi.fn(() => ({
     totalLines: 5,
     errorCount: 1,
@@ -54,6 +55,9 @@ vi.mock('../../utils/archiveSummary', () => ({
     totalUploadBytes: 1024,
     totalDownloadBytes: 2048,
     statusCodes: { '200': 2, '404': 1 },
+    utdCount: 0,
+    utdReasons: {},
+    cryptoSteps: [],
   })),
 }));
 
@@ -315,6 +319,9 @@ describe('ArchiveView', () => {
         totalUploadBytes: 0,
         totalDownloadBytes: 0,
         statusCodes: {},
+        utdCount: 0,
+        utdReasons: {},
+        cryptoSteps: [],
       });
 
       renderArchiveView();
@@ -324,6 +331,50 @@ describe('ArchiveView', () => {
 
       // computeArchiveSummary should NOT have been called again
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('shows a UTDs column with reported (all) per file and a reasons tooltip', () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', [
+        makeEntry('dir/logs.2026-04-14-09.log.gz'),
+      ]);
+      useArchiveStore.getState().setArchiveSummary('dir/logs.2026-04-14-09.log.gz', {
+        totalLines: 10, errorCount: 0, warnCount: 0, sentryCount: 0, httpCount: 0,
+        totalUploadBytes: 0, totalDownloadBytes: 0, statusCodes: {},
+        utdCount: 42, utdReasons: { ['missing_key']: 40, ['unknown_index']: 2 }, cryptoSteps: [],
+      });
+      renderArchiveView();
+      expect(screen.getByRole('columnheader', { name: 'UTDs' })).toBeInTheDocument();
+      expect(screen.getByTitle(/^3 reported of 42 UTDs .* missing_key 40 · unknown_index 2$/)).toHaveTextContent('3 (42)');
+    });
+
+    /** A summarized log file with `utdCount` UTDs of its own. */
+    const withUtds = (name: string, utdCount: number) => useArchiveStore.getState().setArchiveSummary(name, {
+      totalLines: 10, errorCount: 0, warnCount: 0, sentryCount: 0, httpCount: 0,
+      totalUploadBytes: 0, totalDownloadBytes: 0, statusCodes: {},
+      utdCount, utdReasons: { ['missing_key']: utdCount }, cryptoSteps: [],
+    });
+    const utdCell = (name: string) => {
+      const column = screen.getAllByRole('columnheader').findIndex((h) => h.textContent === 'UTDs');
+      return screen.getByText(name).closest('tr')!.querySelectorAll('td')[column];
+    };
+
+    it('counts a UTD retried in the next hourly file once, in the file it first failed', async () => {
+      const { utdsByFile } = await import('../../utils/archiveSummary');
+      vi.mocked(utdsByFile).mockReturnValueOnce(new Map([['dir/logs.2026-04-14-09.log.gz', { count: 1, reported: 0, byReason: { missing_key: 1 } }]]));
+      useArchiveStore.getState().loadArchive('test.tar.gz', [makeEntry('dir/logs.2026-04-14-09.log.gz'), makeEntry('dir/logs.2026-04-14-10.log.gz')]);
+      withUtds('dir/logs.2026-04-14-09.log.gz', 1);
+      withUtds('dir/logs.2026-04-14-10.log.gz', 1);
+      renderArchiveView();
+      // Singular: one UTD.
+      expect(screen.getByTitle(/^0 reported of 1 UTD /)).toHaveTextContent('0 (1)');
+      expect(utdCell('logs.2026-04-14-10.log.gz')).toHaveTextContent(/^—$/);
+    });
+
+    it('shows each file its own UTDs, reported pending, while other files are summarized', () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', [makeEntry('dir/logs.2026-04-14-09.log.gz'), makeEntry('dir/logs.2026-04-14-10.log.gz')]);
+      withUtds('dir/logs.2026-04-14-10.log.gz', 2);
+      renderArchiveView();
+      expect(screen.getByTitle(/^Reported: waiting for the other files /)).toHaveTextContent('… (2)');
     });
   });
 

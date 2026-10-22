@@ -20,6 +20,9 @@ function makeSummary(totalLines = 10): ArchiveSummary {
     totalUploadBytes: 0,
     totalDownloadBytes: 0,
     statusCodes: {},
+    utdCount: 0,
+    utdReasons: {},
+    cryptoSteps: [],
   };
 }
 

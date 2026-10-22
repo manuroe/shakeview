@@ -65,6 +65,9 @@ function makeSummary(totalLines = 5) {
     totalUploadBytes: 1024,
     totalDownloadBytes: 2048,
     statusCodes: { '200': 2, '404': 1 },
+    utdCount: 0,
+    utdReasons: {},
+    cryptoSteps: [],
   };
 }
 

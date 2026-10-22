@@ -10,7 +10,7 @@ import { BurgerMenu } from '../components/BurgerMenu';
 import tableStyles from '../components/Table.module.css';
 import styles from './ArchiveView.module.css';
 import { useListingStore } from '../stores/listingStore';
-import { isAnalyzableEntry, type ArchiveSummary } from '../utils/archiveSummary';
+import { emptyArchiveSummary, isAnalyzableEntry, type ArchiveSummary } from '../utils/archiveSummary';
 import { parseDetailsJson } from '../utils/detailsJson';
 import { fetchExtensionFileBytes } from '../utils/extensionFileLoader';
 import { openMergedEntries } from '../utils/openMergedLogs';
@@ -58,19 +58,6 @@ function getListingLabel(listingUrl: string | null): string {
   } catch {
     return 'Listing';
   }
-}
-
-function zeroSummary(): ArchiveSummary {
-  return {
-    totalLines: 0,
-    errorCount: 0,
-    warnCount: 0,
-    sentryCount: 0,
-    httpCount: 0,
-    totalUploadBytes: 0,
-    totalDownloadBytes: 0,
-    statusCodes: {},
-  };
 }
 
 function StatusChips({ statusCodes }: { readonly statusCodes: Readonly<Record<string, number>> }) {
@@ -258,11 +245,11 @@ export function ListingView() {
             if (response?.ok && response.summary) {
               setListingSummary(entry.name, response.summary);
             } else {
-              setListingSummary(entry.name, zeroSummary());
+              setListingSummary(entry.name, emptyArchiveSummary());
             }
           } catch {
             if (!cancelled) {
-              setListingSummary(entry.name, zeroSummary());
+              setListingSummary(entry.name, emptyArchiveSummary());
             }
           } finally {
             activeCount--;
