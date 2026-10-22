@@ -14,6 +14,7 @@ import { useLogStore } from '../../stores/logStore';
 import type { ArchiveEntry } from '../../stores/archiveStore';
 import { decompressSync } from 'fflate';
 import { parseLogFile } from '../../utils/logParser';
+import { clearMatrixProfiles } from '../../utils/matrixProfile';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearMatrixProfiles();
   // If the original was undefined (jsdom doesn't implement these), fall back to a
   // no-op so React's deferred pngUrls cleanup doesn't throw after restoration.
   URL.createObjectURL = originalCreateObjectURL ?? ((() => '') as typeof URL.createObjectURL);

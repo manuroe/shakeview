@@ -29,7 +29,8 @@ import { parseDetailsJson } from '../utils/detailsJson';
 import { decodeTextBytes } from '../utils/fileValidator';
 import { getEntryKind, getMimeType, sortEntries, stripEntryPrefix } from '../utils/listingEntries';
 import { openMergedEntries } from '../utils/openMergedLogs';
-import { isValidPublicHomeserver, mxcToThumbnailUrl, userInitial } from '../utils/matrixProfile';
+import { userInitial } from '../utils/matrixProfile';
+import { useMatrixProfile } from '../hooks/useMatrixProfile';
 import { formatBytes } from '../utils/sizeUtils';
 import { isNumericStatus } from '../utils/statusCodeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
@@ -124,56 +125,8 @@ export function ArchiveView() {
     [archiveEntries]
   );
 
-  /**
-   * Matrix profile fetched from the user's homeserver.
-   * Populated asynchronously after `parsedDetails.userId` is known.
-   * `null` while loading or when no userId is present.
-   */
-  const [matrixProfile, setMatrixProfile] = useState<{
-    readonly displayName: string | null;
-    readonly avatarHttpUrl: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    const userId = parsedDetails?.userId;
-    if (!userId) {
-      setMatrixProfile(null);
-      return;
-    }
-    // Clear any previous archive's profile immediately so the UI never shows
-    // stale data while the new fetch is in flight.
-    setMatrixProfile(null);
-    // Extract homeserver from @user:homeserver.tld
-    const colonIdx = userId.indexOf(':', 1);
-    if (colonIdx < 0) return;
-    const homeserver = userId.slice(colonIdx + 1);
-
-    // Guard against crafted archives reaching unexpected hosts: only request
-    // profiles for homeservers that look like real internet domain names.
-    // Rejects localhost, raw IPv4/IPv6 addresses, and single-label hostnames.
-    if (!isValidPublicHomeserver(homeserver)) return;
-
-    let cancelled = false;
-    const fetchProfile = async () => {
-      try {
-        const response = await fetch(
-          `https://${homeserver}/_matrix/client/v3/profile/${encodeURIComponent(userId)}`
-        );
-        if (!response.ok || cancelled) return;
-        const json = await response.json() as Record<string, unknown>;
-        const displayName = typeof json['displayname'] === 'string' ? json['displayname'] : null;
-        const avatarHttpUrl =
-          typeof json['avatar_url'] === 'string'
-            ? mxcToThumbnailUrl(homeserver, json['avatar_url'])
-            : null;
-        if (!cancelled) setMatrixProfile({ displayName, avatarHttpUrl });
-      } catch {
-        // Network error or CORS — silently skip the profile header
-      }
-    };
-    void fetchProfile();
-    return () => { cancelled = true; };
-  }, [parsedDetails?.userId]);
+  /** Matrix profile fetched from the user's homeserver; `null` while loading or without a userId. */
+  const matrixProfile = useMatrixProfile(parsedDetails?.userId);
 
   /**
    * Object URLs for PNG entries, created once and revoked on unmount.

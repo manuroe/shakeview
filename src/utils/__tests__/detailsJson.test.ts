@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseDetailsJson, rustSdkShaFromLogs } from '../detailsJson';
-import { isValidPublicHomeserver, mxcToThumbnailUrl, userInitial } from '../matrixProfile';
+import { clearMatrixProfiles, fetchMatrixProfile, isValidPublicHomeserver, mxcToThumbnailUrl, userInitial } from '../matrixProfile';
 import { CRYPTO_WASM_PRETTY_ENTRY } from '../../test/fixtures';
 
 describe('parseDetailsJson', () => {
@@ -64,6 +64,27 @@ describe('matrixProfile helpers', () => {
   it('accepts public domains and rejects localhost-style hosts', () => {
     expect(isValidPublicHomeserver('matrix.org')).toBe(true);
     expect(isValidPublicHomeserver('localhost')).toBe(false);
+  });
+});
+
+describe('fetchMatrixProfile', () => {
+  afterEach(() => {
+    clearMatrixProfiles();
+    vi.restoreAllMocks();
+  });
+
+  it('never asks an anonymized alias domain, nor a subdomain or port of one', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(new Response('{}'));
+    for (const userId of ['@user-0bb8c8918e88:domain-60fc0bb7.org', '@u:matrix.domain-60fc0bb7.org', '@u:domain-60fc0bb7.org:8448']) {
+      expect(await fetchMatrixProfile(userId)).toBeNull();
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('asks a real domain that merely looks alike', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify({ displayname: 'Alice' })));
+    expect(await fetchMatrixProfile('@alice:domain-example.org')).toEqual({ displayName: 'Alice', avatarHttpUrl: null });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
 
