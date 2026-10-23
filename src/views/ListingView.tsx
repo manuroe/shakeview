@@ -10,7 +10,7 @@ import { BurgerMenu } from '../components/BurgerMenu';
 import tableStyles from '../components/Table.module.css';
 import styles from './ArchiveView.module.css';
 import { useListingStore } from '../stores/listingStore';
-import { isAnalyzableEntry, type ArchiveSummary } from '../utils/archiveSummary';
+import { emptyArchiveSummary, isAnalyzableEntry, type ArchiveSummary } from '../utils/archiveSummary';
 import { parseDetailsJson } from '../utils/detailsJson';
 import { fetchExtensionFileBytes } from '../utils/extensionFileLoader';
 import { openMergedEntries } from '../utils/openMergedLogs';
@@ -22,12 +22,9 @@ import {
 } from '../utils/listingEntries';
 import { formatBytes } from '../utils/sizeUtils';
 import { isNumericStatus } from '../utils/statusCodeUtils';
-import {
-  isValidPublicHomeserver,
-  mxcToThumbnailUrl,
-  userInitial,
-} from '../utils/matrixProfile';
-import type { ListingDetails, MatrixProfile } from '../types/listing';
+import { userInitial } from '../utils/matrixProfile';
+import { useMatrixProfile } from '../hooks/useMatrixProfile';
+import type { ListingDetails } from '../types/listing';
 
 export const LISTING_URL_PARAM = 'listingUrl';
 
@@ -61,19 +58,6 @@ function getListingLabel(listingUrl: string | null): string {
   } catch {
     return 'Listing';
   }
-}
-
-function zeroSummary(): ArchiveSummary {
-  return {
-    totalLines: 0,
-    errorCount: 0,
-    warnCount: 0,
-    sentryCount: 0,
-    httpCount: 0,
-    totalUploadBytes: 0,
-    totalDownloadBytes: 0,
-    statusCodes: {},
-  };
 }
 
 function StatusChips({ statusCodes }: { readonly statusCodes: Readonly<Record<string, number>> }) {
@@ -146,7 +130,8 @@ export function ListingView() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [detailsUrl, setDetailsUrl] = useState<string | null>(null);
   const [parsedDetails, setParsedDetails] = useState<ListingDetails | null>(null);
-  const [matrixProfile, setMatrixProfile] = useState<MatrixProfile | null>(null);
+
+  const matrixProfile = useMatrixProfile(parsedDetails?.userId);
 
   useEffect(() => {
     if (!listingUrlParam && listingEntries.length === 0) {
@@ -225,48 +210,6 @@ export function ListingView() {
     };
   }, [detailsUrl]);
 
-  useEffect(() => {
-    const userId = parsedDetails?.userId;
-    if (!userId) {
-      setMatrixProfile(null);
-      return;
-    }
-
-    setMatrixProfile(null);
-    const colonIndex = userId.indexOf(':', 1);
-    if (colonIndex < 0) return;
-
-    const homeserver = userId.slice(colonIndex + 1);
-    if (!isValidPublicHomeserver(homeserver)) return;
-
-    let cancelled = false;
-
-    const fetchProfile = async (): Promise<void> => {
-      try {
-        const response = await fetch(
-          `https://${homeserver}/_matrix/client/v3/profile/${encodeURIComponent(userId)}`
-        );
-        if (!response.ok || cancelled) return;
-        const json = (await response.json()) as Record<string, unknown>;
-        const displayName = typeof json['displayname'] === 'string' ? json['displayname'] : null;
-        const avatarHttpUrl =
-          typeof json['avatar_url'] === 'string'
-            ? mxcToThumbnailUrl(homeserver, json['avatar_url'])
-            : null;
-        if (!cancelled) {
-          setMatrixProfile({ displayName, avatarHttpUrl });
-        }
-      } catch {
-        // Ignore profile fetch failures — the rest of the details card still renders.
-      }
-    };
-
-    void fetchProfile();
-    return () => {
-      cancelled = true;
-    };
-  }, [parsedDetails?.userId]);
-
   const sortedEntries = useMemo(() => sortEntries(listingEntries), [listingEntries]);
   const pngEntries = useMemo(
     () => sortedEntries.filter((entry) => entry.name.toLowerCase().endsWith('.png')),
@@ -302,11 +245,11 @@ export function ListingView() {
             if (response?.ok && response.summary) {
               setListingSummary(entry.name, response.summary);
             } else {
-              setListingSummary(entry.name, zeroSummary());
+              setListingSummary(entry.name, emptyArchiveSummary());
             }
           } catch {
             if (!cancelled) {
-              setListingSummary(entry.name, zeroSummary());
+              setListingSummary(entry.name, emptyArchiveSummary());
             }
           } finally {
             activeCount--;

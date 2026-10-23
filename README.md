@@ -18,6 +18,9 @@ Live at **https://manuroe.github.io/shakeview/**
 ![Sync waterfall](public/demo/screenshot-sync-light.png#gh-light-mode-only)
 ![Sync waterfall](public/demo/screenshot-sync-dark.png#gh-dark-mode-only)
 
+![Megolm decryption](public/demo/screenshot-decryption-light.png#gh-light-mode-only)
+![Megolm decryption](public/demo/screenshot-decryption-dark.png#gh-dark-mode-only)
+
 ## Demo mode
 
 Click **"Try with demo logs: Mobile · Web"** on the landing page to explore the app with an Element X or Element Web log, without a real log file.

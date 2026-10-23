@@ -22,7 +22,7 @@ import { createElement } from 'react';
  * ```
  */
 export function findMatchingIndices<T>(
-  items: T[],
+  items: readonly T[],
   query: string,
   caseSensitive: boolean,
   getText: (item: T) => string

@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ListingView } from '../ListingView';
 import { useListingStore } from '../../stores/listingStore';
+import { clearMatrixProfiles } from '../../utils/matrixProfile';
 
 const {
   mockNavigate,
@@ -64,6 +65,9 @@ function makeSummary(totalLines = 5) {
     totalUploadBytes: 1024,
     totalDownloadBytes: 2048,
     statusCodes: { '200': 2, '404': 1 },
+    utdCount: 0,
+    utdReasons: {},
+    cryptoSteps: [],
   };
 }
 
@@ -178,6 +182,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearMatrixProfiles();
   global.fetch = originalFetch as typeof global.fetch;
   window.open = originalOpen;
   URL.createObjectURL = originalCreateObjectURL ?? ((() => '') as typeof URL.createObjectURL);

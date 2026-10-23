@@ -101,6 +101,20 @@ describe('BurgerMenu', () => {
       );
     });
 
+    it('lists Decryption under a Crypto section and keeps the time window', () => {
+      currentSearchParams = new URLSearchParams('start=2025-01-01T00:00:00Z');
+      useLogStore.setState({ rawLogLines: [createParsedLogLine({ lineNumber: 1, rawText: 'x' })] });
+      render(
+        <MemoryRouter initialEntries={['/summary?start=2025-01-01T00:00:00Z']}>
+          <BurgerMenu />
+        </MemoryRouter>
+      );
+      fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+      expect(screen.getByText('Crypto')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Decryption'));
+      expect(navigateMock).toHaveBeenCalledWith('/decryption?start=2025-01-01T00%3A00%3A00Z');
+    });
+
     it('clears view-specific params (scale, status, filter, request_id) when navigating', () => {
       currentSearchParams = new URLSearchParams(
         'start=2025-01-01T00:00:00Z&end=2025-01-01T12:00:00Z&scale=50&status=200,500&filter=sync&request_id=REQ-1'

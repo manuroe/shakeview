@@ -7,14 +7,24 @@
  * end) preserved. Any failure lands on the landing page instead.
  */
 import { StrictMode } from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
-const { mockParseTarGzArchive, mockLoadArchive, mockOpenMergedEntries, mockNavigate } = vi.hoisted(() => ({
+const { mockParseTarGzArchive, mockLoadArchive, mockOpenMergedEntries, mockNavigate, mockLoadCryptoDevice, mockStartCase, mockDeviceFromFile } = vi.hoisted(() => ({
   mockParseTarGzArchive: vi.fn(),
   mockLoadArchive: vi.fn(),
   mockOpenMergedEntries: vi.fn(),
   mockNavigate: vi.fn(),
+  mockLoadCryptoDevice: vi.fn(),
+  mockStartCase: vi.fn(),
+  mockDeviceFromFile: vi.fn(),
+}));
+
+vi.mock('../../utils/crypto/loadDevice', () => ({ deviceFromFile: mockDeviceFromFile }));
+
+vi.mock('../../stores/cryptoStore', () => ({
+  loadCryptoDevice: mockLoadCryptoDevice,
+  startCase: mockStartCase,
 }));
 
 vi.mock('../../utils/tarGzArchive', () => ({
@@ -51,9 +61,11 @@ vi.mock('../../stores/archiveStore', () => ({
 }));
 
 let mockSearchParams: URLSearchParams;
+let mockPathname = '/logs';
 vi.mock('react-router-dom', () => ({
   useSearchParams: () => [mockSearchParams, vi.fn()],
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ pathname: mockPathname }),
 }));
 
 import { useArchiveUrl, ARCHIVE_URL_PARAM, ARCHIVE_FILE_PARAM } from '../useArchiveUrl';
@@ -77,9 +89,14 @@ describe('useArchiveUrl', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockSearchParams = new URLSearchParams();
+    mockPathname = '/logs';
     putInStore('', []);
     mockParseTarGzArchive.mockReturnValue(ENTRIES);
     mockOpenMergedEntries.mockResolvedValue('/summary');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('is a no-op when the archive param is absent', () => {
@@ -87,6 +104,53 @@ describe('useArchiveUrl', () => {
     renderHook(() => useArchiveUrl());
     expect(fetch).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('on /decryption: opens the first archive, adds the others as devices, stays on /decryption', async () => {
+    mockFetchOk();
+    mockPathname = '/decryption';
+    mockSearchParams = new URLSearchParams(`?${ARCHIVE_URL_PARAM}=${ARCHIVE_URL}&${ARCHIVE_URL_PARAM}=http://127.0.0.1:7357/sender.tar.gz&session=S`);
+
+    renderHook(() => useArchiveUrl());
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith({ pathname: '/decryption', search: 'session=S' }, { replace: true }));
+    expect(fetch).toHaveBeenCalledWith(ARCHIVE_URL);
+    expect(mockStartCase).toHaveBeenCalledTimes(1);
+    expect(mockLoadCryptoDevice).toHaveBeenCalledWith('sender.tar.gz', expect.any(Function));
+  });
+
+  it('on /decryption: the same archive again still adds the other archives as devices', async () => {
+    mockFetchOk();
+    mockSearchParams = new URLSearchParams(`?${ARCHIVE_URL_PARAM}=${ARCHIVE_URL}`);
+    const { rerender } = renderHook(() => useArchiveUrl());
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      mockPathname = '/decryption';
+      mockSearchParams = new URLSearchParams(`?${ARCHIVE_URL_PARAM}=${ARCHIVE_URL}&${ARCHIVE_URL_PARAM}=http://127.0.0.1:7357/sender.tar.gz`);
+    });
+    rerender();
+
+    await waitFor(() => expect(mockLoadCryptoDevice).toHaveBeenCalledWith('sender.tar.gz', expect.any(Function)));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenLastCalledWith({ pathname: '/decryption', search: '' }, { replace: true });
+  });
+
+  it('on /decryption: each added device is fetched from its URL, and an HTTP error is reported', async () => {
+    mockFetchOk();
+    mockPathname = '/decryption';
+    mockSearchParams = new URLSearchParams(`?${ARCHIVE_URL_PARAM}=${ARCHIVE_URL}&${ARCHIVE_URL_PARAM}=http://127.0.0.1:7357/sender.tar.gz`);
+    mockDeviceFromFile.mockResolvedValue({ archiveName: 'sender.tar.gz' });
+    renderHook(() => useArchiveUrl());
+    await waitFor(() => expect(mockLoadCryptoDevice).toHaveBeenCalled());
+    const load = mockLoadCryptoDevice.mock.calls[0][1] as () => Promise<unknown>;
+
+    await expect(load()).resolves.toEqual({ archiveName: 'sender.tar.gz' });
+    expect(fetch).toHaveBeenLastCalledWith('http://127.0.0.1:7357/sender.tar.gz');
+    expect(mockDeviceFromFile).toHaveBeenCalledWith('sender.tar.gz', expect.any(Uint8Array));
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    await expect(load()).rejects.toThrow('fetch failed with HTTP 404');
   });
 
   it('fetches the archive, opens the analyzable entries merged, and lands on /logs', async () => {
@@ -163,6 +227,23 @@ describe('useArchiveUrl', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(mockLoadArchive).toHaveBeenCalledTimes(1);
     expect(mockOpenMergedEntries).toHaveBeenLastCalledWith(['console.2026-07-22-11.log.gz']);
+  });
+
+  it('re-opens the very same link when its archive is no longer in memory', async () => {
+    mockFetchOk();
+    mockSearchParams = new URLSearchParams(`?${ARCHIVE_URL_PARAM}=${ARCHIVE_URL}`);
+    const { rerender } = renderHook(() => useArchiveUrl());
+    await waitFor(() => expect(mockLoadArchive).toHaveBeenCalledTimes(1));
+
+    // A /decryption step link re-opened another device's archive in between.
+    act(() => {
+      putInStore('sender.tar.gz', []);
+      mockSearchParams = new URLSearchParams(`?${ARCHIVE_URL_PARAM}=${ARCHIVE_URL}`);
+    });
+    rerender();
+
+    await waitFor(() => expect(mockLoadArchive).toHaveBeenCalledTimes(2));
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('re-fetches when another archive has replaced the one in memory', async () => {

@@ -4,6 +4,7 @@ import { useURLParams } from '../hooks/useURLParams';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { INCOMPLETE_STATUS_KEY, CLIENT_ERROR_STATUS_KEY } from '../utils/statusCodeUtils';
 import { getHttpStatusColor } from '../utils/httpStatusColors';
+import { toggleFilterKey } from '../utils/filterSelection';
 import styles from './StatusFilterDropdown.module.css';
 
 interface StatusFilterDropdownProps {
@@ -25,27 +26,7 @@ export function StatusFilterDropdown({ availableStatusCodes }: StatusFilterDropd
 
   /** Toggle a status code in the filter */
   const toggleStatusCode = useCallback((code: string) => {
-    if (statusCodeFilter === null) {
-      // Currently showing all - switch to all except this one
-      const newFilter = new Set(availableStatusCodes.filter(c => c !== code));
-      setStatusFilter(newFilter);
-    } else if (statusCodeFilter.has(code)) {
-      // Remove this code from filter
-      const newFilter = new Set(statusCodeFilter);
-      newFilter.delete(code);
-      // If no codes selected, reset to null (show all)
-      setStatusFilter(newFilter.size === 0 ? null : newFilter);
-    } else {
-      // Add this code to filter
-      const newFilter = new Set(statusCodeFilter);
-      newFilter.add(code);
-      // If all codes now selected, reset to null (show all)
-      if (newFilter.size === availableStatusCodes.length) {
-        setStatusFilter(null);
-      } else {
-        setStatusFilter(newFilter);
-      }
-    }
+    setStatusFilter(toggleFilterKey(statusCodeFilter, availableStatusCodes, code));
   }, [statusCodeFilter, availableStatusCodes, setStatusFilter]);
 
   /** Select all status codes (reset filter) */

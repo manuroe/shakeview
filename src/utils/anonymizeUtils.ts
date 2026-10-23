@@ -145,6 +145,22 @@ export function isDomainAlias(host: string): boolean {
 }
 
 /**
+ * True for a Matrix identifier alias as written by the anonymizer (see
+ * `buildAnonymizationDictionary`), with or without its domain alias. A view can
+ * then tell an anonymized id, which links nowhere (no matrix.to permalink), from a real one.
+ *
+ * @example
+ * ```ts
+ * isIdentifierAlias('!room-0c9231edecda'); // true
+ * isIdentifierAlias('$event-fd3eb2001791:domain-60fc0bb7.org'); // true
+ * isIdentifierAlias('!abc:matrix.org'); // false
+ * ```
+ */
+export function isIdentifierAlias(id: string): boolean {
+  return /^(?:@user|#room_alias|!room|\$event)-[0-9a-f]{12}(?::domain-[0-9a-f]{8}\.org(?::\d{1,5})?)?$/.test(id);
+}
+
+/**
  * Decode a percent-encoded identifier (`%21abc%3Aexample.org` → `!abc:example.org`),
  * as many times as it was encoded. `levels` is that count; plain identifiers
  * come back unchanged with `levels` 0.

@@ -178,7 +178,7 @@ export function filterHttpRequests(
     }
 
     // Time filter
-    if (timeRangeUs && !isRequestInTimeRange(r, rawLogLines, timeRangeUs)) {
+    if (timeRangeUs && !isRequestInTimeRange(r, rawLogLines, timeRangeUs, lineNumberIndex)) {
       return false;
     }
 

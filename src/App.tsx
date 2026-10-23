@@ -28,6 +28,7 @@ import { ShortcutHelpOverlay, ChordToast } from './components/ShortcutHelpOverla
 import { useExtensionFile } from './hooks/useExtensionFile';
 import { useTabLog, TAB_LOG_PARAM } from './hooks/useTabLog';
 import { useArchiveUrl, ARCHIVE_URL_PARAM } from './hooks/useArchiveUrl';
+import { DecryptionView } from './views/DecryptionView';
 import { AnonymizingProgressModal } from './components/AnonymizingProgressModal';
 import uploadStyles from './components/FileUpload.module.css';
 
@@ -140,6 +141,7 @@ function AppContent() {
         <Route path="/spans" element={<SpansView />} />
         <Route path="/http_requests" element={<HttpRequestsView />} />
         <Route path="/http_requests/sync" element={<SyncView />} />
+        <Route path="/decryption" element={<DecryptionView />} />
       </Routes>
       <ShortcutHelpOverlay />
       <ChordToast />

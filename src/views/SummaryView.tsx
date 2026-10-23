@@ -1,12 +1,18 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
+import { useArchiveStore } from '../stores/archiveStore';
+import { loadedArchive } from '../stores/cryptoStore';
+import { useMatrixProfile } from '../hooks/useMatrixProfile';
+import { deviceIdentity } from '../utils/crypto/identity';
+import { detailsFromEntries } from '../utils/crypto/loadDevice';
 import { useURLParams } from '../hooks/useURLParams';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
 import { HttpActivityChart } from '../components/HttpActivityChart';
 import { BandwidthChart } from '../components/BandwidthChart';
+import { DecryptionActivityCard } from '../components/DecryptionActivityCard';
 import { calculateTimeRangeMicros, formatTimestamp, formatDuration, getMinMaxTimestamps, snapSelectionToLogLine, SNAP_TOLERANCE_US } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
@@ -39,8 +45,18 @@ export function SummaryView() {
     detectedPlatform,
     lineNumberIndex,
     logFileName,
+    loadedEntryNames,
+    isAnonymized,
   } = useLogStore();
   const { setTimeFilter } = useURLParams();
+  const archiveName = useArchiveStore((s) => s.archiveName);
+  const archiveEntries = useArchiveStore((s) => s.archiveEntries);
+
+  // Whose rageshake this is: details.json of the loaded archive, else the logs (as on /decryption).
+  const identity = useMemo(() => deviceIdentity(
+    loadedArchive(archiveName, archiveEntries, loadedEntryNames) ? detailsFromEntries(archiveEntries) : null, rawLogLines,
+  ), [archiveName, archiveEntries, loadedEntryNames, rawLogLines]);
+  const profile = useMatrixProfile(isAnonymized ? undefined : identity.userId);
 
   const summaryTitle = `Summary${detectedPlatform ? ` - ${detectedPlatform === 'ios' ? 'iOS' : 'Android'}` : ''}`;
 
@@ -247,7 +263,17 @@ export function SummaryView() {
           <h1 className="header-title">{summaryTitle}</h1>
           {logFileName && <p className={styles.fileName}>{logFileName}</p>}
         </div>
-        
+
+        {(identity.userId || identity.deviceId) && (
+          <div className={`header-center ${styles.identity}`}>
+            {profile?.avatarHttpUrl && <img src={profile.avatarHttpUrl} alt="" className={styles.avatar} onError={(e) => { e.currentTarget.hidden = true; }} />}
+            <div className={styles.identityText}>
+              {profile?.displayName && <div className={styles.displayName}>{profile.displayName}</div>}
+              <div className={styles.ids}>{[identity.userId, identity.deviceId].filter(Boolean).join(' · ')}</div>
+            </div>
+          </div>
+        )}
+
         <div className="header-right">
           {shouldShowApplyButton && localStartTime !== null && localEndTime !== null && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -473,6 +499,17 @@ export function SummaryView() {
             </section>
           )}
         </div>
+
+        <DecryptionActivityCard
+          rawLogLines={rawLogLines}
+          filteredLogLines={stats.filteredLogLines}
+          onTimeRangeSelected={handleTimeRangeSelected}
+          onResetZoom={handleResetZoom}
+          externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
+          externalSelection={enableChartSync ? sharedSelection : undefined}
+          onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
+          onSelectionChange={enableChartSync ? setSharedSelection : undefined}
+        />
 
         {/* HTTP Activity — unified section for requests + bandwidth charts */}
         {hasHttpActivityData && (

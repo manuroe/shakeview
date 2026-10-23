@@ -24,12 +24,16 @@ import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { decompressSync } from 'fflate';
 import { useArchiveStore } from '../stores/archiveStore';
-import { isAnalyzableEntry, computeArchiveSummary, type ArchiveSummary } from '../utils/archiveSummary';
+import { isAnalyzableEntry, computeArchiveSummary, emptyArchiveSummary, utdsByFile, type ArchiveSummary, type FileUtds } from '../utils/archiveSummary';
+import { formatCounts } from '../utils/crypto/decryptionSummary';
+import { REPORTED_MEANING } from '../utils/crypto/labels';
+import { plural } from '../utils/crypto/format';
 import { parseDetailsJson } from '../utils/detailsJson';
 import { decodeTextBytes } from '../utils/fileValidator';
 import { getEntryKind, getMimeType, sortEntries, stripEntryPrefix } from '../utils/listingEntries';
 import { openMergedEntries } from '../utils/openMergedLogs';
-import { isValidPublicHomeserver, mxcToThumbnailUrl, userInitial } from '../utils/matrixProfile';
+import { userInitial } from '../utils/matrixProfile';
+import { useMatrixProfile } from '../hooks/useMatrixProfile';
 import { formatBytes } from '../utils/sizeUtils';
 import { isNumericStatus } from '../utils/statusCodeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
@@ -69,6 +73,17 @@ function StatusChips({ statusCodes }: { readonly statusCodes: Readonly<Record<st
       })}
     </span>
   );
+}
+
+/** A file's UTDs in its cell; `reported` is `undefined` while other files are still being summarized. */
+type UtdCell = Omit<FileUtds, 'reported'> & { readonly reported: number | null | undefined };
+
+/** The UTDs cell's tooltip: what "reported (all)" counts, then the UTDs per reason. */
+function utdTitle(u: UtdCell): string {
+  const head = u.reported === undefined ? 'Reported: waiting for the other files'
+    : u.reported === null ? 'Reported: unknown, no timeline logs'
+    : `${u.reported.toLocaleString()} reported of ${plural(u.count, 'UTD')}`;
+  return `${head}\n${REPORTED_MEANING}\n${formatCounts(u.byReason)}`;
 }
 
 /** A single data cell — shows "…" while loading, "—" for non-analyzable, or the value. */
@@ -124,56 +139,8 @@ export function ArchiveView() {
     [archiveEntries]
   );
 
-  /**
-   * Matrix profile fetched from the user's homeserver.
-   * Populated asynchronously after `parsedDetails.userId` is known.
-   * `null` while loading or when no userId is present.
-   */
-  const [matrixProfile, setMatrixProfile] = useState<{
-    readonly displayName: string | null;
-    readonly avatarHttpUrl: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    const userId = parsedDetails?.userId;
-    if (!userId) {
-      setMatrixProfile(null);
-      return;
-    }
-    // Clear any previous archive's profile immediately so the UI never shows
-    // stale data while the new fetch is in flight.
-    setMatrixProfile(null);
-    // Extract homeserver from @user:homeserver.tld
-    const colonIdx = userId.indexOf(':', 1);
-    if (colonIdx < 0) return;
-    const homeserver = userId.slice(colonIdx + 1);
-
-    // Guard against crafted archives reaching unexpected hosts: only request
-    // profiles for homeservers that look like real internet domain names.
-    // Rejects localhost, raw IPv4/IPv6 addresses, and single-label hostnames.
-    if (!isValidPublicHomeserver(homeserver)) return;
-
-    let cancelled = false;
-    const fetchProfile = async () => {
-      try {
-        const response = await fetch(
-          `https://${homeserver}/_matrix/client/v3/profile/${encodeURIComponent(userId)}`
-        );
-        if (!response.ok || cancelled) return;
-        const json = await response.json() as Record<string, unknown>;
-        const displayName = typeof json['displayname'] === 'string' ? json['displayname'] : null;
-        const avatarHttpUrl =
-          typeof json['avatar_url'] === 'string'
-            ? mxcToThumbnailUrl(homeserver, json['avatar_url'])
-            : null;
-        if (!cancelled) setMatrixProfile({ displayName, avatarHttpUrl });
-      } catch {
-        // Network error or CORS — silently skip the profile header
-      }
-    };
-    void fetchProfile();
-    return () => { cancelled = true; };
-  }, [parsedDetails?.userId]);
+  /** Matrix profile fetched from the user's homeserver; `null` while loading or without a userId. */
+  const matrixProfile = useMatrixProfile(parsedDetails?.userId);
 
   /**
    * Object URLs for PNG entries, created once and revoked on unmount.
@@ -195,6 +162,14 @@ export function ArchiveView() {
     };
   }, [pngUrls]);
 
+  // UTDs need every file: a UTD retried or decrypted in the next one counts once, in the file it first failed.
+  // `undefined` until all files are summarized; only modelled when some file has UTDs.
+  const archiveUtds = useMemo(() => {
+    const files = sortedEntries.filter((e) => isAnalyzableEntry(e.name));
+    if (!files.every((e) => archiveSummaries.has(e.name))) return undefined;
+    return files.some((e) => archiveSummaries.get(e.name)!.utdCount > 0) ? utdsByFile(archiveSummaries) : new Map<string, FileUtds>();
+  }, [sortedEntries, archiveSummaries]);
+
   // Background summary computation: parse one entry at a time, yielding between
   // each via setTimeout(0) so the UI stays responsive.
   useEffect(() => {
@@ -214,20 +189,11 @@ export function ArchiveView() {
           const isGz = entry.name.toLowerCase().endsWith('.gz');
           const bytes = isGz ? decompressSync(entry.data) : entry.data;
           const text = decodeTextBytes(bytes);
-          const summary = computeArchiveSummary(text);
+          const summary = computeArchiveSummary(text, entry.name);
           setArchiveSummary(entry.name, summary);
         } catch {
           // Decompression or parsing failed — record zeros so the row never stays "…"
-          setArchiveSummary(entry.name, {
-            totalLines: 0,
-            errorCount: 0,
-            warnCount: 0,
-            sentryCount: 0,
-            httpCount: 0,
-            totalUploadBytes: 0,
-            totalDownloadBytes: 0,
-            statusCodes: {},
-          });
+          setArchiveSummary(entry.name, emptyArchiveSummary());
         }
       }
 
@@ -392,6 +358,7 @@ export function ArchiveView() {
               <th className={`${tableStyles.tableHeadCell} ${tableStyles.alignRight}`}>Errors</th>
               <th className={`${tableStyles.tableHeadCell} ${tableStyles.alignRight}`}>Warnings</th>
               <th className={`${tableStyles.tableHeadCell} ${tableStyles.alignRight}`}>Requests</th>
+              <th className={`${tableStyles.tableHeadCell} ${tableStyles.alignRight}`}>UTDs</th>
               <th className={`${tableStyles.tableHeadCell} ${tableStyles.alignRight}`}>Upload</th>
               <th className={`${tableStyles.tableHeadCell} ${tableStyles.alignRight}`}>Download</th>
               <th className={tableStyles.tableHeadCell}>Status</th>
@@ -401,6 +368,10 @@ export function ArchiveView() {
             {sortedEntries.map((entry) => {
               const displayName = stripEntryPrefix(entry.name);
               const summary = archiveSummaries.get(entry.name);
+              // Until every file is summarized: this file's own count, reported pending.
+              const utds: UtdCell | undefined = archiveUtds
+                ? archiveUtds.get(entry.name)
+                : summary && { count: summary.utdCount, reported: undefined, byReason: summary.utdReasons };
               const analyzable = isAnalyzableEntry(entry.name);
               const kind = getEntryKind(entry.name);
               return (
@@ -469,6 +440,14 @@ export function ArchiveView() {
                         {s.httpCount > 0 ? s.httpCount.toLocaleString() : '—'}
                       </span>
                     )}
+                  </DataCell>
+
+                  <DataCell summary={summary} analyzable={analyzable}>
+                    {() => (utds && utds.count > 0 ? (
+                      <span className={styles.errorCount} title={utdTitle(utds)}>
+                        {`${utds.reported === undefined ? '…' : utds.reported === null ? '?' : utds.reported.toLocaleString()} (${utds.count.toLocaleString()})`}
+                      </span>
+                    ) : <span className={styles.zeroCount}>—</span>)}
                   </DataCell>
 
                   <DataCell summary={summary} analyzable={analyzable}>

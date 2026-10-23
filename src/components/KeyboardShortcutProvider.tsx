@@ -120,6 +120,7 @@ export function KeyboardShortcutProvider({ children }: KeyboardShortcutProviderP
         case 'n': navigateTo('/spans'); break;
         case 'h': navigateTo('/http_requests'); break;
         case 'y': navigateTo('/http_requests/sync'); break;
+        case 'd': navigateTo('/decryption'); break;
         default: break;
       }
     },

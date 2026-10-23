@@ -29,6 +29,12 @@ describe('App routing fallback', () => {
     expect(useLogStore.getState().lastRoute).toBe('/logs');
   });
 
+  it('redirects /decryption without data to the landing page (reload behaviour)', async () => {
+    window.location.hash = '#/decryption';
+    render(<App />);
+    await waitFor(() => expect(screen.getByText(/Drop Rageshake Here/i)).toBeInTheDocument());
+  });
+
   // ============================================================================
   // Multi-Parameter Combination Tests
   // ============================================================================

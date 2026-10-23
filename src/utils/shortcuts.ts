@@ -77,6 +77,12 @@ export const SHORTCUTS = {
     category: 'navigation',
     requiresNoInputFocus: true,
   },
+  goDecryption: {
+    label: 'g → d',
+    description: 'Go to Megolm decryption',
+    category: 'navigation',
+    requiresNoInputFocus: true,
+  },
   focusSearch: {
     label: '/',
     description: 'Focus search input',

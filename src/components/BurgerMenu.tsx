@@ -256,6 +256,14 @@ export function BurgerMenu() {
           >
             Sync
           </button>
+          <div className={styles.burgerDivider} />
+          <div className={styles.burgerSectionTitle}>Crypto</div>
+          <button
+            className={`${styles.burgerItem} ${isActive('/decryption') ? styles.active : ''}`}
+            onClick={() => handleNavigate('/decryption')}
+          >
+            Decryption
+          </button>
           {canSelectLogs && (
             <>
               <div className={styles.burgerDivider} />

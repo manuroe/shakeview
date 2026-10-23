@@ -17,7 +17,8 @@ jobs:
       github.actor != 'github-actions[bot]' &&
       (github.event_name == 'push' ||
        github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04, where Playwright cannot install Chromium yet.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:

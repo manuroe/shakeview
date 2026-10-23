@@ -222,6 +222,20 @@ async function main(): Promise<void> {
   await setTheme('dark');
   await shot('sync-dark');
 
+  // Megolm decryption: the web demo added as the sender of the mobile demo, on the
+  // UTD a late room key resolved. Without that session (demo logs edited) the view
+  // falls back to its first session, still a valid shot.
+  await page.goto(`${BASE_URL}/#/decryption`);
+  const addSender = page.getByRole('button', { name: 'Add sender rageshake' });
+  await addSender.click();
+  await addSender.waitFor({ state: 'detached', timeout: 15_000 });
+  await page.goto(`${BASE_URL}/#/decryption?session=${encodeURIComponent('yN9zHYIa4UOrGNATMuDJawTgsu8PO+799nKSNrh9UCa')}`);
+  await page.waitForTimeout(600);
+  await setTheme('light');
+  await shot('decryption-light');
+  await setTheme('dark');
+  await shot('decryption-dark');
+
   // Extension listing page — navigate to the demo rageshake-style HTML and capture
   // the native view before the extension takes over.
   const demoLogText = await readFile(resolve(ROOT, 'public', 'demo', 'demo.log'), 'utf-8');

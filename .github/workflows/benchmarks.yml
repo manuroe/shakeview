@@ -18,7 +18,8 @@ jobs:
   benchmarks:
     name: Run CodSpeed benchmarks
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04, which the CodSpeed runner does not support yet ("Unsupported system").
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4

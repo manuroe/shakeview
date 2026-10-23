@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isAnalyzableEntry, computeArchiveSummary } from '../archiveSummary';
+import { isAnalyzableEntry, computeArchiveSummary, utdsByFile } from '../archiveSummary';
 
 describe('isAnalyzableEntry', () => {
   it('accepts .log.gz entries', () => {
@@ -86,5 +86,46 @@ describe('computeArchiveSummary', () => {
 
     const summary = computeArchiveSummary(log);
     expect(summary.statusCodes['client-error']).toBe(1);
+  });
+
+  /** A Rust UTD of `id` in room session S, at `time` on 2026-09-08. */
+  const failed = (id: string, time = '06:55:22') => `2026-09-08T${time}.130000Z  WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None | crates/matrix-sdk-crypto/src/machine/mod.rs:2516 | spans: decrypt_room_event{event_id="${id}" session_id="S" message_index=0}`;
+
+  it('counts distinct UTD events and their reasons', () => {
+    const text = [
+      "2026-09-08T06:55:22.130000Z  WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None | crates/matrix-sdk-crypto/src/machine/mod.rs:2516 | spans: decrypt_room_event{event_id=\"$ev1\" session_id=\"S\" message_index=0}",
+      "2026-09-08T06:55:23.130000Z  WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None | crates/matrix-sdk-crypto/src/machine/mod.rs:2516 | spans: decrypt_room_event{event_id=\"$ev1\" session_id=\"S\" message_index=0}",
+    ].join('\n');
+    const summary = computeArchiveSummary(text);
+    expect(summary.utdCount).toBe(1);
+    expect(summary.utdReasons.missing_key).toBe(1);
+  });
+
+  it('counts reported UTDs over the whole archive, in the file of the first failure', () => {
+    const a = computeArchiveSummary([failed('$ev1'), failed('$ev2')].join('\n'), 'a.log');
+    // The app's report of $ev1 is only in the next file.
+    const b = computeArchiveSummary('2026-09-08T07:00:30.000000Z DEBUG elementx: onUtd for event $ev1, timeToDecryptMs: null |  |', 'b.log');
+    const utds = utdsByFile(new Map([['a.log', a], ['b.log', b]]));
+    expect(utds.get('a.log')).toEqual({ count: 2, reported: 1, byReason: { missing_key: 2 } });
+    expect(utds.get('b.log')).toBeUndefined();
+  });
+
+  it('counts a UTD retried across an hourly boundary once, in the file it first failed', () => {
+    const a = computeArchiveSummary(failed('$ev1'), 'a.log');
+    const b = computeArchiveSummary([
+      failed('$ev1', '07:00:05'),
+      '2026-09-08T07:00:30.000000Z DEBUG elementx: onUtd for event $ev1, timeToDecryptMs: null |  |',
+    ].join('\n'), 'b.log');
+    // Each file alone sees the UTD: the archive-wide count credits only the first.
+    expect([a.utdCount, b.utdCount]).toEqual([1, 1]);
+    // Summaries in any order: the first failure decides, not the map order.
+    const utds = utdsByFile(new Map([['b.log', b], ['a.log', a]]));
+    expect(utds.get('a.log')).toEqual({ count: 1, reported: 1, byReason: { missing_key: 1 } });
+    expect(utds.get('b.log')).toBeUndefined();
+  });
+
+  it('cannot tell reported UTDs without timeline logs', () => {
+    expect(utdsByFile(new Map([['a.log', computeArchiveSummary(failed('$ev1'), 'a.log')]])).get('a.log'))
+      .toEqual({ count: 1, reported: null, byReason: { missing_key: 1 } });
   });
 });

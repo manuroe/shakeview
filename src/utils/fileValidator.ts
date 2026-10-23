@@ -247,9 +247,12 @@ export async function validateGzipFile(
 }
 
 /**
- * Helper: Read blob as ArrayBuffer
+ * Read a blob (a dropped file) as an ArrayBuffer through FileReader: unlike
+ * `Blob.arrayBuffer()`, jsdom implements it, so callers stay testable.
+ *
+ * @example new Uint8Array(await readBlob(file))
  */
-function readBlob(blob: Blob): Promise<ArrayBuffer> {
+export function readBlob(blob: Blob): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -263,4 +266,16 @@ function readBlob(blob: Blob): Promise<ArrayBuffer> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(blob);
   });
+}
+
+/**
+ * Fetch a URL's body as bytes, throwing on an HTTP error so callers report it
+ * rather than parse an error page: archives and demo logs are fetched this way.
+ *
+ * @example const bytes = await fetchBytes('http://127.0.0.1:7357/case/shake.tar.gz');
+ */
+export async function fetchBytes(url: string): Promise<Uint8Array> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`fetch failed with HTTP ${response.status}`);
+  return new Uint8Array(await response.arrayBuffer());
 }
