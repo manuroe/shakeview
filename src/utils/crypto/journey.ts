@@ -63,6 +63,8 @@ function ago(us: number): string {
 const NOT_LOADED = "sender's rageshake not loaded";
 /** A bundle's keys are imported shortly after it arrives. */
 const BUNDLE_IMPORT_US = 10 * 60 * 1_000_000;
+/** A send is only provably lost when the receiver's logs cover this long after it. */
+const DELIVERY_WINDOW_US = 60 * 1_000_000;
 /** µs from the key's arrival to the logged re-decryption, when longer than the analytics grace period. */
 function applyGap(u: UtdEvent): number | undefined {
   const r = u.resolution;
@@ -149,10 +151,23 @@ export function buildJourney(session: MegolmSession, sender: CryptoDevice | unde
   const shares = sSteps.filter((x) => x.kind === 'share.encrypt');
   const { userId, deviceId } = receiver.identity;
   const share = shares.find((x) => (x.keys.recipients ?? []).some(([u, d]) => u === userId && d === deviceId));
+  // Re-shares list only the devices new to the session: being absent from them proves
+  // nothing unless the session's first share (message index 0) is in the logs.
+  const firstShareLogged = shares.some((x) => x.keys.messageIndex === 0);
+  const loggedIndexes = shares.flatMap((x) => (x.keys.messageIndex !== undefined ? [x.keys.messageIndex] : []));
   // Left out of every share: the sender's last failure to create an Olm session with this device says why.
   const noOlm = share ? undefined : sender?.steps.filter((x) => x.kind === 'olm.claim' && x.keys.error
     && x.keys.userId === userId && x.keys.deviceId === deviceId && x.ts <= (shares[shares.length - 1]?.ts ?? 0)).pop();
-  const delivery = session.deliveries.find((d) => d.receiverId === receiver.id);
+  // A re-sent key that arrived counts; else the latest send speaks for the delivery.
+  const toThisDevice = session.deliveries.filter((d) => d.receiverId === receiver.id);
+  const delivery = toThisDevice.find((d) => d.received)
+    ?? toThisDevice.reduce<typeof toThisDevice[number] | undefined>((a, d) => (!a || d.batch.ts > a.batch.ts ? d : a), undefined);
+  // "Never received" only holds when this device logs its to-device events and its logs cover the send.
+  const sentAt = delivery?.batch.ts;
+  const unprovenLoss = !delivery || delivery.received ? undefined
+    : !receiver.steps.some((x) => x.kind === 'todevice.received') ? "no to-device events in this device's logs"
+    : !receiver.coverage.some((c) => c.start <= sentAt! && c.end >= sentAt! + DELIVERY_WINDOW_US) ? `this device's logs do not cover the send at ${clock(sentAt!)}`
+    : undefined;
   const toDeviceKey = keys.find((x) => x.keys.toDeviceType === 'm.room_key' || x.keys.toDeviceType === 'm.forwarded_room_key');
 
   // History sharing (room key bundles): room-level steps the builder attached to this session.
@@ -182,13 +197,16 @@ export function buildJourney(session: MegolmSession, sender: CryptoDevice | unde
     sentBeforeJoin,
     predatesLogs,
     backup: backupState,
-    leftOut: shares.length > 0 && !!userId && !!deviceId && !share,
+    leftOut: shares.length > 0 && !!userId && !!deviceId && !share && (firstShareLogged || !!noOlm),
     noOlm,
-    lost: !!delivery && !delivery.received,
+    lost: !!delivery && !delivery.received && !unprovenLoss,
+    deliveryUnknown: !!unprovenLoss,
     withheld: rSteps.find((x) => x.kind === 'withheld.received'),
     olm: rSteps.filter((x) => x.kind === 'olm.decrypt_failed' && x.keys.senderKey === session.senderKey),
     stillAfterKey: utds.find((u) => u.keyArrivedButFailed),
-    payload: !!sender && session.utds.some((u) => u.deviceId === sender.id)
+    // Every loaded device of the session failed, the sender included, with one error.
+    payload: !!sender && [session.sender.loadedId, ...session.receivers.map((r) => r.loadedId)]
+      .every((id) => !id || session.utds.some((u) => u.deviceId === id))
       && new Set(session.utds.map((u) => u.error)).size === 1,
   };
 
@@ -235,7 +253,9 @@ export function buildJourney(session: MegolmSession, sender: CryptoDevice | unde
           ? { state: 'unknown', label: 'This device in the share', detail: "this device's identity is unknown" }
           : noOlm
             ? { state: 'fail', label: 'This device in the share', detail: `no Olm session with this device: ${noOlm.keys.error}`, ...at(noOlm, 'sender') }
-            : { state: 'fail', label: 'This device in the share', detail: `not in the recipients of ${plural(shares.length, 'share')}; the SDK does not log why`, ...at(shares[0], 'sender') });
+            : !firstShareLogged
+              ? { state: 'unknown', label: 'This device in the share', detail: `not in the ${plural(shares.length, 'logged share')}; the earliest is at message index ${loggedIndexes.length > 0 ? Math.min(...loggedIndexes) : '?'}, earlier shares are not in the logs`, ...at(shares[0], 'sender') }
+              : { state: 'fail', label: 'This device in the share', detail: `not in the recipients of ${plural(shares.length, 'share')}; the SDK does not log why`, ...at(shares[0], 'sender') });
     }
     // The anchor the timed lines are ordered around: the first failure on this device.
     lines.push({ state: 'fail', label: 'Failed to decrypt', detail: `${clock(utds[0].firstFailedAt)} · ${REASON_NAME[utds[0].reason]}`, ...at(utds[0].steps[0], 'receiver') });
@@ -248,7 +268,9 @@ export function buildJourney(session: MegolmSession, sender: CryptoDevice | unde
       lines.push(delivery.received
         ? { state: 'ok', label: 'Delivered to this device', detail: `${clock(delivery.received.ts)} · ${delivery.latency !== undefined && delivery.latency < 0 ? 'clock skew?' : `after ${formatUs(delivery.latency ?? 0)}`}`, ...at(delivery.received, 'receiver') }
         // A non-event: untimed, so it stays after the send it failed to follow.
-        : { state: 'fail', label: 'Delivered to this device', detail: `never received${federated ? ' · the homeservers differ (federation)' : ''}`, ref: delivery.batch.line, lane: 'sender' });
+        : unprovenLoss
+          ? { state: 'unknown', label: 'Delivered to this device', detail: unprovenLoss, ref: delivery.batch.line, lane: 'sender' }
+          : { state: 'fail', label: 'Delivered to this device', detail: `never received${federated ? ' · the homeservers differ (federation)' : ''}`, ref: delivery.batch.line, lane: 'sender' });
     } else {
       lines.push(toDeviceKey
         ? { state: 'ok', label: 'Key received over to-device', detail: `${clock(toDeviceKey.ts)} · ${toDeviceKey.keys.toDeviceType}`, ...at(toDeviceKey, 'receiver') }
@@ -337,7 +359,7 @@ function verdictOf(
   facts: {
     history: { notShared?: CryptoStep; noBundle?: CryptoStep; rejected?: CryptoStep; notInBundle: boolean };
     sentBeforeJoin: boolean; predatesLogs: boolean; backup: JourneyLine;
-    leftOut: boolean; noOlm?: CryptoStep; lost: boolean; withheld?: CryptoStep; olm: readonly CryptoStep[]; stillAfterKey?: UtdEvent; payload: boolean;
+    leftOut: boolean; noOlm?: CryptoStep; lost: boolean; deliveryUnknown: boolean; withheld?: CryptoStep; olm: readonly CryptoStep[]; stillAfterKey?: UtdEvent; payload: boolean;
   },
 ): { verdict: string; because: string } {
   if (open.length === 0) {
@@ -371,7 +393,8 @@ function verdictOf(
           ? ['a historical message, and key backup looks broken: its keys fail to decrypt', 'Key backup on this device']
           : [`a historical message, and key backup is unavailable (${facts.backup.detail.split(' · ')[0]})`, 'Key backup on this device']
     : !sender ? ["the key never reached this device; load the sender's rageshake to see why", 'Key received over to-device']
-    : ['the key never reached this device', 'Key received over to-device'];
+    // A send this device's logs can't confirm or deny: the delivery line is where it stops.
+    : ['the key never reached this device', facts.deliveryUnknown ? 'Delivered to this device' : 'Key received over to-device'];
   return { verdict: `Likely ${cause}${late}`, because };
 }
 

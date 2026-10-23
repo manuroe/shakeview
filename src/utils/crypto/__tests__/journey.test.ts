@@ -6,7 +6,7 @@ import { ALICE, BOB_PHONE, dev, st, utd } from './helpers';
 type Steps = ReturnType<typeof st>[];
 const msg = { messageId: 'm1', userId: '@bob:b.org', deviceId: 'BOBPHONE' };
 const aliceShares = (recipients: [string, string][] = [['@bob:b.org', 'BOBPHONE']]): Steps => [
-  st('alice', 'share.encrypt', 10, { sessionId: 'S', transactionId: 'T1', recipients }),
+  st('alice', 'share.encrypt', 10, { sessionId: 'S', transactionId: 'T1', recipients, messageIndex: 0 }),
   st('alice', 'todevice.batch', 11, { sessionId: 'S', requestId: 'req1', messages: [msg] }),
   st('alice', 'todevice.http', 12, { requestId: 'req1', status: '200' }),
 ];
@@ -33,7 +33,7 @@ describe('buildJourney', () => {
     const alone = journey([utd('bob', 20)]);
     expect(alone.basis).toBe("this device's logs only; the sender's rageshake is not loaded");
     expect(alone.lines.filter((l) => l.decisive).map((l) => l.label)).toEqual(['Key received over to-device']);
-    const pair = journey([utd('bob', 20)], aliceShares());
+    const pair = journey([st('bob', 'todevice.received', 5, { messageId: 'other' }), utd('bob', 20)], aliceShares());
     expect(pair.basis).toBe("this device's and the sender's logs");
     expect(pair.lines.filter((l) => l.decisive).map((l) => l.label)).toEqual(['Delivered to this device']);
     const trust = journey([utd('bob', 20, '$ev1', { reason: 'trust_requirement', error: 'x' })]);
@@ -61,13 +61,63 @@ describe('buildJourney', () => {
   });
 
   it('sender loaded, key sent but never received: lost in delivery', () => {
-    const j = journey([utd('bob', 20)], aliceShares());
+    const j = journey([st('bob', 'todevice.received', 5, { messageId: 'other' }), utd('bob', 20)], aliceShares());
     expect(shape(j)).toEqual([
       'ok Shared by the sender', 'ok This device in the share', 'ok Accepted by the server', 'fail Failed to decrypt',
       'fail Delivered to this device', 'unknown Key backup on this device', 'fail Still failing',
     ]);
     expect(j.verdict).toBe('Likely lost in delivery: the key was sent but never received');
     expect(j.events.map((e) => e.eventId)).toEqual(['$ev1']);
+  });
+
+  it('lost in delivery needs this device\'s logs to cover the send', () => {
+    const bob = { ...dev('bob', BOB_PHONE, [st('bob', 'todevice.received', 5, { messageId: 'other' }), utd('bob', 20)]), coverage: [{ start: 0, end: 30_000_000 }] };
+    const devices = [bob, dev('alice', ALICE, [...aliceShares().slice(0, 1), st('alice', 'todevice.batch', 40, { sessionId: 'S', requestId: 'req1', messages: [msg] })])];
+    const s = buildCryptoModel(devices, { includeHealthy: true }).find((x) => x.sessionId === 'S')!;
+    const j = buildJourney(s, devices[1], bob);
+    expect(j.lines.find((l) => l.label === 'Delivered to this device'))
+      .toMatchObject({ state: 'unknown', detail: "this device's logs do not cover the send at 00:00:40.000" });
+    expect(j.verdict).toBe('Likely the key never reached this device');
+  });
+
+  it('lost in delivery needs this device to log its to-device events at all', () => {
+    const j = journey([utd('bob', 20)], aliceShares());
+    expect(j.lines.find((l) => l.label === 'Delivered to this device'))
+      .toMatchObject({ state: 'unknown', detail: "no to-device events in this device's logs" });
+    expect(j.verdict).toBe('Likely the key never reached this device');
+    expect(j.lines.filter((l) => l.decisive).map((l) => l.label)).toEqual(['Delivered to this device']);
+  });
+
+  it('a re-sent key that arrived is delivered, even if the first send was not', () => {
+    const j = journey([st('bob', 'todevice.received', 30, { messageId: 'm2' }), utd('bob', 20)], [
+      ...aliceShares(),
+      st('alice', 'todevice.batch', 25, { sessionId: 'S', requestId: 'req2', messages: [{ ...msg, messageId: 'm2' }] }),
+    ]);
+    expect(j.lines.find((l) => l.label === 'Delivered to this device')?.state).toBe('ok');
+    expect(j.verdict).not.toContain('lost in delivery');
+  });
+
+  it('left out of the share needs the session\'s first share in the logs', () => {
+    const j = journey([utd('bob', 20, '$ev1', { messageIndex: 7 })], [
+      st('alice', 'share.encrypt', 10, { sessionId: 'S', recipients: [['@bob:b.org', 'OTHER']], messageIndex: 5 }),
+    ]);
+    expect(j.lines.find((l) => l.label === 'This device in the share')).toMatchObject({
+      state: 'unknown', detail: 'not in the 1 logged share; the earliest is at message index 5, earlier shares are not in the logs',
+    });
+    expect(j.verdict).not.toContain('left out');
+  });
+
+  it('every loaded device fails the same way only when every loaded device failed', () => {
+    const err = { reason: 'invalid_payload' as const, error: 'unexpected end of hex escape at line 1 column 114' };
+    const devices = [
+      dev('bob', BOB_PHONE, [utd('bob', 20, '$ev1', err)]),
+      dev('alice', ALICE, [...aliceShares(), utd('alice', 20, '$ev1', err)]),
+      dev('carol', { userId: '@carol:c.org', deviceId: 'C1' }, [st('carol', 'roomkey.received', 15, { sessionId: 'S', toDeviceType: 'm.room_key' })]),
+    ];
+    const s = buildCryptoModel(devices, { includeHealthy: true }).find((x) => x.sessionId === 'S')!;
+    const j = buildJourney(s, devices[1], devices[0]);
+    expect(j.verdict).not.toContain('every loaded device fails the same way');
+    expect(j.verdict).toBe('Likely a malformed event: it did not parse, so the key is not the problem');
   });
 
   it('sender loaded, receiver left out of the share', () => {
