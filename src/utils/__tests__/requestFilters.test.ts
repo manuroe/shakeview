@@ -6,7 +6,7 @@
  * - Each filter combination is tested in isolation.
  * - Time-range tests use real ISO timestamps derived from the test data.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { filterSyncRequests, filterHttpRequests, getTimeRangeUs } from '../requestFilters';
 import type { SyncRequestFilters, HttpRequestFilters } from '../requestFilters';
 import {
@@ -627,6 +627,30 @@ describe('filterHttpRequests', () => {
 
     expect(result).toHaveLength(2);
     expect(result.map((r) => r.requestId).sort()).toEqual(['first', 'second']);
+  });
+
+  it('looks request lines up in the line-number index, not by scanning every line', () => {
+    const baseUs = 1700000000000000 as const;
+    const rawLines = [
+      createParsedLogLine({ lineNumber: 1, timestampUs: baseUs }),
+      createParsedLogLine({ lineNumber: 2, timestampUs: baseUs + 4_000_000 }),
+    ];
+    const index = new Map(rawLines.map((l) => [l.lineNumber, l]));
+    const requests = [
+      createHttpRequest({ requestId: 'in', status: '200', responseLineNumber: 1 }),
+      createHttpRequest({ requestId: 'out', status: '200', responseLineNumber: 2 }),
+    ];
+    const find = vi.spyOn(rawLines, 'find');
+
+    const result = filterHttpRequests(
+      requests,
+      rawLines,
+      makeFilters({ startTime: microsToISO(baseUs), endTime: microsToISO(baseUs + 1_000_000) }),
+      index,
+    );
+
+    expect(result.map((r) => r.requestId)).toEqual(['in']);
+    expect(find).not.toHaveBeenCalled();
   });
 
   it('filters incomplete HTTP requests by send timestamp when time range is active', () => {
