@@ -27,7 +27,8 @@ const parsed = parseLogFile(lines.join('\n')).rawLogLines;
 const spanTs = (i: number) => new Date(Date.UTC(2026, 9, 13, 16, 0, 0) + i * 10).toISOString().replace('Z', '000Z');
 const ROOM = '!room-cce672fdf3cf:domain-60fc0bb7.org';
 const NOTIFY = `root > get_notification{room_id="${ROOM}" event_id="$event-10f139a56c2c"} > retry_decryption`;
-const spanLines = Array.from({ length: 30_000 }, (_, i) => [
+// 6k, not more: under CodSpeed's simulation one longer run blocks the worker past Vitest's 60 s RPC timeout.
+const spanLines = Array.from({ length: 6_000 }, (_, i) => [
   `${spanTs(i)}  WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None | crates/matrix-sdk-crypto/src/machine/mod.rs:2516 | spans: ${NOTIFY} > decrypt_room_event{room_id="${ROOM}" sender="@user-0bb8c8918e88:domain-60fc0bb7.org" event_id="$event-${i}" origin_server_ts="2026-09-17T16:45:03.048Z" algorithm="m.megolm.v1.aes-sha2" sender_key=Some("curve25519:3fHdx8Sv0/UkvVTIwPio/iobDBDivyufU4BN3cxBQVY") session_id="S${i % 6000}" message_index=0}`,
   `${spanTs(i)} DEBUG matrix_sdk::http_client: Got response | crates/matrix-sdk/src/http_client/mod.rs:219 | spans: send{config=RequestConfig { timeout: Some(15s), read_timeout: 60s, retry_limit: 3, max_retry_time: 5s } request_id="REQ-${i}" method=GET uri="https://matrix-client.domain-60fc0bb7.org/_matrix/client/v3/room_keys/keys/${ROOM}/S${i % 6000}" status=200 response_size="838B"}`,
   `${spanTs(i)}  INFO matrix_sdk_crypto::store: Received a new megolm room key | crates/matrix-sdk-crypto/src/store/mod.rs:706 | spans: ${NOTIFY} > run_fixed_iterations > sync_once{conn_id="encryption" timeout=3000} > handle_response > receive_to_device_event{sender="@user-0bb8c8918e88:domain-60fc0bb7.org" event_type="m.room.encrypted" message_id="7d825321b0544febaabd864e2020bda3"} > handle_decrypted_to_device_event{sender_key="curve25519:3fHdx8Sv0/UkvVTIwPio/iobDBDivyufU4BN3cxBQVY" event_type="m.room_key"} > handle_key{room_id="${ROOM}" session_id="S${i % 6000}" message_index=0}`,
@@ -75,7 +76,7 @@ describe('crypto extraction', () => {
   bench('extractSteps: 50k lines', () => {
     extractSteps(parsed, { archive: 'bench', file: 'bench.log' });
   });
-  bench('extractSteps: 30k Element X crypto lines with span chains', () => {
+  bench('extractSteps: 6k Element X crypto lines with span chains', () => {
     extractSteps(spanParsed, { archive: 'bench', file: 'bench.log' });
   }, { iterations: 3 });
   bench('buildCryptoModel: 2k UTD lines over 300 sessions', () => {
