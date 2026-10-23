@@ -155,9 +155,10 @@ describe('UTD events', () => {
     ['backup', [st('bob', 'backup.download', 20, { sessionId: 'S' }), st('bob', 'backup.imported', 30, { sessionIds: ['S'] })]],
     ['backup', [st('bob', 'backup.download', 30, { sessionId: 'S', ok: true })]],
     ['import', [st('bob', 'backup.imported', 30, { sessionIds: ['S'] })]],
-    ['history_bundle', [st('bob', 'bundle.received', 25), st('bob', 'backup.imported', 30, { sessionIds: ['S'] })]],
+    ['history_bundle', [st('bob', 'bundle.received', 25, { roomId: '!r:a.org' }), st('bob', 'backup.imported', 30, { sessionIds: ['S'] })]],
+    ['import', [st('bob', 'bundle.received', 25, { roomId: '!other:a.org' }), st('bob', 'backup.imported', 30, { sessionIds: ['S'] })]],
   ])('resolved by %s, inferred, 20 s delay', (by, after) => {
-    const [s] = buildCryptoModel([dev('bob', BOB_PHONE, [utd('bob', 10), ...after])]);
+    const [s] = buildCryptoModel([dev('bob', BOB_PHONE, [utd('bob', 10, '$ev1', { roomId: '!r:a.org' }), ...after])]);
     expect(s.utds[0].resolution).toMatchObject({ state: 'resolved', by, delay: 20_000_000, confirmed: false });
   });
 

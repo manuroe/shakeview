@@ -217,7 +217,7 @@ function buildSession(
     const byEvent = new Map<string, CryptoStep[]>();
     for (const f of failures) addTo(byEvent, f.keys.eventId!, f);
     for (const [eventId, list] of byEvent) {
-      const u = resolveUtd(d.id, sessionId, eventId, list, perDevice.get(d.id) ?? [], idx);
+      const u = resolveUtd(d.id, sessionId, roomId, eventId, list, perDevice.get(d.id) ?? [], idx);
       utds.push({ ...u, analytics: analyticsOf(u, idx) });
       for (const s of idx.byEvent.get(eventId) ?? []) if (s.kind !== 'redecrypt.failed') push(d.id, s);
     }
@@ -281,11 +281,12 @@ function isUsableKey(s: CryptoStep, sessionId: string, messageIndex: number | un
 }
 
 /** `own`: the device's steps naming this session. */
-function mechanism(key: CryptoStep, own: readonly CryptoStep[], idx: DeviceIndex, sessionId: string): ResolutionMechanism {
+function mechanism(key: CryptoStep, own: readonly CryptoStep[], idx: DeviceIndex, sessionId: string, roomId: string | undefined): ResolutionMechanism {
   if (key.kind === 'roomkey.received') return key.keys.toDeviceType === 'm.forwarded_room_key' ? 'forwarded_key' : 'late_key';
   if (key.kind === 'backup.download') return 'backup';
   if (own.some((s) => s.kind === 'backup.download' && s.keys.sessionId === sessionId && s.ts <= key.ts)) return 'backup';
-  if (idx.bundles.some((s) => s.ts <= key.ts && key.ts - s.ts <= WINDOW_US)) return 'history_bundle';
+  // A bundle is per room: it only explains an import for a session of its own room.
+  if (roomId && idx.bundles.some((s) => s.keys.roomId === roomId && s.ts <= key.ts && key.ts - s.ts <= WINDOW_US)) return 'history_bundle';
   return 'import';
 }
 
@@ -316,7 +317,7 @@ function analyticsOf(u: Omit<UtdEvent, 'analytics'>, idx: DeviceIndex): UtdAnaly
 
 /** `own`: the device's steps naming this session, in time order. */
 function resolveUtd(
-  deviceId: string, sessionId: string, eventId: string, failures: CryptoStep[], own: readonly CryptoStep[], idx: DeviceIndex,
+  deviceId: string, sessionId: string, roomId: string | undefined, eventId: string, failures: CryptoStep[], own: readonly CryptoStep[], idx: DeviceIndex,
 ): Omit<UtdEvent, 'analytics'> {
   const sorted = [...failures].sort(byTs);
   const first = sorted[0];
@@ -353,7 +354,7 @@ function resolveUtd(
   const decryptedAt = retry && retry.ts >= at.ts ? retry.ts : undefined;
   const resolution: UtdResolution = {
     state: 'resolved',
-    by: key ? mechanism(key, own, idx, sessionId) : 'unknown',
+    by: key ? mechanism(key, own, idx, sessionId, roomId) : 'unknown',
     at: at.ts,
     decryptedAt,
     delay: (decryptedAt ?? at.ts) - first.ts,
