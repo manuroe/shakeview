@@ -4,7 +4,7 @@
  *
  * Run with: npm run bench
  */
-import { describe, bench } from 'vitest';
+import { beforeEach, describe, bench } from 'vitest';
 import { parseLogFile } from '../../logParser';
 import { extractSteps } from '../steps';
 import { buildCryptoModel } from '../buildCryptoModel';
@@ -67,6 +67,11 @@ const busySteps: CryptoStep[] = [
 const busy: CryptoDevice = { id: 'busy', entries: [], identity: {}, steps: busySteps, coverage: [] };
 
 describe('crypto extraction', () => {
+  // CodSpeed's simulation runner chains a suite's runs on microtasks only, so the worker never
+  // reaches its event loop: this suite takes minutes there, past Vitest's 60 s RPC timeout
+  // ("Timeout calling onTaskUpdate"). It awaits beforeEach before every run, outside the
+  // measurement; Vitest's own bench runner ignores hooks.
+  beforeEach(() => new Promise<void>((resolve) => { setTimeout(resolve, 0); }));
   bench('buildCryptoModel: big room, 40 sessions × 500 recipients, 2 × 30k-step receivers', () => {
     buildCryptoModel(bigRoom);
   }, { iterations: 3 });
