@@ -22,17 +22,21 @@ interface CryptoStore {
    * archive (a step link re-opens it) does not lose it: it joins as a device.
    */
   readonly caseArchive: { readonly name: string; readonly entries: readonly ArchiveEntry[] } | null;
+  /** sessionId → device id the user set as that session's sender. */
+  readonly senderOverrides: Readonly<Record<string, string>>;
   addDevice: (device: CryptoDevice) => void;
   /** A load of `name` starting forgets its last failure: a retry that works must not still show it. */
   setPending: (name: string, pending: boolean) => void;
   addError: (name: string, message: string) => void;
-  /** Start a new case: no added devices or errors. */
+  /** Set (or, with null, clear) the device the user says sent `sessionId`. */
+  setSenderOverride: (sessionId: string, deviceId: string | null) => void;
+  /** Start a new case: no added devices, errors or sender overrides. */
   resetForCase: (caseKey: string, caseArchive?: CryptoStore['caseArchive']) => void;
   clear: () => void;
 }
 
 /** A fresh empty state: no shared arrays between resets. */
-const empty = () => ({ devices: [], pending: [], errors: [], caseKey: null, caseArchive: null });
+const empty = () => ({ devices: [], pending: [], errors: [], caseKey: null, caseArchive: null, senderOverrides: {} });
 
 /** The devices added on /decryption, for the case of the loaded logs. */
 export const useCryptoStore = create<CryptoStore>((set) => ({
@@ -44,6 +48,10 @@ export const useCryptoStore = create<CryptoStore>((set) => ({
     ? { pending: [...s.pending, name], errors: s.errors.filter((e) => e.name !== name) }
     : { pending: s.pending.filter((n) => n !== name) })),
   addError: (name, message) => set((s) => ({ errors: [...s.errors.filter((e) => e.name !== name), { name, message }] })),
+  setSenderOverride: (sessionId, deviceId) => set((s) => {
+    const { [sessionId]: _previous, ...rest } = s.senderOverrides;
+    return { senderOverrides: deviceId ? { ...rest, [sessionId]: deviceId } : rest };
+  }),
   resetForCase: (caseKey, caseArchive = null) => set({ ...empty(), caseKey, caseArchive }),
   clear: () => set(empty()),
 }));

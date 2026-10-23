@@ -126,4 +126,13 @@ describe('cryptoStore', () => {
     useLogStore.getState().loadMergedLogParserResults([{ name: 'carol.log', result: parseLogFile('2026-09-08T06:55:10.000000Z  INFO x: y | f.rs:1') }]);
     expect(currentCaseKey()).toBe('carol.log');
   });
+
+  it('sets and clears a sender override per session; a new case forgets them', () => {
+    useCryptoStore.getState().setSenderOverride('S', 'alice.tar.gz');
+    useCryptoStore.getState().setSenderOverride('T', 'carol.log');
+    useCryptoStore.getState().setSenderOverride('T', null);
+    expect(useCryptoStore.getState().senderOverrides).toEqual({ S: 'alice.tar.gz' });
+    useCryptoStore.getState().resetForCase('bob.tar.gz');
+    expect(useCryptoStore.getState().senderOverrides).toEqual({});
+  });
 });

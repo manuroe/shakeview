@@ -97,6 +97,27 @@ describe('DecryptionView', () => {
     expect(screen.getByTestId('time-range-selector')).toBeInTheDocument();
   });
 
+  it('says how the sender was found', async () => {
+    loadBob();
+    await addAlice();
+    renderView();
+    expect(screen.getAllByTestId('device-header')[0]).toHaveTextContent('identified by its key share');
+  });
+
+  it('an unidentified sender can be set to an added rageshake, and undone', () => {
+    loadBob();
+    useCryptoStore.setState({ devices: [dev('carol.tar.gz', { userId: '@carol:c.org', deviceId: 'C1' }, [])], caseKey: 'bob.tar.gz' });
+    renderView();
+    const sender = () => screen.getAllByTestId('device-header')[0];
+    fireEvent.click(within(sender()).getByRole('button', { name: 'Set @carol:c.org · C1 as sender' }));
+    expect(useCryptoStore.getState().senderOverrides).toEqual({ SESS: 'carol.tar.gz' });
+    expect(sender()).toHaveTextContent('@carol:c.org · C1');
+    expect(sender()).toHaveTextContent('set by you');
+    fireEvent.click(within(sender()).getByRole('button', { name: 'Undo' }));
+    expect(useCryptoStore.getState().senderOverrides).toEqual({});
+    expect(within(sender()).getByRole('button', { name: 'Set @carol:c.org · C1 as sender' })).toHaveClass('btn-secondary');
+  });
+
   it('shows the loaded logs as the main device next to an added sender', async () => {
     loadBob();
     await addAlice();

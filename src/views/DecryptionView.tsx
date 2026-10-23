@@ -34,7 +34,7 @@ import { findMatchingIndices } from '../utils/textMatching';
 import { allLinesOf, detailsFromEntries, deviceFromDroppedFiles, deviceFromEntries, deviceFromFile, deviceFromLoadedLogs, droppedDevices, linesOfFile } from '../utils/crypto/loadDevice';
 import type { ParsedLogLine } from '../types/log.types';
 import { LogDisplayView } from './LogDisplayView';
-import type { CryptoDevice, CryptoStep, DeviceRef, LineRef, MegolmSession } from '../utils/crypto/types';
+import type { CryptoDevice, CryptoStep, DeviceRef, LineRef, MegolmSession, SenderSource } from '../utils/crypto/types';
 import styles from './DecryptionView.module.css';
 
 const SESSION_PARAM = 'session';
@@ -221,6 +221,17 @@ type Search = { readonly query: string; readonly lane: Lane };
 const allLines = new WeakMap<CryptoDevice, readonly ParsedLogLine[]>();
 /** No added devices, one array for every render: a store selector returning a fresh one would re-render forever. */
 const NO_DEVICES: readonly CryptoDevice[] = [];
+const NO_OVERRIDES: Readonly<Record<string, string>> = {};
+
+/** How the sender lane's device was found, for its header. */
+function senderSourceText(source: SenderSource): string {
+  switch (source) {
+    case 'share': return 'identified by its key share';
+    case 'curve_key': return 'identified by its curve key';
+    case 'override': return 'set by you';
+    default: return '';
+  }
+}
 
 /** Show every log line naming this id in the bottom panel. */
 function OccurrencesButton({ query, onSearch }: { query: string; onSearch: (query: string) => void }) {
@@ -374,12 +385,15 @@ function SharedWith({ steps, receiver, mainUserId }: { steps: readonly CryptoSte
 }
 
 /** A lane's header: role, identity, and what the lane can or cannot show. */
-function LaneHeader({ lane, deviceRef, device, session, receiver, mainUserId, onAddFiles, onAddDemo }: {
+function LaneHeader({ lane, deviceRef, device, session, receiver, mainUserId, onAddFiles, onAddDemo, candidates = NO_DEVICES }: {
   lane: Lane; deviceRef: DeviceRef | undefined; device: CryptoDevice | undefined; session: MegolmSession;
   receiver: CryptoDevice | undefined; mainUserId: string | undefined; onAddFiles: (files: FileList | null) => void;
   /** Set when the loaded logs are a demo: adds the other side of the demo conversation instead of asking for a file. */
   onAddDemo?: () => void;
+  /** Loaded devices the user can set as this session's sender when it was not identified. */
+  candidates?: readonly CryptoDevice[];
 }) {
+  const setSenderOverride = useCryptoStore((s) => s.setSenderOverride);
   const fileInput = useRef<HTMLInputElement>(null);
   const isAnonymized = useLogStore((s) => s.isAnonymized);
   const profile = useMatrixProfile(isAnonymized ? undefined : device?.identity.userId ?? deviceRef?.userId);
@@ -418,6 +432,19 @@ function LaneHeader({ lane, deviceRef, device, session, receiver, mainUserId, on
           )}
         </div>
       )}
+      {isSender && device && session.senderSource !== 'unknown' && (
+        <div className={styles.muted}>
+          {senderSourceText(session.senderSource)}
+          {session.senderSource === 'override' && (
+            <button type="button" className={`btn-secondary ${styles.addButton}`} onClick={() => setSenderOverride(session.sessionId, null)}>Undo</button>
+          )}
+        </div>
+      )}
+      {isSender && !device && candidates.map((d) => (
+        <button key={d.id} type="button" className={`btn-secondary ${styles.addButton}`} onClick={() => setSenderOverride(session.sessionId, d.id)}>
+          Set {deviceLabel(d)} as sender
+        </button>
+      ))}
       {!covered && <div className={styles.note}>no logs at this time</div>}
       {device && isSender && <SharedWith steps={session.stepsByDevice[device.id] ?? []} receiver={receiver} mainUserId={mainUserId} />}
     </div>
@@ -555,6 +582,7 @@ export function DecryptionView() {
   const sourceArchive = loadedArchive(archiveName, archiveEntries, loadedEntryNames);
   const caseKey = caseKeyOf(archiveName, archiveEntries, loadedEntryNames);
   const added = useCryptoStore((s) => (isInCase(s, caseKey) ? s.devices : NO_DEVICES));
+  const senderOverrides = useCryptoStore((s) => (isInCase(s, caseKey) ? s.senderOverrides : NO_OVERRIDES));
 
   // Added devices belong to one case; opening other logs starts a new one. Opening an
   // added device's archive (a step link does) stays in the case: the case's own
@@ -588,7 +616,7 @@ export function DecryptionView() {
   }, [rawLogLines, startTime, endTime]);
 
   // Built once per device set (the slow part on big logs), then cut to each time window.
-  const model = useMemo(() => buildCryptoModel(devices, { includeHealthy: true }), [devices]);
+  const model = useMemo(() => buildCryptoModel(devices, { includeHealthy: true, senderOverrides }), [devices, senderOverrides]);
   const allSessions = useMemo(
     () => scopeSessions(model, range.startUs, range.endUs)
       .map((s) => {
@@ -751,7 +779,7 @@ export function DecryptionView() {
                 <div role="row" className={`${styles.tlRow} ${styles.tlHead}`}>
                   <div role="columnheader" />
                   <div role="columnheader" />
-                  <LaneHeader lane="sender" deviceRef={session.sender} device={sender} session={session} receiver={receiver} mainUserId={main.identity.userId} onAddFiles={addFiles} onAddDemo={addDemoPeer} />
+                  <LaneHeader lane="sender" deviceRef={session.sender} device={sender} session={session} receiver={receiver} mainUserId={main.identity.userId} onAddFiles={addFiles} onAddDemo={addDemoPeer} candidates={devices.filter((d) => d.id !== receiver?.id)} />
                   <div role="columnheader" />
                   <LaneHeader lane="receiver" deviceRef={receiverRef} device={receiver} session={session} receiver={receiver} mainUserId={main.identity.userId} onAddFiles={addFiles} />
                 </div>
