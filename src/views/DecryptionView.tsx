@@ -14,7 +14,7 @@ import { OutcomeFilterDropdown, type OutcomeOption } from '../components/Outcome
 import { AnalyticsFilterDropdown } from '../components/AnalyticsFilterDropdown';
 import { InfoPopover, InfoSection } from '../components/InfoPopover';
 import { SearchInput } from '../components/SearchInput';
-import { useCryptoStore, loadCryptoDevice, loadedArchive, caseKeyOf, startCase } from '../stores/cryptoStore';
+import { useCryptoStore, loadCryptoDevice, loadedArchive, caseKeyOf, isInCase, startCase } from '../stores/cryptoStore';
 import { useArchiveStore } from '../stores/archiveStore';
 import { useLogStore } from '../stores/logStore';
 import { useMatrixProfile } from '../hooks/useMatrixProfile';
@@ -31,7 +31,7 @@ import { describeStep, stepTone, utdStepNote } from '../utils/crypto/describeSte
 import { formatUs, plural, short, utcText } from '../utils/crypto/format';
 import { isIdentifierAlias } from '../utils/anonymizeUtils';
 import { findMatchingIndices } from '../utils/textMatching';
-import { allLinesOf, detailsFromEntries, deviceFromDroppedFile, deviceFromEntries, deviceFromFile, deviceFromLoadedLogs, linesOfFile } from '../utils/crypto/loadDevice';
+import { allLinesOf, detailsFromEntries, deviceFromDroppedFiles, deviceFromEntries, deviceFromFile, deviceFromLoadedLogs, droppedDevices, linesOfFile } from '../utils/crypto/loadDevice';
 import type { ParsedLogLine } from '../types/log.types';
 import { LogDisplayView } from './LogDisplayView';
 import type { CryptoDevice, CryptoStep, DeviceRef, LineRef, MegolmSession } from '../utils/crypto/types';
@@ -219,6 +219,8 @@ function StepCard({ step, session, device }: { step: CryptoStep; session: Megolm
 type Search = { readonly query: string; readonly lane: Lane };
 /** Every line of an added device, parsed once per device on first search. */
 const allLines = new WeakMap<CryptoDevice, readonly ParsedLogLine[]>();
+/** No added devices, one array for every render: a store selector returning a fresh one would re-render forever. */
+const NO_DEVICES: readonly CryptoDevice[] = [];
 
 /** Show every log line naming this id in the bottom panel. */
 function OccurrencesButton({ query, onSearch }: { query: string; onSearch: (query: string) => void }) {
@@ -540,7 +542,6 @@ export function DecryptionView() {
     setOpenedLine(null);
     setSearch({ query, lane: 'receiver' });
   }, []);
-  const added = useCryptoStore((s) => s.devices);
   const pending = useCryptoStore((s) => s.pending);
   const errors = useCryptoStore((s) => s.errors);
   const rawLogLines = useLogStore((s) => s.rawLogLines);
@@ -553,6 +554,7 @@ export function DecryptionView() {
   // The archive the loaded logs come from (archiveStore can be stale), and the case they form.
   const sourceArchive = loadedArchive(archiveName, archiveEntries, loadedEntryNames);
   const caseKey = caseKeyOf(archiveName, archiveEntries, loadedEntryNames);
+  const added = useCryptoStore((s) => (isInCase(s, caseKey) ? s.devices : NO_DEVICES));
 
   // Added devices belong to one case; opening other logs starts a new one. Opening an
   // added device's archive (a step link does) stays in the case: the case's own
@@ -561,11 +563,14 @@ export function DecryptionView() {
     const crypto = useCryptoStore.getState();
     if (crypto.caseKey === caseKey) return;
     const { caseArchive } = crypto;
-    if (caseArchive && crypto.devices.some((d) => d.id === caseKey)) {
-      void loadCryptoDevice(caseArchive.name, () => deviceFromEntries(caseArchive.name, caseArchive.entries));
+    if (!caseArchive || !isInCase(crypto, caseKey)) {
+      startCase();
       return;
     }
-    startCase();
+    // Once: a second visit to an added device's archive finds the case's own already added.
+    if (!crypto.devices.some((d) => d.id === caseArchive.name)) {
+      void loadCryptoDevice(caseArchive.name, () => deviceFromEntries(caseArchive.name, caseArchive.entries));
+    }
   }, [caseKey]);
 
   // The loaded logs are the main device, like on every other view.
@@ -646,12 +651,13 @@ export function DecryptionView() {
   }, [opened, rawLogLines, navigate]);
 
   const addFiles = (files: FileList | null) => {
-    for (const f of Array.from(files ?? [])) {
-      void loadCryptoDevice(f.name, () => deviceFromDroppedFile(f));
+    for (const d of droppedDevices(Array.from(files ?? []))) {
+      void loadCryptoDevice(d.name, () => deviceFromDroppedFiles(d));
     }
   };
   const demoPeer = loadedEntryNames.length === 1 ? DEMO_PEER[loadedEntryNames[0]] : undefined;
-  const addDemoPeer = demoPeer
+  // Once added, the button asks for a file: the demo peer again would be refused as already open.
+  const addDemoPeer = demoPeer && !added.some((d) => d.id === demoPeer)
     ? () => { void loadCryptoDevice(demoPeer, async () => deviceFromFile(demoPeer, await fetchDemoLog(demoPeer))); }
     : undefined;
   // setSearchParams changes identity with every URL change: a ref keeps the list's callback stable.

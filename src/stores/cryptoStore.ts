@@ -23,6 +23,7 @@ interface CryptoStore {
    */
   readonly caseArchive: { readonly name: string; readonly entries: readonly ArchiveEntry[] } | null;
   addDevice: (device: CryptoDevice) => void;
+  /** A load of `name` starting forgets its last failure: a retry that works must not still show it. */
   setPending: (name: string, pending: boolean) => void;
   addError: (name: string, message: string) => void;
   /** Start a new case: no added devices or errors. */
@@ -39,13 +40,25 @@ export const useCryptoStore = create<CryptoStore>((set) => ({
   addDevice: (device) => set((s) => (
     s.devices.some((d) => d.id === device.id) ? s : { devices: [...s.devices, device] }
   )),
-  setPending: (name, pending) => set((s) => ({
-    pending: pending ? [...s.pending, name] : s.pending.filter((n) => n !== name),
-  })),
-  addError: (name, message) => set((s) => ({ errors: [...s.errors, { name, message }] })),
+  setPending: (name, pending) => set((s) => (pending
+    ? { pending: [...s.pending, name], errors: s.errors.filter((e) => e.name !== name) }
+    : { pending: s.pending.filter((n) => n !== name) })),
+  addError: (name, message) => set((s) => ({ errors: [...s.errors.filter((e) => e.name !== name), { name, message }] })),
   resetForCase: (caseKey, caseArchive = null) => set({ ...empty(), caseKey, caseArchive }),
   clear: () => set(empty()),
 }));
+
+/**
+ * Whether the added devices belong with the loaded logs of `caseKey`: their own case,
+ * or one of their archives opened as the loaded logs (a step link does), which keeps
+ * the case. Read during render, so a switch to other logs never shows the previous
+ * case's devices for the render before the view starts a new case.
+ *
+ * @example isInCase(useCryptoStore.getState(), 'bob.tar.gz') // false once other logs are loaded
+ */
+export function isInCase(s: Pick<CryptoStore, 'caseKey' | 'caseArchive' | 'devices'>, caseKey: string): boolean {
+  return s.caseKey === caseKey || (s.caseArchive !== null && s.devices.some((d) => d.id === caseKey));
+}
 
 /**
  * The archive the loaded logs come from, or null. archiveStore keeps the last
@@ -77,11 +90,18 @@ export function startCase(): void {
 
 /**
  * Load a device once per name; concurrent calls for the same name are no-ops.
+ * Devices go by name, so a name already open (an added device, or the loaded logs)
+ * is refused with an error rather than dropped without a word: it may be another
+ * rageshake by the same file name.
  * A load that finishes after its case was replaced is dropped: it belongs to other logs.
  */
 export async function loadCryptoDevice(name: string, load: () => Promise<CryptoDevice>): Promise<void> {
   const state = useCryptoStore.getState();
-  if (state.pending.includes(name) || state.devices.some((d) => d.id === name)) return;
+  if (state.pending.includes(name)) return;
+  if (name === currentCaseKey() || state.devices.some((d) => d.id === name)) {
+    state.addError(name, 'a rageshake by this name is already open; rename the file to add it');
+    return;
+  }
   const { caseKey } = state;
   const sameCase = () => useCryptoStore.getState().caseKey === caseKey;
   state.setPending(name, true);

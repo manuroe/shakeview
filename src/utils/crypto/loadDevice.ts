@@ -77,21 +77,44 @@ export function deviceFromFile(name: string, bytes: Uint8Array): Promise<CryptoD
   return deviceFromEntries(name, entries);
 }
 
+/** One device's files out of a drop or a pick, and the name it goes by (see droppedDevices). */
+export interface DroppedDevice {
+  readonly name: string;
+  readonly files: readonly File[];
+}
+
 /**
- * One device from a file the user dropped or picked, checked first like the
+ * The devices one drop or pick holds: each archive is a rageshake of its own, while
+ * loose log files dropped together are one rageshake's logs (its hourly files), so
+ * they make one device rather than one per file.
+ *
+ * @example droppedDevices([alice.tar.gz, a.log, b.log]) // [{ name: 'alice.tar.gz', files: [alice] }, { name: 'a.log, b.log', files: [a, b] }]
+ */
+export function droppedDevices(files: readonly File[]): DroppedDevice[] {
+  const groups = files.filter((f) => ARCHIVE_NAME.test(f.name)).map((f) => [f]);
+  const logs = files.filter((f) => !ARCHIVE_NAME.test(f.name));
+  if (logs.length > 0) groups.push(logs);
+  return groups.map((g) => ({ name: g.map((f) => f.name).join(', '), files: g }));
+}
+
+/**
+ * One device from files the user dropped or picked, each checked first like the
  * landing page's upload (size, gzip header, text content), so a bad file is
  * refused before it is read whole. Throws the first validation error.
  *
- * @example await deviceFromDroppedFile(new File([log], 'bob.log')) // a device, or throws 'File too large …'
+ * @example await deviceFromDroppedFiles({ name: 'bob.log', files: [new File([log], 'bob.log')] }) // a device, or throws 'File too large …'
  */
-export async function deviceFromDroppedFile(file: File): Promise<CryptoDevice> {
-  if (ARCHIVE_NAME.test(file.name)) {
-    assertArchiveSizeOk(file.size);
-  } else {
-    const v = file.name.toLowerCase().endsWith('.gz') ? await validateGzipFile(file, decompressSync) : await validateTextFile(file);
-    if (!v.isValid) throw v.errors[0] ?? new Error('Invalid file');
+export async function deviceFromDroppedFiles({ name, files }: DroppedDevice): Promise<CryptoDevice> {
+  for (const file of files) {
+    if (ARCHIVE_NAME.test(file.name)) {
+      assertArchiveSizeOk(file.size);
+    } else {
+      const v = file.name.toLowerCase().endsWith('.gz') ? await validateGzipFile(file, decompressSync) : await validateTextFile(file);
+      if (!v.isValid) throw v.errors[0] ?? new Error('Invalid file');
+    }
   }
-  return deviceFromFile(file.name, new Uint8Array(await readBlob(file)));
+  const entries = await Promise.all(files.map(async (f) => ({ name: f.name, data: new Uint8Array(await readBlob(f)) })));
+  return entries.length === 1 ? deviceFromFile(name, entries[0].data) : deviceFromEntries(name, entries);
 }
 
 /**

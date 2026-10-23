@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseLogFile } from '../../logParser';
-import { allLinesOf, deviceFromDroppedFile, deviceFromEntries, deviceFromFile, deviceFromLoadedLogs, detailsFromEntries, linesOfFile, loadedLogSteps } from '../loadDevice';
+import { allLinesOf, deviceFromDroppedFiles, deviceFromEntries, deviceFromFile, deviceFromLoadedLogs, detailsFromEntries, droppedDevices, linesOfFile, loadedLogSteps } from '../loadDevice';
 import { deviceIdentity } from '../identity';
 import { SENDER_LOG, RECEIVER_LOG, SENDER_DETAILS, entry } from './fixtures';
 
@@ -61,18 +61,33 @@ describe('deviceFromFile', () => {
   });
 });
 
-describe('deviceFromDroppedFile', () => {
+describe('droppedDevices', () => {
+  it('makes one device per archive and one of all the loose logs', () => {
+    const [alice, carol, a, b] = ['alice.tar.gz', 'carol.tgz', 'a.log', 'b.log.gz'].map((n) => new File([''], n));
+    expect(droppedDevices([a, alice, b, carol])).toEqual([
+      { name: 'alice.tar.gz', files: [alice] }, { name: 'carol.tgz', files: [carol] }, { name: 'a.log, b.log.gz', files: [a, b] },
+    ]);
+  });
+});
+
+describe('deviceFromDroppedFiles', () => {
+  const dropped = (...files: File[]) => ({ name: files.map((f) => f.name).join(', '), files });
   it('loads a valid log', async () => {
-    expect((await deviceFromDroppedFile(new File([RECEIVER_LOG], 'bob.log'))).steps.map((s) => s.kind)).toEqual(['event.utd']);
+    expect((await deviceFromDroppedFiles(dropped(new File([RECEIVER_LOG], 'bob.log')))).steps.map((s) => s.kind)).toEqual(['event.utd']);
+  });
+  it('loads several logs of one rageshake as one device', async () => {
+    const d = await deviceFromDroppedFiles(dropped(new File([SENDER_LOG], 'a.log'), new File([RECEIVER_LOG], 'b.log')));
+    expect(d.id).toBe('a.log, b.log');
+    expect(new Set(d.steps.map((s) => s.line.file))).toEqual(new Set(['a.log', 'b.log']));
   });
   it('refuses what the landing page upload refuses, before reading it', async () => {
-    await expect(deviceFromDroppedFile(new File([RECEIVER_LOG], 'bob.log.gz'))).rejects.toThrow('Not a valid gzip file');
+    await expect(deviceFromDroppedFiles(dropped(new File([RECEIVER_LOG], 'bob.log.gz')))).rejects.toThrow('Not a valid gzip file');
     const huge = new File(['x'], 'huge.log');
     Object.defineProperty(huge, 'size', { value: 600 * 1024 * 1024 });
-    await expect(deviceFromDroppedFile(huge)).rejects.toThrow(/File too large .*Maximum is 500MB/);
+    await expect(deviceFromDroppedFiles(dropped(new File([RECEIVER_LOG], 'ok.log'), huge))).rejects.toThrow(/File too large .*Maximum is 500MB/);
     const hugeArchive = new File(['x'], 'huge.tar.gz');
     Object.defineProperty(hugeArchive, 'size', { value: 600 * 1024 * 1024 });
-    await expect(deviceFromDroppedFile(hugeArchive)).rejects.toThrow(/Archive is too large/);
+    await expect(deviceFromDroppedFiles(dropped(hugeArchive))).rejects.toThrow(/Archive is too large/);
   });
 });
 

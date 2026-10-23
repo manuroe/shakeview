@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useCryptoStore, loadCryptoDevice, currentCaseKey, startCase } from '../cryptoStore';
+import { useCryptoStore, loadCryptoDevice, currentCaseKey, isInCase, startCase } from '../cryptoStore';
 import { useArchiveStore } from '../archiveStore';
 import { useLogStore } from '../logStore';
 import { parseLogFile } from '../../utils/logParser';
@@ -22,13 +22,41 @@ describe('cryptoStore', () => {
     const first = loadCryptoDevice('b.log', load);
     expect(useCryptoStore.getState().pending).toEqual(['b.log']);
     await Promise.all([first, loadCryptoDevice('b.log', load)]);
-    await loadCryptoDevice('b.log', load);
     expect(calls).toBe(1);
-    expect(useCryptoStore.getState().pending).toEqual([]);
+    expect(useCryptoStore.getState()).toMatchObject({ pending: [], errors: [] });
 
     await loadCryptoDevice('bad.tar.gz', async () => { throw new Error('not a valid archive'); });
     expect(useCryptoStore.getState().errors).toEqual([{ name: 'bad.tar.gz', message: 'not a valid archive' }]);
     expect(useCryptoStore.getState().pending).toEqual([]);
+  });
+
+  it('refuses a name already open, with an error: it may be another rageshake', async () => {
+    useArchiveStore.getState().loadArchive('logs.tar.gz', [{ name: 'a.log', data: new Uint8Array() }]);
+    useLogStore.getState().clearData();
+    useLogStore.getState().loadMergedLogParserResults([{ name: 'a.log', result: parseLogFile('2026-09-08T06:55:10.000000Z  INFO x: y | f.rs:1') }]);
+    let calls = 0;
+    const load = (name: string) => async () => { calls += 1; return device(name); };
+    await loadCryptoDevice('b.log', load('b.log'));
+    await loadCryptoDevice('b.log', load('b.log'));
+    await loadCryptoDevice('logs.tar.gz', load('logs.tar.gz'));
+    expect(calls).toBe(1);
+    expect(useCryptoStore.getState().errors.map((e) => e.name)).toEqual(['b.log', 'logs.tar.gz']);
+  });
+
+  it('a retry that loads forgets the earlier failure of that name', async () => {
+    await loadCryptoDevice('bob.log', async () => { throw new Error('offline'); });
+    await loadCryptoDevice('bob.log', async () => { throw new Error('still offline'); });
+    expect(useCryptoStore.getState().errors).toEqual([{ name: 'bob.log', message: 'still offline' }]);
+    await loadCryptoDevice('bob.log', async () => device('bob.log'));
+    expect(useCryptoStore.getState()).toMatchObject({ errors: [], devices: [device('bob.log')] });
+  });
+
+  it('isInCase: the devices of the case, or of an added device opened as the loaded logs', () => {
+    const s = { caseKey: 'bob.tar.gz', caseArchive: { name: 'bob.tar.gz', entries: [] }, devices: [device('alice.tar.gz')] };
+    expect(isInCase(s, 'bob.tar.gz')).toBe(true);
+    expect(isInCase(s, 'alice.tar.gz')).toBe(true);
+    expect(isInCase(s, 'carol.tar.gz')).toBe(false);
+    expect(isInCase({ ...s, caseArchive: null }, 'alice.tar.gz')).toBe(false);
   });
 
   it('drops a load that finishes after its case was replaced', async () => {
