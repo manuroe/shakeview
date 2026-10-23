@@ -92,5 +92,5 @@ format); Element Web adds a few matrix-js-sdk lines.
 | UTD (`Failed to decrypt a room event`) | ✓ | ✓, plus js-sdk `Error decrypting event` |
 | Key received (`Received a new megolm room key`, direct vs forwarded) | ✓ | ✓ |
 | Key backup lookup / import | `Performing backup download`, per-session `GET /room_keys/keys/<room>/<session>` (200 found, 404 not in backup), `Successfully imported room keys` | `[PerSessionKeyBackupDownloader] …`, `Successfully imported room keys` |
-| Re-decryption success | trace only, so resolutions are "inferred" | `Decrypted event on retry`, so "confirmed" |
+| Re-decryption success | `Successfully redecrypted events` (trace level): "confirmed" when the log level keeps it, else "inferred" | `Decrypted event on retry`, so "confirmed" |
 | Device identity | `details.json` | `details.json`, else `setLoggedIn: mxid: … deviceId: …` |
