@@ -14,6 +14,7 @@ import { decodeTextBytes, readBlob, validateGzipFile, validateTextFile } from '.
 import { parseLogFile } from '../logParser';
 import { assertArchiveSizeOk, parseTarGzArchive } from '../tarGzArchive';
 import { getMinMaxTimestamps } from '../timeUtils';
+import { byTs } from './buildCryptoModel';
 import { deviceIdentity } from './identity';
 import { extractSteps } from './steps';
 import type { CryptoDevice, CryptoStep, DeviceCoverage } from './types';
@@ -30,8 +31,6 @@ function coverageOf(lines: readonly ParsedLogLine[]): DeviceCoverage | null {
   const { min, max } = getMinMaxTimestamps(lines);
   return max > 0 ? { start: min, end: max } : null;
 }
-
-const byTs = (a: CryptoStep, b: CryptoStep) => a.ts - b.ts;
 
 /**
  * The `details.json` of an archive, if it has one: who the device is.

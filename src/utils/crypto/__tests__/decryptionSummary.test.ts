@@ -6,7 +6,7 @@ import {
   bucketByTime, countBy, countUtdEvents, formatCounts, lateDecryptionRows, lateOutcomeKey, summarizeDecryption, utdOutcomeKey, utdReasonRows,
 } from '../decryptionSummary';
 import { RECEIVER_LOG, RECEIVER_LATE_LINES, SENDER_LOG } from './fixtures';
-import { BOB_PHONE, dev, utd } from './helpers';
+import { BOB_PHONE, dev, st, utd } from './helpers';
 
 const steps = extractSteps(parseLogFile(`${RECEIVER_LOG}\n${RECEIVER_LATE_LINES}`).rawLogLines, { archive: '', file: 'f.log' });
 
@@ -60,6 +60,10 @@ describe('countUtdEvents', () => {
     const failures = [utd('bob', 10), utd('bob', 20, '$ev1', payload), utd('bob', 30, '$ev1', { reason: 'other', error: '?' })];
     expect(countUtdEvents(failures).byReason).toEqual({ ['invalid_payload']: 1 });
     expect(buildCryptoModel([dev('bob', BOB_PHONE, failures)])[0].utds[0].reason).toBe('invalid_payload');
+  });
+  it('skips failures without a session id: the model can never resolve or judge them', () => {
+    const sessionless = st('bob', 'event.utd', 11, { eventId: '$x', error: 'x', reason: 'other' });
+    expect(countUtdEvents([utd('bob', 10), sessionless])).toEqual({ count: 1, byReason: { ['missing_key']: 1 } });
   });
 });
 

@@ -176,6 +176,15 @@ describe('UTD events', () => {
     expect(s.stepsByDevice.bob.map((x) => x.kind)).toContain('event.redecrypted');
   });
 
+  it('a key logged after the re-decryption is not what decrypted the event', () => {
+    const [s] = buildCryptoModel([dev('bob', BOB_PHONE, [
+      utd('bob', 10),
+      st('bob', 'event.redecrypted', 20, { eventId: '$ev1' }),
+      st('bob', 'roomkey.received', 30, { sessionId: 'S', toDeviceType: 'm.forwarded_room_key' }),
+    ])]);
+    expect(s.utds[0].resolution).toMatchObject({ by: 'unknown', at: 20_000_000, decryptedAt: 20_000_000, delay: 10_000_000, confirmed: true });
+  });
+
   it('a Rust batch re-decryption long after the key: the delay runs to the re-decryption', () => {
     const [s] = buildCryptoModel([dev('bob', BOB_PHONE, [
       utd('bob', 10),
@@ -289,11 +298,10 @@ describe('room-level history steps', () => {
 });
 
 describe('deviceFromSteps', () => {
-  it('wraps steps as a device, in time order', () => {
-    const a = st('alice', 'share.encrypt', 1, { sessionId: 'S' });
-    const b = st('alice', 'todevice.batch', 2, { sessionId: 'S' });
-    const d = deviceFromSteps('archive', [b, a]);
+  it('wraps sorted steps as a device, without copying them', () => {
+    const steps = [st('alice', 'share.encrypt', 1, { sessionId: 'S' }), st('alice', 'todevice.batch', 2, { sessionId: 'S' })];
+    const d = deviceFromSteps('archive', steps);
     expect(d).toMatchObject({ id: 'archive', entries: [], identity: {}, coverage: [] });
-    expect(d.steps).toEqual([a, b]);
+    expect(d.steps).toBe(steps);
   });
 });

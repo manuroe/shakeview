@@ -18,8 +18,8 @@ import { parseLogFile } from './logParser';
 import { parseSizeString } from './sizeUtils';
 import { getEntryKind } from './listingEntries';
 import { extractSteps } from './crypto/steps';
-import { countBy, countUtdEvents } from './crypto/decryptionSummary';
-import { buildCryptoModel, deviceFromSteps } from './crypto/buildCryptoModel';
+import { countBy, countUtdEvents, utdEventId } from './crypto/decryptionSummary';
+import { addTo, buildCryptoModel, byTs, deviceFromSteps } from './crypto/buildCryptoModel';
 import type { CryptoStep, UtdReason } from './crypto/types';
 
 /** Comprehensive summary matching what the browser extension shows per log file. */
@@ -167,17 +167,14 @@ export interface FileUtds {
  */
 export function utdsByFile(summaries: ReadonlyMap<string, ArchiveSummary>): ReadonlyMap<string, FileUtds> {
   // In time order: an event's first failure names its file, and decisiveFailure reads the failures in order.
-  const steps = [...summaries.values()].flatMap((s) => s.cryptoSteps).sort((a, b) => a.ts - b.ts);
+  const steps = [...summaries.values()].flatMap((s) => s.cryptoSteps).sort(byTs);
   const fileOf = new Map<string, string>();
   const failures = new Map<string, CryptoStep[]>();
   for (const s of steps) {
-    const id = s.kind === 'event.utd' ? s.keys.eventId : undefined;
+    const id = utdEventId(s);
     if (!id) continue;
     if (!fileOf.has(id)) fileOf.set(id, s.line.file);
-    const file = fileOf.get(id)!;
-    const list = failures.get(file);
-    if (list) list.push(s);
-    else failures.set(file, [s]);
+    addTo(failures, fileOf.get(id)!, s);
   }
   const utds = buildCryptoModel([deviceFromSteps('archive', steps)]).flatMap((s) => s.utds);
   const canTell = utds.some((u) => u.analytics.category !== 'unknown');

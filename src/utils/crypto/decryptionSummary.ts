@@ -1,6 +1,6 @@
 /** Megolm aggregates for one set of loaded logs: the /summary keys and UTDs cards, the /archive UTD column, and the /decryption filters. */
 import { formatTimestamp } from '../timeUtils';
-import { buildCryptoModel, deviceFromSteps } from './buildCryptoModel';
+import { addTo, buildCryptoModel, deviceFromSteps } from './buildCryptoModel';
 import { decisiveFailure } from './classifyUtd';
 import type { AnalyticsCategory, CryptoStep, MegolmSession, ResolutionMechanism, UtdEvent, UtdReason } from './types';
 
@@ -139,10 +139,7 @@ function groupBy<P, K>(points: readonly P[], key: (p: P) => K | undefined): Map<
   const groups = new Map<K, P[]>();
   for (const p of points) {
     const k = key(p);
-    if (k === undefined) continue;
-    const list = groups.get(k);
-    if (list) list.push(p);
-    else groups.set(k, [p]);
+    if (k !== undefined) addTo(groups, k, p);
   }
   return groups;
 }
@@ -239,13 +236,23 @@ export function sessionOutcomeCounts(s: MegolmSession): Map<string, number> {
 }
 
 /**
+ * The event a UTD step failed for, when the model can build it a session (it groups by session id):
+ * the UTDs /archive counts are then the ones it can resolve and judge, like /summary's.
+ *
+ * @example utdEventId(step) // '$ev1', or undefined for another kind or a failure without a session id
+ */
+export function utdEventId(s: CryptoStep): string | undefined {
+  return s.kind === 'event.utd' && s.keys.sessionId ? s.keys.eventId : undefined;
+}
+
+/**
  * Distinct failed events (by event id) and their reasons, as the model classes them (see decisiveFailure);
  * cheap, no resolution: /archive counts every file of an archive.
  *
  * @example countUtdEvents(steps) // { count: 2, byReason: { missing_key: 2 } }
  */
 export function countUtdEvents(steps: readonly CryptoStep[]): { readonly count: number; readonly byReason: Partial<Record<UtdReason, number>> } {
-  const failures = groupBy(steps, (s) => (s.kind === 'event.utd' ? s.keys.eventId : undefined));
+  const failures = groupBy(steps, utdEventId);
   const byReason = countBy([...failures.values()], (list) => decisiveFailure(list).keys.reason ?? 'other');
   return { count: failures.size, byReason };
 }

@@ -25,12 +25,13 @@ const isJsFailure = (s: CryptoStep) => s.text.startsWith('Error decrypting event
 
 /**
  * Steps with no archive behind them as one device, so the model can be built over them:
- * the /summary card's loaded logs, the /archive files' steps together.
+ * the /summary card's loaded logs, the /archive files' steps together. `steps` must be
+ * in time order, like a device's: both callers already sort them, so no copy is made.
  *
- * @example buildCryptoModel([deviceFromSteps('archive', steps)])
+ * @example buildCryptoModel([deviceFromSteps('archive', [...steps].sort(byTs))])
  */
 export function deviceFromSteps(id: string, steps: readonly CryptoStep[]): CryptoDevice {
-  return { id, entries: [], identity: {}, steps: [...steps].sort(byTs), coverage: [] };
+  return { id, entries: [], identity: {}, steps, coverage: [] };
 }
 
 const refOf = (d: CryptoDevice): DeviceRef => ({
@@ -44,7 +45,12 @@ type RoomIndex = Map<string, Map<string, CryptoStep[]>>;
 const sessionIdsOf = (s: CryptoStep): readonly string[] =>
   s.keys.sessionIds ?? (s.keys.sessionId ? [s.keys.sessionId] : []);
 
-const byTs = (a: CryptoStep, b: CryptoStep) => a.ts - b.ts;
+/**
+ * Steps in time order: the sort every device, session and UTD list relies on.
+ *
+ * @example [...steps].sort(byTs)
+ */
+export const byTs = (a: CryptoStep, b: CryptoStep) => a.ts - b.ts;
 
 /**
  * The few steps a session looks up on a device beyond its own, gathered in one
@@ -65,7 +71,12 @@ interface DeviceIndex {
   readonly byRequest: ReadonlyMap<string, readonly CryptoStep[]>;
 }
 
-function addTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+/**
+ * Append to the list of `key`, creating it: the one grouping helper of the crypto model and its summaries.
+ *
+ * @example addTo(byFile, step.line.file, step)
+ */
+export function addTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   const list = map.get(key);
   if (list) list.push(value);
   else map.set(key, [value]);
@@ -326,8 +337,9 @@ function resolveUtd(
   };
 
   const byEvent = idx.byEvent.get(eventId) ?? [];
-  const key = own.find((s) => s.ts > first.ts && isUsableKey(s, sessionId, messageIndex));
   const retry = byEvent.find((s) => s.kind === 'event.redecrypted' && s.ts > first.ts);
+  // A key logged after the re-decryption came too late to be what decrypted the event.
+  const key = own.find((s) => s.ts > first.ts && (!retry || s.ts <= retry.ts) && isUsableKey(s, sessionId, messageIndex));
   const at = key ?? retry;
   if (!at) return { ...base, resolution: { state: 'unresolved' } };
 
