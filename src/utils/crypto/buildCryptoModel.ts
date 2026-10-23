@@ -5,13 +5,15 @@
  */
 import { decisiveFailure } from './classifyUtd';
 import type {
-  CryptoDevice, CryptoStep, DeviceRef, MegolmSession, ResolutionMechanism, StepKind,
+  CryptoDevice, CryptoStep, DeviceRef, MegolmSession, ResolutionMechanism, SenderSource, StepKind,
   ToDeviceLink, UtdAnalytics, UtdEvent, UtdResolution,
 } from './types';
 
 interface BuildOptions {
   /** Also build sessions without a UTD (/decryption lists them; summaries only need the failing ones). */
   readonly includeHealthy?: boolean;
+  /** sessionId → device id the user set as the sender; always wins over detection. */
+  readonly senderOverrides?: Readonly<Record<string, string>>;
 }
 
 /** Two failures of one event closer than this are one attempt (Rust + js-sdk lines log the same failure). */
@@ -146,26 +148,28 @@ export function buildCryptoModel(devices: readonly CryptoDevice[], opts: BuildOp
   const index = new Map(devices.map((d) => [d.id, indexDevice(d)]));
   return [...direct]
     .filter(([, perDevice]) => opts.includeHealthy || hasUtd(perDevice))
-    .map(([sid, perDevice]) => buildSession(sid, devices, perDevice, receivedById, roomSteps, index));
+    .map(([sid, perDevice]) => buildSession(sid, devices, perDevice, receivedById, roomSteps, index, opts.senderOverrides?.[sid]));
 }
 
-/** The device that shared the session, else the one owning its curve key, else an unloaded one named by the key. */
+/** The sender the user chose, else the device that shared the session, else the one owning its curve key, else an unloaded one named by the key. */
 function detectSender(
   devices: readonly CryptoDevice[], perDevice: Map<string, CryptoStep[]>,
-  senderKey: string | undefined, eventSender: string | undefined,
-): DeviceRef {
+  senderKey: string | undefined, eventSender: string | undefined, override: string | undefined,
+): { readonly sender: DeviceRef; readonly senderSource: SenderSource } {
+  const chosen = override ? devices.find((d) => d.id === override) : undefined;
+  if (chosen) return { sender: refOf(chosen), senderSource: 'override' };
   const sharer = devices.find((d) => (perDevice.get(d.id) ?? []).some((s) => s.kind === 'share.encrypt' || s.kind === 'todevice.batch'));
-  if (sharer) return refOf(sharer);
+  if (sharer) return { sender: refOf(sharer), senderSource: 'share' };
   const byCurve = senderKey ? devices.find((d) => d.identity.curveKey === senderKey) : undefined;
-  if (byCurve) return refOf(byCurve);
-  return { key: `curve:${senderKey ?? '?'}`, userId: eventSender, senderKey };
+  if (byCurve) return { sender: refOf(byCurve), senderSource: 'curve_key' };
+  return { sender: { key: `curve:${senderKey ?? '?'}`, userId: eventSender, senderKey }, senderSource: 'unknown' };
 }
 
 type ReceivedIndex = Map<string, { readonly deviceId: string; readonly step: CryptoStep }>;
 
 function buildSession(
   sessionId: string, devices: readonly CryptoDevice[], perDevice: Map<string, CryptoStep[]>,
-  receivedById: ReceivedIndex, roomSteps: RoomIndex, index: Map<string, DeviceIndex>,
+  receivedById: ReceivedIndex, roomSteps: RoomIndex, index: Map<string, DeviceIndex>, senderOverride: string | undefined,
 ): MegolmSession {
   const steps: Record<string, CryptoStep[]> = {};
   for (const d of devices) steps[d.id] = [...(perDevice.get(d.id) ?? [])];
@@ -180,7 +184,7 @@ function buildSession(
   // The receiver's logs name the sender's user (UTD line, m.room_key to-device), never its device.
   const eventSender = (utdSteps.find((s) => s.keys.userId)
     ?? all.find((s) => s.kind === 'roomkey.received' && s.keys.toDeviceType === 'm.room_key' && s.keys.userId))?.keys.userId;
-  const sender = detectSender(devices, perDevice, senderKey, eventSender);
+  const { sender, senderSource } = detectSender(devices, perDevice, senderKey, eventSender, senderOverride);
   const senderDev = devices.find((d) => d.id === sender.loadedId);
 
   // Sender: pull in steps linked by transaction id (event.sent) and request id (http, sent marks).
@@ -260,7 +264,7 @@ function buildSession(
   }
 
   return {
-    sessionId, roomId, senderKey, sender,
+    sessionId, roomId, senderKey, sender, senderSource,
     receivers: [...loadedReceivers, ...seen.values()],
     stepsByDevice: steps, utds, deliveries,
   };

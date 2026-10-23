@@ -218,11 +218,15 @@ export interface ToDeviceLink extends ToDeviceMessage {
 }
 
 /** One megolm session as every loaded device saw it: what /decryption lists, with its UTDs when some failed. */
+/** How a session's sender was found: a share it logged, its curve key, the user's choice, or not at all. */
+export type SenderSource = 'share' | 'curve_key' | 'override' | 'unknown';
+
 export interface MegolmSession {
   readonly sessionId: string;
   readonly roomId?: string;
   readonly senderKey?: string;
   readonly sender: DeviceRef;
+  readonly senderSource: SenderSource;
   /** Loaded receivers first (by first activity), then seen-only devices from the sender's recipients. */
   readonly receivers: readonly DeviceRef[];
   /** Steps per loaded device id, sorted by ts. */

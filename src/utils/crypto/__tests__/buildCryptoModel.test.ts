@@ -38,17 +38,33 @@ describe('sender detection', () => {
   it('share: the device that logged a share for the session', () => {
     const [s] = buildCryptoModel([dev('alice', {}, [share(1, [])]), bob()]);
     expect(s.sender.loadedId).toBe('alice');
+    expect(s.senderSource).toBe('share');
   });
 
   it('curve_key: the device whose details curve key equals the session sender key', () => {
     const [s] = buildCryptoModel([dev('alice', ALICE, []), bob()]);
     expect(s.sender.loadedId).toBe('alice');
+    expect(s.senderSource).toBe('curve_key');
   });
 
   it('unknown: keeps the sender key and the event sender', () => {
     const [s] = buildCryptoModel([bob()]);
     expect(s.sender).toMatchObject({ senderKey: 'ALICEKEY', userId: '@alice:a.org' });
     expect(s.sender.loadedId).toBeUndefined();
+    expect(s.senderSource).toBe('unknown');
+  });
+
+  it('override: always wins, even over a device that shared the session', () => {
+    const devices = [dev('alice', {}, [share(1, [])]), bob(), dev('carol', {}, [])];
+    const [s] = buildCryptoModel(devices, { senderOverrides: { S: 'carol' } });
+    expect(s.sender.loadedId).toBe('carol');
+    expect(s.senderSource).toBe('override');
+  });
+
+  it('override to a device that is not loaded is ignored', () => {
+    const [s] = buildCryptoModel([dev('alice', {}, [share(1, [])]), bob()], { senderOverrides: { S: 'gone' } });
+    expect(s.sender.loadedId).toBe('alice');
+    expect(s.senderSource).toBe('share');
   });
 
   it('unknown without a UTD: the event sender comes from the m.room_key to-device sender', () => {
