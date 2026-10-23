@@ -75,20 +75,19 @@ export function fetchMatrixProfile(userId: string): Promise<MatrixProfile | null
   const domain = homeserver.replace(/:\d+$/, '').split('.').slice(-2).join('.');
   if (!isValidPublicHomeserver(homeserver) || isDomainAlias(domain)) return Promise.resolve(null);
   const request = (async () => {
-    try {
-      const response = await fetch(`https://${homeserver}/_matrix/client/v3/profile/${encodeURIComponent(userId)}`);
-      if (!response.ok) return null;
-      const json = (await response.json()) as Record<string, unknown>;
-      return {
-        displayName: typeof json['displayname'] === 'string' ? json['displayname'] : null,
-        avatarHttpUrl: typeof json['avatar_url'] === 'string' ? mxcToThumbnailUrl(homeserver, json['avatar_url']) : null,
-      };
-    } catch {
-      // Offline or CORS: forget the failure, so the next fetch of this user (a later mount) retries.
-      profiles.delete(userId);
-      return null;
-    }
-  })();
+    const response = await fetch(`https://${homeserver}/_matrix/client/v3/profile/${encodeURIComponent(userId)}`);
+    if (!response.ok) return null;
+    const json = (await response.json()) as Record<string, unknown>;
+    return {
+      displayName: typeof json['displayname'] === 'string' ? json['displayname'] : null,
+      avatarHttpUrl: typeof json['avatar_url'] === 'string' ? mxcToThumbnailUrl(homeserver, json['avatar_url']) : null,
+    };
+  })().catch(() => {
+    // Offline or CORS: forget the failure, so the next fetch of this user (a later mount) retries.
+    // A reaction, so it runs after the set below even when the request throws before its first await.
+    profiles.delete(userId);
+    return null;
+  });
   profiles.set(userId, request);
   return request;
 }

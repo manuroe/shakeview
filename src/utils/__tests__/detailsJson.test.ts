@@ -86,6 +86,14 @@ describe('fetchMatrixProfile', () => {
     expect(await fetchMatrixProfile('@alice:domain-example.org')).toEqual({ displayName: 'Alice', avatarHttpUrl: null });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('forgets a failure, even one thrown before the request is sent, so the next fetch retries', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockImplementationOnce(() => { throw new TypeError('blocked'); })
+      .mockResolvedValue(new Response(JSON.stringify({ displayname: 'Alice' })));
+    expect(await fetchMatrixProfile('@alice:matrix.org')).toBeNull();
+    expect(await fetchMatrixProfile('@alice:matrix.org')).toEqual({ displayName: 'Alice', avatarHttpUrl: null });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('rustSdkShaFromLogs', () => {
