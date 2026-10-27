@@ -862,6 +862,14 @@ describe('megolm', () => {
     expect(out).toContain(`./rs grep ${bob} '$event-0000000000ff'`);
   });
 
+  it('--session takes a unique prefix of 6+ characters, and lists the sessions an ambiguous one names', () => {
+    const keyLine = (sid: string) => CAROL_KEY_LINE.replace('session_id="SESS3"', `session_id="${sid}"`);
+    const two = cryptoArchive('two.tar.gz', anon(RECEIVER_DETAILS), ['# [shakeview-anonymized]', keyLine('Abcdef1xyz'), keyLine('Abcdef2xyz')].join('\n'));
+    expect(megolm(two, '--session', 'Abcdef1')).toContain('# session Abcdef1xyz ');
+    expect(megolm(two, '--session', 'Abcdef')).toContain('# 2 sessions start with Abcdef: Abcdef1xyz · Abcdef2xyz');
+    expect(megolm(two, '--session', 'Abcd')).toContain('no megolm session Abcd');
+  });
+
   it('--session drills into a session without UTD, ignoring the window', () => {
     const out = megolm(bob, '--session', 'SESS3', '--from', '2026-09-08T06:58:30Z');
     expect(out).toContain('verdict: Likely fine: key received, no UTD in the loaded logs');

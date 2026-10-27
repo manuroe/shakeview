@@ -94,7 +94,7 @@ Filters:
                                !room-…, @user-…), a prefix of 6+ hex of one, or any text holding one, e.g. a
                                permalink: a raw id never matches. The user's bug report (summary userText)
                                usually has them aliased. A --room matching nothing lists the rooms with a UTD
-  --session <id>               This session in full (megolm)
+  --session <id>               This session in full (megolm); a unique prefix of 6+ characters is enough
   --room <id>                  Only sessions in this room (megolm)
   --sender <id>                Only sessions this user sent (megolm)
 
@@ -1318,8 +1318,13 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
       }
       if (!session) return [...out, `# no UTD for ${ev} in the loaded logs: it may have decrypted fine`, ...nexts(`'${ev}'`)].join('\n');
     } else {
-      session = model.find((s) => s.sessionId === flags.session);
-      if (!session) return [...out, `# no megolm session ${flags.session} in the loaded logs`].join('\n');
+      const id = flags.session ?? '';
+      // The exact id, else a prefix: base64 ids are long, and people quote them cut short.
+      const named = model.filter((s) => s.sessionId === id);
+      const matches = named.length > 0 || id.length < MIN_ALIAS_HEX ? named : model.filter((s) => s.sessionId.startsWith(id));
+      if (matches.length > 1) return [...out, `# ${matches.length} sessions start with ${id}: ${matches.slice(0, 10).map((s) => s.sessionId).join(' · ')} — give more of it`].join('\n');
+      session = matches[0];
+      if (!session) return [...out, `# no megolm session ${id} in the loaded logs`].join('\n');
     }
     emitMegolmSession(out, session, devices, mainId, num, ref, flags);
     out.push(...nexts(session.sessionId));
