@@ -30,7 +30,7 @@
 .ids {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-family: monospace;
+    font-family: var(--font-mono);
     word-break: break-all;
 }
 

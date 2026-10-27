@@ -162,7 +162,7 @@ export function UnanonymizeDialog({ onClose }: UnanonymizeDialogProps) {
         {/* Body */}
         <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 16 }}>
           This log was loaded already-anonymised. To restore the original identifiers, upload the
-          <code style={{ margin: '0 4px', fontFamily: 'monospace' }}>dictionary.json</code>
+          <code style={{ margin: '0 4px', fontFamily: 'var(--font-mono)' }}>dictionary.json</code>
           file that was saved alongside the anonymised export.
         </p>
 

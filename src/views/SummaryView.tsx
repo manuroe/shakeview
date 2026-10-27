@@ -367,7 +367,7 @@ export function SummaryView() {
                 <tbody>
                   {stats.sentryEvents.map((event) => (
                     <tr key={event.sentryId ?? `line-${event.lineNumber}`}>
-                      <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                         <button
                           type="button"
                           onClick={() => navigate(`/logs?filter=${encodeURIComponent(event.sentryId ?? 'Sending error to Sentry')}`)}
@@ -377,7 +377,7 @@ export function SummaryView() {
                           {event.message.substring(0, 150)}
                         </button>
                       </td>
-                      <td style={{ fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', whiteSpace: 'nowrap' }}>
                         {event.sentryUrl && event.sentryId ? (
                           <a
                             href={event.sentryUrl}
@@ -740,7 +740,7 @@ export function SummaryView() {
                             {formatDuration(req.duration)}
                           </span>
                         </td>
-                        <td style={{ fontFamily: 'monospace', fontSize: '13px', color: '#007acc' }}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#007acc' }}>
                           <a
                             href={`#/http_requests?request_id=${req.id}`}
                             className={styles.actionLink}

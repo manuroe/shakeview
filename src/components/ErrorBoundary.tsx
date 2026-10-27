@@ -157,7 +157,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   backgroundColor: '#1f2937',
                   color: '#f3f4f6',
                   borderRadius: '4px',
-                  fontFamily: 'monospace',
+                  fontFamily: 'var(--font-mono)',
                   fontSize: '12px',
                   overflow: 'auto',
                   maxHeight: '400px',
