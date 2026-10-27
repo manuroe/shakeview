@@ -754,7 +754,7 @@ export function RequestTable({
                 </div>
 
                 {/* Right panel - waterfall */}
-                <div data-testid="request-table-right-scroll" className={styles.timelineRowsRight} ref={waterfallContainerRef} tabIndex={0} aria-label="Request timeline">
+                <div data-testid="request-table-right-scroll" className={styles.timelineRowsRight} ref={waterfallContainerRef} tabIndex={0} role="region" aria-label="Request timeline">
                   {/* Spacer div establishes the full scrollable height and contains absolutely-positioned rows + gap overlays. */}
                   <div style={{ width: `${timeline.totalWidthPx}px`, height: `${totalVirtualHeight}px`, position: 'relative' }}>
                     {virtualRows.map((vRow) => {

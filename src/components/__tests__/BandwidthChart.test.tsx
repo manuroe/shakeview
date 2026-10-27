@@ -263,7 +263,7 @@ describe('BandwidthChart', () => {
           }}
         />,
       );
-      // External selection band renders a semi-transparent blue rect
+      // External selection band renders a semi-transparent primary-colour rect
       const selectionRect = container.querySelector('rect[fill="var(--color-primary)"][fill-opacity="0.2"]');
       expect(selectionRect).toBeInTheDocument();
     });
