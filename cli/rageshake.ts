@@ -34,10 +34,11 @@ import { scopeSessions } from '../src/utils/crypto/scope.ts';
 import { sessionTime } from '../src/utils/crypto/sessionList.ts';
 import { sessionLanes, shareRecipients } from '../src/utils/crypto/timeline.ts';
 import { buildJourney, type JourneyState } from '../src/utils/crypto/journey.ts';
-import { lateOutcomeKey, utdOutcomeKey } from '../src/utils/crypto/decryptionSummary.ts';
+import { lateOutcomeKey, matchesOutcomes, sessionEventKeys, utdOutcomeKey } from '../src/utils/crypto/decryptionSummary.ts';
+import { ANALYTICS_CATEGORIES, REPORTED_MEANING } from '../src/utils/crypto/labels.ts';
 import { describeStep } from '../src/utils/crypto/describeStep.ts';
 import { plural } from '../src/utils/crypto/format.ts';
-import type { CryptoDevice, LineRef, MegolmSession } from '../src/utils/crypto/types.ts';
+import type { AnalyticsCategory, CryptoDevice, LineRef, MegolmSession, UtdEvent } from '../src/utils/crypto/types.ts';
 import { cmdServe } from './serve.ts';
 import type { LogParserResult, ParsedLogLine, LifecycleEvent, HttpRequest } from '../src/types/log.types.ts';
 import type { TimestampMicros, ISODateTimeString } from '../src/types/time.types.ts';
@@ -86,6 +87,9 @@ Filters:
   --slowest <N>                N slowest requests, sorted by duration (http)
   --top <N|all>                Per-file table: N noisiest files or "all" (summary, default 5)
   --utd                        Only sessions with a UTD on some device (megolm)
+  --analytics <value>          Only sessions with a UTD the app's analytics counts so (megolm, as /decryption):
+                               reported | not_reported | unknown. Reported = still not decrypted 4 s after
+                               the app first tried to show it, i.e. the UTDs the user saw
   --event <id>                 The session of this UTD, in full (megolm). Ids here are aliases ($event-…,
                                !room-…, @user-…) or any text holding one, e.g. a permalink: a raw id never
                                matches. The user's bug report (summary userText) usually has them aliased
@@ -257,6 +261,7 @@ interface Flags {
   width?: string;
   spans?: boolean;
   utd?: boolean;
+  analytics?: string;
   event?: string;
   session?: string;
   room?: string;
@@ -1298,8 +1303,11 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   const range = resolveRange(archives[0].ing.merged, flags, (m) => out.push(m));
   const room = flags.room ? aliasFlag(flags.room, 'room') : undefined;
   const sender = flags.sender ? aliasFlag(flags.sender, 'sender') : undefined;
+  const analytics = flags.analytics as AnalyticsCategory | undefined;
+  if (analytics && !ANALYTICS_CATEGORIES.includes(analytics)) throw new Error(`invalid --analytics "${flags.analytics}" (use ${ANALYTICS_CATEGORIES.join(' | ')})`);
   const sessions = (range ? scopeSessions(model, range.startUs, range.endUs) : model)
     .filter((s) => !flags.utd || s.utds.length > 0)
+    .filter((s) => !analytics || matchesOutcomes(sessionEventKeys(s), null, analytics))
     .filter((s) => !room || idKey(s.roomId) === room)
     .filter((s) => !sender || idKey(s.sender.userId) === sender || s.utds.some((u) => u.steps.some((x) => idKey(x.keys.userId) === sender)))
     .map((s) => ({ s, ts: sessionTime(s) }))
@@ -1308,10 +1316,11 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   const totals = devices.map((d, i) => {
     const mine = sessions.filter(({ s }) => (s.stepsByDevice[d.id]?.length ?? 0) > 0);
     const utds = mine.flatMap(({ s }) => s.utds.filter((u) => u.deviceId === d.id));
-    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')} (${utds.filter((u) => u.analytics.category === 'reported').length} seen)`;
+    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')}${analyticsCounts(utds)}`;
   });
   out.push(`# ${plural(sessions.length, 'session')}${flags.utd ? ' with a UTD' : ''}, newest first · ${totals.join(' · ')}`);
-  out.push('# time room session · sender (archive, how found) · per archive: utd:<reason>×N still failing, late:<how>×N decrypted later (seen = reached the UI)');
+  out.push('# time room session · sender (archive, how found) · per archive: utd:<reason>×N still failing, late:<how>×N decrypted later, (analytics)');
+  out.push(`# ${REPORTED_MEANING}`);
 
   const limit = intFlag(flags.limit, LINE_LIMIT);
   const offset = intFlag(flags.offset, 0);
@@ -1334,6 +1343,15 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   return out.join('\n');
 }
 
+/** UTDs per analytics value, as /decryption names them: ` (2 reported, 1 unknown)`; empty for none. */
+function analyticsCounts(utds: readonly UtdEvent[]): string {
+  const parts = ANALYTICS_CATEGORIES.flatMap((c) => {
+    const n = utds.filter((u) => u.analytics.category === c).length;
+    return n > 0 ? [`${n} ${c.replace('_', ' ')}`] : [];
+  });
+  return parts.length > 0 ? ` (${parts.join(', ')})` : '';
+}
+
 /** One archive's part of a session row: outbound and how widely shared, its UTDs by outcome, or that it got the key. */
 function archiveOutcome(s: MegolmSession, d: CryptoDevice): string {
   const parts: string[] = [];
@@ -1348,9 +1366,7 @@ function archiveOutcome(s: MegolmSession, d: CryptoDevice): string {
       const k = u.resolution.state === 'resolved' ? lateOutcomeKey(u.resolution.by) : utdOutcomeKey(u.reason);
       byKey.set(k, (byKey.get(k) ?? 0) + 1);
     }
-    const seen = utds.filter((u) => u.analytics.category === 'reported').length;
-    const unknown = utds.filter((u) => u.analytics.category === 'unknown').length;
-    parts.push(`${[...byKey].map(([k, n]) => `${k}×${n}`).join(' ')} (${seen} seen${unknown > 0 ? `, ${unknown} ?` : ''})`);
+    parts.push(`${[...byKey].map(([k, n]) => `${k}×${n}`).join(' ')}${analyticsCounts(utds)}`);
   } else if (parts.length === 0 && (s.stepsByDevice[d.id] ?? []).some((x) => x.kind === 'roomkey.received')) {
     parts.push('key_received');
   }
@@ -1445,6 +1461,7 @@ export function run(argv: string[]): { code: number; output: string } {
       width: { type: 'string' },
       spans: { type: 'boolean' },
       utd: { type: 'boolean' },
+      analytics: { type: 'string' },
       event: { type: 'string' },
       session: { type: 'string' },
       room: { type: 'string' },

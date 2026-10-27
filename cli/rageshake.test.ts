@@ -728,7 +728,9 @@ describe('megolm', () => {
     .replaceAll('https://a.org', 'https://domain-aaaaaaaa.org');
   const CAROL_KEY_LINE = `2026-09-08T06:57:00.000000Z  INFO matrix_sdk_crypto::store: Received a new megolm room key | crates/matrix-sdk-crypto/src/store/mod.rs:703 | spans: receive_to_device_event{sender="@user-cccccccccccc:domain-cccccccc.org" event_type="m.room.encrypted" message_id="msg7"} > handle_decrypted_to_device_event{sender_key="curve25519:CAROLKEY" event_type="m.room_key"} > add_room_key{algorithm="m.megolm.v1.aes-sha2"} > handle_key{room_id="${OTHER_ROOM}" session_id="SESS3" message_index=0 shared_history=false}`;
   const [sync, utdLine, stillSyncing] = anon(RECEIVER_LOG).split('\n');
-  const receiverLog = ['# [shakeview-anonymized]', sync, utdLine, CAROL_KEY_LINE, stillSyncing, anon(RECEIVER_LATE_LINES)].join('\n');
+  // Element X Android logs its own analytics report: $ev1 counts as reported.
+  const REPORT_LINE = `2026-09-08T06:55:27.000000Z  INFO elementx: onUtd for event ${EV1}, timeToDecryptMs: null`;
+  const receiverLog = ['# [shakeview-anonymized]', sync, utdLine, REPORT_LINE, CAROL_KEY_LINE, stillSyncing, anon(RECEIVER_LATE_LINES)].join('\n');
   const senderLog = `# [shakeview-anonymized]\n${anon(SENDER_LOG)}`;
 
   function cryptoArchive(name: string, details: string, log: string): string {
@@ -753,10 +755,12 @@ describe('megolm', () => {
     expect(at('SESS2')).toBeLessThan(at('SESS3'));
     expect(at('SESS3')).toBeLessThan(at('SESS'));
     expect(rowOf(out, 'SESS')).toContain(ROOM);
-    expect(rowOf(out, 'SESS')).toContain('1: utd:missing_key×1');
+    expect(rowOf(out, 'SESS')).toContain('1: utd:missing_key×1 (1 reported)');
     expect(rowOf(out, 'SESS')).toContain('2: outbound, shared to 1 device');
     expect(rowOf(out, 'SESS')).toContain(`sender ${ALICE_ID} ALICEPHONE (2, by share)`);
-    expect(rowOf(out, 'SESS2')).toContain('1: late:late_key×1');
+    expect(rowOf(out, 'SESS2')).toContain('1: late:late_key×1 (1 unknown)');
+    expect(out).toContain('1: 3 sessions, 2 UTDs (1 reported, 1 unknown)');
+    expect(out).toContain('A UTD counts as reported when');
     expect(rowOf(out, 'SESS3')).toContain('1: key_received');
     expect(rowOf(out, 'SESS3')).toContain('(not loaded)');
   });
@@ -766,6 +770,15 @@ describe('megolm', () => {
     expect(rowOf(out, 'SESS')).not.toBe('');
     expect(rowOf(out, 'SESS2')).not.toBe('');
     expect(rowOf(out, 'SESS3')).toBe('');
+  });
+
+  it('--analytics keeps sessions with a UTD of that analytics value', () => {
+    const out = megolm(bob, '--analytics', 'reported');
+    expect(rowOf(out, 'SESS')).not.toBe('');
+    expect(rowOf(out, 'SESS2')).toBe('');
+    expect(rowOf(out, 'SESS3')).toBe('');
+    expect(rowOf(megolm(bob, '--analytics', 'unknown'), 'SESS2')).not.toBe('');
+    expect(() => megolm(bob, '--analytics', 'seen')).toThrow(/reported \| not_reported \| unknown/);
   });
 
   it('--room takes a permalink and --sender an alias', () => {
