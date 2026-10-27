@@ -93,9 +93,9 @@ Filters:
   --event <id>                 The session of this UTD, in full (megolm). Ids here are aliases ($event-…,
                                !room-…, @user-…), a prefix of 6+ hex of one, or any text holding one, e.g. a
                                permalink: a raw id never matches. The user's bug report (summary userText)
-                               usually has them aliased. A --room matching nothing lists the rooms with a UTD
+                               usually has them aliased
   --session <id>               This session in full (megolm); a unique prefix of 6+ characters is enough
-  --room <id>                  Only sessions in this room (megolm)
+  --room <id>                  Only sessions in this room (megolm); matching nothing lists the rooms with a UTD
   --sender <id>                Only sessions this user sent (megolm)
 
 Pagination (all line/tree output is capped, never unbounded):
@@ -470,11 +470,15 @@ function filesLegend(ing: Ingest, tags: Map<string, string> | null, citedFiles: 
   for (const name of citedFiles) if (name !== undefined) cited.add(name);
   const shown = ing.files.filter((f) => cited.has(f.name));
   if (shown.length === 0) return null;
-  // A logcat whose device-local clock was aligned to UTC says so, so the times
-  // printed here never silently disagree with the raw file.
-  const note = (name: string): string =>
-    ing.logcatSkewUs !== 0 && isLogcatFile(name) ? ` (device-local times shifted ${formatSkew(ing.logcatSkewUs)} to UTC)` : '';
-  return `# files: ${shown.map((f) => `${tags.get(f.name)}=${basename(f.name)}${note(f.name)}`).join(' · ')}`;
+  return `# files: ${shown.map((f) => `${tags.get(f.name)}=${basename(f.name)}${skewNote(ing, f.name)}`).join(' · ')}`;
+}
+
+/**
+ * A logcat whose device-local clock was aligned to UTC says so in a legend, so
+ * the times printed never silently disagree with the raw file.
+ */
+function skewNote(ing: Ingest, name: string): string {
+  return ing.logcatSkewUs !== 0 && isLogcatFile(name) ? ` (device-local times shifted ${formatSkew(ing.logcatSkewUs)} to UTC)` : '';
 }
 
 /** Render a clock skew as a signed hours/minutes label, e.g. `-2h`, `+5h45m` or `+30m`. */
@@ -994,8 +998,7 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
   if (flags.count) {
     // One histogram mixes the patterns: say when each one happens, so each gets its own window.
     if (queries.length > 1) {
-      const stamped = firstUs.filter((t) => t > 0);
-      const sameDay = new Set([...stamped, ...lastUs.filter((t) => t > 0)].map((t) => microsToISO(t as TimestampMicros).slice(0, 10))).size <= 1;
+      const sameDay = new Set([...firstUs, ...lastUs].filter((t) => t > 0).map((t) => microsToISO(t as TimestampMicros).slice(0, 10))).size <= 1;
       const at = (us: number) => microsToISO(us as TimestampMicros).slice(sameDay ? 11 : 5, sameDay ? 19 : 16);
       const when = patterns.flatMap((p, k) => (firstUs[k] > 0 ? [`"${p}" ${at(firstUs[k])} → ${at(lastUs[k])}`] : []));
       if (when.length > 0) out.push(`# when: ${when.join(' · ')}`);
@@ -1291,7 +1294,7 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
     const i = (num.get(r.archive) ?? 1) - 1;
     const tag = tagsOf[i]?.get(r.file);
     const where = i === 0 ? tag ?? '' : `${i + 1}${tag ? `:${tag}` : ''}`;
-    if (tag) cited.set(i === 0 ? tag : where, i === 0 ? basename(r.file) : `${devices[i].id}/${basename(r.file)}`);
+    if (tag) cited.set(i === 0 ? tag : where, `${i === 0 ? '' : `${devices[i].id}/`}${basename(r.file)}${skewNote(archives[i].ing, r.file)}`);
     return `[${r.line - (archives[i].ing.offsets.get(r.file) ?? 0)}${where ? `|${where}` : ''}]`;
   };
 
@@ -1307,14 +1310,14 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
     let mainId = devices[0].id;
     if (flags.event) {
       const ev = aliasFlag(flags.event, 'event');
-      for (const s of model) {
-        const u = s.utds.find((x) => isAlias(x.eventId, ev));
-        if (u) {
-          session = s;
-          // Judge the device that failed the event asked about: buildJourney keeps only its receiver's UTDs.
-          mainId = u.deviceId;
-          break;
-        }
+      // A prefix can name several events: refuse rather than pick one at random.
+      const hits = model.flatMap((s) => s.utds.filter((x) => isAlias(x.eventId, ev)).map((u) => ({ s, u })));
+      const named = [...new Set(hits.map(({ u }) => idKey(u.eventId)))];
+      if (named.length > 1) return [...out, `# ${named.length} UTD events start with ${ev}: ${named.slice(0, 10).join(' · ')} — give more of it`].join('\n');
+      if (hits.length > 0) {
+        session = hits[0].s;
+        // Judge the device that failed the event asked about: buildJourney keeps only its receiver's UTDs.
+        mainId = hits[0].u.deviceId;
       }
       if (!session) return [...out, `# no UTD for ${ev} in the loaded logs: it may have decrypted fine`, ...nexts(`'${ev}'`)].join('\n');
     } else {
@@ -1333,6 +1336,7 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   }
 
   const range = resolveRange(archives[0].ing.merged, flags, (m) => out.push(m));
+  if (range) rangeHeader(out, range, archives[0].ing.merged);
   const room = flags.room ? aliasFlag(flags.room, 'room') : undefined;
   const sender = flags.sender ? aliasFlag(flags.sender, 'sender') : undefined;
   const analytics = flags.analytics as AnalyticsCategory | undefined;
@@ -1366,7 +1370,7 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
       const outcome = archiveOutcome(s, d);
       return outcome ? [`${i + 1}: ${outcome}`] : [];
     });
-    out.push(`${clockOf(ts)} ${s.roomId ?? '?'} ${s.sessionId} · sender ${s.sender.userId ?? '?'}${s.sender.deviceId ? ` ${s.sender.deviceId}` : ''} (${from}) · ${perArchive.join(' · ')}`);
+    out.push(`${clockOf(ts)} ${s.roomId ?? '?'} ${s.sessionId} · sender ${s.sender.userId ?? '?'}${s.sender.deviceId ? ` ${s.sender.deviceId}` : ''} (${from})${perArchive.map((p) => ` · ${p}`).join('')}`);
   }
   const remaining = sessions.length - offset - page.length;
   if (remaining > 0) out.push(`# ${remaining} more sessions — next: --offset ${offset + page.length}`);
@@ -1473,13 +1477,14 @@ function emitMegolmSession(
     if (last && last[0].kind === x.kind && last[0].line.archive === x.line.archive) last.push(x);
     else runs.push([x]);
   }
-  const rows = runs.flatMap((r) => (r.length >= FOLD_RUN ? [r] : r.map((x) => [x])));
+  // A run holding the decisive step stays unfolded: a folded row cites only its first step's ref.
+  const rows = runs.flatMap((r) => (r.length >= FOLD_RUN && !r.some(isDecisive) ? [r] : r.map((x) => [x])));
   let lastDay = '';
   capped(`timeline (${plural(timeline.length, 'step')}, time order: time archive step):`, rows, (r) => {
     const marker: string[] = [];
     lastDay = pushDayMarker(marker, r[0].ts, lastDay);
     const fold = r.length > 1 ? ` ×${r.length} to ${clockOf(r[r.length - 1].ts)}` : '';
-    const mark = r.some(isDecisive) ? ' ← decisive' : '';
+    const mark = isDecisive(r[0]) ? ' ← decisive' : '';
     return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${describeStep(r[0])}${fold} ${ref(r[0].line)}${mark}`].join('\n');
   }, offset);
 }

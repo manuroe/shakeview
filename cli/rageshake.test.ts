@@ -798,6 +798,7 @@ describe('megolm', () => {
 
   it('cuts the list to the window of the main archive', () => {
     const out = megolm(bob, alice, '--from', '2026-09-08T06:58:30Z');
+    expect(out).toContain('# range: 2026-09-08T06:58:30');
     expect(rowOf(out, 'SESS2')).not.toBe('');
     expect(rowOf(out, 'SESS')).toBe('');
     expect(rowOf(out, 'SESS3')).toBe('');
@@ -854,6 +855,11 @@ describe('megolm', () => {
   it('--event on a UTD only an added archive logged judges that archive', () => {
     const out = megolm(alice, bob, '--event', EV1);
     expect(out).toContain('verdict: Likely this device was left out of the key share');
+  });
+
+  it('--event refuses a prefix naming several UTD events', () => {
+    // $ev1 (SESS) and $ev2 (SESS2) share the prefix $event-eeeeeeeeeee.
+    expect(megolm(bob, '--event', '$event-eeeeeeeeeee')).toContain(`# 2 UTD events start with $event-eeeeeeeeeee: ${EV1} · $event-eeeeeeeeeee2`);
   });
 
   it('--event without a matching UTD says so and points at grep', () => {
