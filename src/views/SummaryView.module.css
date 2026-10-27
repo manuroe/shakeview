@@ -202,8 +202,11 @@
     composes: monoCell from '../components/Table.module.css';
 }
 
+/* Neutral: a duration is a value, not a status or a link. */
 .durationBadge {
-    composes: badge badgeInfo from '../components/Table.module.css';
+    composes: badge from '../components/Table.module.css';
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .statusBadge {
