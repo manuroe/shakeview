@@ -27,7 +27,7 @@
 .input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-primary-muted);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .input.expandable:focus {
@@ -67,5 +67,5 @@
 
 .clearButton:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-primary-muted);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }

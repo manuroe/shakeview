@@ -21,6 +21,7 @@
   --color-primary-light: var(--cpd-color-bg-accent-subtle);
   --color-primary-muted: var(--cpd-color-alpha-green-300);
   --color-on-primary: var(--cpd-color-text-on-solid-primary);
+  --focus-ring: var(--cpd-color-border-focused);
   --color-visited: var(--cpd-color-purple-1100);
 
   /* -------------------------------------------------------------------------
@@ -52,7 +53,7 @@
   --text-secondary: var(--cpd-color-text-secondary);
   --text-tertiary: var(--cpd-color-text-secondary);
   --text-muted: var(--cpd-color-text-secondary);
-  --text-placeholder: var(--cpd-color-text-disabled);
+  --text-placeholder: var(--cpd-color-text-secondary);
 
   /* -------------------------------------------------------------------------
      Background Colors
@@ -79,12 +80,12 @@
      ------------------------------------------------------------------------- */
   --log-bg: #1e1e1e;
   --log-text: #d4d4d4;
-  --log-text-muted: #858585;
+  --log-text-muted: #9a9a9a;
   --log-scrollbar: #424242;
   --log-scrollbar-hover: #4e4e4e;
 
   /* Log Level Colors */
-  --log-level-trace: #808080;
+  --log-level-trace: #9a9a9a;
   --log-level-debug: #569cd6;
   --log-level-debug-text: #b5cea8;
   --log-level-info: #4ec9b0;
@@ -117,7 +118,7 @@
   --font-mono: var(--cpd-font-family-mono);
 
   /* Font Sizes */
-  --font-size-xs: 10px;
+  --font-size-xs: 11px;
   --font-size-sm: 11px;
   --font-size-base: 12px;
   --font-size-md: 13px;
@@ -187,55 +188,59 @@
   /* -------------------------------------------------------------------------
      HTTP Status Code Colors
      A distinct palette for visualizing HTTP status codes in charts/tables.
+     Categories (green / cyan / orange / purple, plus client-error and
+     incomplete) stay apart under deutan, protan and tritan colour blindness;
+     codes within a category are lightness shades of its base, each at least
+     3:1 against the canvas.
      ------------------------------------------------------------------------- */
   /* 2xx Success (greens) */
-  --http-200: #28a745;
-  --http-201: #2ecc71;
-  --http-202: #27ae60;
-  --http-204: #1abc9c;
-  --http-2xx: #28a745;
+  --http-200: #166534;
+  --http-201: #1e8b47;
+  --http-202: #229e51;
+  --http-204: #1a783e;
+  --http-2xx: #166534;
 
   /* 3xx Redirect (blues/cyans) */
-  --http-301: #17a2b8;
-  --http-302: #20c997;
-  --http-304: #6610f2;
-  --http-307: #0dcaf0;
-  --http-308: #0d6efd;
+  --http-301: #127e8f;
+  --http-302: #1490a4;
+  --http-304: #17a2b8;
+  --http-307: #0f6c7b;
+  --http-308: #0d5a66;
   --http-3xx: #17a2b8;
 
-  /* 4xx Client Error (reds) */
-  --http-400: #ef4444;
-  --http-401: #dc2626;
-  --http-403: #f87171;
-  --http-404: #dc2626;
-  --http-405: #b91c1c;
-  --http-408: #991b1b;
-  --http-409: #ef4444;
-  --http-410: #b91c1c;
-  --http-422: #dc2626;
-  --http-429: #f87171;
-  --http-4xx: #ef4444;
+  /* 4xx Client Error (oranges) */
+  --http-400: #d97706;
+  --http-401: #b66405;
+  --http-403: #a55a05;
+  --http-404: #c86d06;
+  --http-405: #5f3403;
+  --http-408: #4e2b02;
+  --http-409: #824704;
+  --http-410: #3d2102;
+  --http-422: #713e03;
+  --http-429: #945104;
+  --http-4xx: #d97706;
 
   /* 5xx Server Error (purples) */
   --http-500: #a855f7;
-  --http-501: #9333ea;
-  --http-502: #a855f7;
-  --http-503: #7c3aed;
-  --http-504: #9333ea;
+  --http-501: #7b0be5;
+  --http-502: #9d3ff6;
+  --http-503: #9229f5;
+  --http-504: #8613f4;
   --http-5xx: #a855f7;
 
    /* Incomplete/Unknown (cancelled catchup variation) */
    --http-incomplete: #7b8667;
 
   /* Client-side transport errors (timeout, connection failure — no HTTP response received) */
-  --http-client-error: #9716f9;
+  --http-client-error: #0f172a;
 
   /* -------------------------------------------------------------------------
      Row Backgrounds (used for zebra striping)
      ------------------------------------------------------------------------- */
   --row-bg-odd: var(--cpd-color-bg-subtle-secondary);
   --row-bg-even: var(--cpd-color-bg-canvas-default);
-  --row-bg-hover: var(--cpd-color-bg-subtle-primary);
+  --row-bg-hover: var(--cpd-color-blue-300);  /* hue sets it apart from both stripes; secondary text stays >= 4.5:1 */
   --row-bg-expanded: var(--cpd-color-bg-accent-subtle);
 }
 
@@ -271,42 +276,42 @@
   --gap-label-color: #9e9e9e;
 
   /* HTTP Status Code Colors (dark theme - brighter for visibility) */
-  --http-200: #4caf50;
-  --http-201: #66bb6a;
-  --http-202: #43a047;
-  --http-204: #26a69a;
-  --http-2xx: #4caf50;
+  --http-200: #2ea043;
+  --http-201: #35b84d;
+  --http-202: #278839;
+  --http-204: #3ec858;
+  --http-2xx: #2ea043;
 
-  --http-301: #29b6f6;
-  --http-302: #4dd0e1;
-  --http-304: #7c4dff;
-  --http-307: #00e5ff;
-  --http-308: #448aff;
-  --http-3xx: #29b6f6;
+  --http-301: #22d3ee;
+  --http-302: #3ed9f0;
+  --http-304: #11c5e0;
+  --http-307: #56ddf2;
+  --http-308: #0fb0c8;
+  --http-3xx: #22d3ee;
 
-  /* 4xx Client Error (reds - brighter for dark mode) */
-  --http-400: #f87171;
-  --http-401: #ef4444;
-  --http-403: #fca5a5;
-  --http-404: #ef4444;
-  --http-405: #dc2626;
-  --http-408: #f87171;
-  --http-409: #f87171;
-  --http-410: #dc2626;
-  --http-422: #ef4444;
-  --http-429: #fca5a5;
-  --http-4xx: #f87171;
+  /* 4xx Client Error (ambers - brighter for dark mode) */
+  --http-400: #fbbf24;
+  --http-401: #fcc842;
+  --http-403: #fab606;
+  --http-404: #fccf5b;
+  --http-405: #e3a504;
+  --http-408: #fcd56f;
+  --http-409: #cf9604;
+  --http-410: #fddb83;
+  --http-422: #bb8803;
+  --http-429: #fddf92;
+  --http-4xx: #fbbf24;
 
   /* 5xx Server Error (purples - brighter for dark mode) */
   --http-500: #c084fc;
-  --http-501: #a855f7;
-  --http-502: #c084fc;
-  --http-503: #9333ea;
-  --http-504: #a855f7;
+  --http-501: #cfa2fd;
+  --http-502: #b166fb;
+  --http-503: #dcbbfd;
+  --http-504: #a44dfb;
   --http-5xx: #c084fc;
 
    --http-incomplete: #8d9878;
-  --http-client-error: #a78bfa;
+  --http-client-error: #f472b6;
 }
 
 /* Auto dark mode (respects system preference when no explicit theme is set) */
@@ -331,42 +336,42 @@
     --gap-label-color: #9e9e9e;
 
     /* HTTP Status Code Colors (dark theme - brighter for visibility) */
-    --http-200: #4caf50;
-    --http-201: #66bb6a;
-    --http-202: #43a047;
-    --http-204: #26a69a;
-    --http-2xx: #4caf50;
+    --http-200: #2ea043;
+    --http-201: #35b84d;
+    --http-202: #278839;
+    --http-204: #3ec858;
+    --http-2xx: #2ea043;
 
-    --http-301: #29b6f6;
-    --http-302: #4dd0e1;
-    --http-304: #7c4dff;
-    --http-307: #00e5ff;
-    --http-308: #448aff;
-    --http-3xx: #29b6f6;
+    --http-301: #22d3ee;
+    --http-302: #3ed9f0;
+    --http-304: #11c5e0;
+    --http-307: #56ddf2;
+    --http-308: #0fb0c8;
+    --http-3xx: #22d3ee;
 
-    /* 4xx Client Error (reds - brighter for dark mode) */
-    --http-400: #f87171;
-    --http-401: #ef4444;
-    --http-403: #fca5a5;
-    --http-404: #ef4444;
-    --http-405: #dc2626;
-    --http-408: #f87171;
-    --http-409: #f87171;
-    --http-410: #dc2626;
-    --http-422: #ef4444;
-    --http-429: #fca5a5;
-    --http-4xx: #f87171;
+    /* 4xx Client Error (ambers - brighter for dark mode) */
+    --http-400: #fbbf24;
+    --http-401: #fcc842;
+    --http-403: #fab606;
+    --http-404: #fccf5b;
+    --http-405: #e3a504;
+    --http-408: #fcd56f;
+    --http-409: #cf9604;
+    --http-410: #fddb83;
+    --http-422: #bb8803;
+    --http-429: #fddf92;
+    --http-4xx: #fbbf24;
 
     /* 5xx Server Error (purples - brighter for dark mode) */
     --http-500: #c084fc;
-    --http-501: #a855f7;
-    --http-502: #c084fc;
-    --http-503: #9333ea;
-    --http-504: #a855f7;
+    --http-501: #cfa2fd;
+    --http-502: #b166fb;
+    --http-503: #dcbbfd;
+    --http-504: #a44dfb;
     --http-5xx: #c084fc;
 
       --http-incomplete: #8d9878;
-    --http-client-error: #a78bfa;
+    --http-client-error: #f472b6;
   }
 }
 
@@ -451,5 +456,5 @@ select:focus,
 button:focus-visible {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-primary-muted);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }

@@ -9,8 +9,8 @@ import { extractCategory } from './listingEntries';
 // ponytail: fixed palette, distinct hues that read on both the light and dark
 // log backgrounds. Wraps if there are ever more processes than colours.
 const PALETTE = [
+  '#0dbd8b', // Element green: the main app lane, matching the Compound accent
   '#3b82f6', // blue
-  '#10b981', // green
   '#f59e0b', // amber
   '#ec4899', // pink
   '#8b5cf6', // violet
@@ -23,7 +23,7 @@ const PALETTE = [
  * Base colour of the main app (console) lane. The app-state bars are shades of
  * this — see `appStateColors`. Matches the colour the `console` process gets
  * from {@link buildProcessColorMap} (it sorts first), so the app lane reads as
- * "the blue stream" just like in multi-process view.
+ * "the green stream" just like in multi-process view.
  */
 export const APP_LANE_COLOR = PALETTE[0];
 

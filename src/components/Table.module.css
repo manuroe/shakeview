@@ -83,58 +83,89 @@
     color: var(--color-warning-text);
 }
 
-.badgeIncomplete {
-    background: var(--http-incomplete);
-    color: white;
+/* HTTP status badges: a tint of the status colour with a ring of the full
+   colour, and theme text on top, so the label reads in both themes whatever
+   the status shade (WCAG 1.4.3 for the text, 1.4.11 for the ring). */
+.badgeIncomplete,
+.badgeClientError,
+.badgeHttp200,
+.badgeHttp201,
+.badgeHttp202,
+.badgeHttp204,
+.badgeHttp2xx,
+.badgeHttp301,
+.badgeHttp302,
+.badgeHttp304,
+.badgeHttp307,
+.badgeHttp308,
+.badgeHttp3xx,
+.badgeHttp400,
+.badgeHttp401,
+.badgeHttp403,
+.badgeHttp404,
+.badgeHttp405,
+.badgeHttp408,
+.badgeHttp409,
+.badgeHttp410,
+.badgeHttp422,
+.badgeHttp429,
+.badgeHttp4xx,
+.badgeHttp500,
+.badgeHttp501,
+.badgeHttp502,
+.badgeHttp503,
+.badgeHttp504,
+.badgeHttp5xx {
+    background: color-mix(in srgb, var(--badge-c) 16%, transparent);
+    box-shadow: inset 0 0 0 1px var(--badge-c);
+    color: var(--text-primary);
 }
 
-.badgeClientError {
-    background: var(--http-client-error);
-    color: white;
-}
+.badgeIncomplete { --badge-c: var(--http-incomplete); }
+.badgeClientError { --badge-c: var(--http-client-error); }
 
-/* HTTP Status Code Badge Styles (solid background with contrasting text) */
-/* 2xx Success codes - white text on green */
-.badgeHttp200 { background: var(--http-200); color: white; }
-.badgeHttp201 { background: var(--http-201); color: white; }
-.badgeHttp202 { background: var(--http-202); color: white; }
-.badgeHttp204 { background: var(--http-204); color: white; }
-.badgeHttp2xx { background: var(--http-2xx); color: white; }
+/* 2xx Success */
+.badgeHttp200 { --badge-c: var(--http-200); }
+.badgeHttp201 { --badge-c: var(--http-201); }
+.badgeHttp202 { --badge-c: var(--http-202); }
+.badgeHttp204 { --badge-c: var(--http-204); }
+.badgeHttp2xx { --badge-c: var(--http-2xx); }
 
-/* 3xx Redirect codes - white text on blue/cyan */
-.badgeHttp301 { background: var(--http-301); color: white; }
-.badgeHttp302 { background: var(--http-302); color: white; }
-.badgeHttp304 { background: var(--http-304); color: white; }
-.badgeHttp307 { background: var(--http-307); color: #1a1a2e; }
-.badgeHttp308 { background: var(--http-308); color: white; }
-.badgeHttp3xx { background: var(--http-3xx); color: white; }
+/* 3xx Redirect */
+.badgeHttp301 { --badge-c: var(--http-301); }
+.badgeHttp302 { --badge-c: var(--http-302); }
+.badgeHttp304 { --badge-c: var(--http-304); }
+.badgeHttp307 { --badge-c: var(--http-307); }
+.badgeHttp308 { --badge-c: var(--http-308); }
+.badgeHttp3xx { --badge-c: var(--http-3xx); }
 
-/* 4xx Client Error codes - dark text on orange/yellow (lighter colors) */
-.badgeHttp400 { background: var(--http-400); color: #1a1a2e; }
-.badgeHttp401 { background: var(--http-401); color: white; }
-.badgeHttp403 { background: var(--http-403); color: white; }
-.badgeHttp404 { background: var(--http-404); color: #1a1a2e; }
-.badgeHttp405 { background: var(--http-405); color: #1a1a2e; }
-.badgeHttp408 { background: var(--http-408); color: white; }
-.badgeHttp409 { background: var(--http-409); color: #1a1a2e; }
-.badgeHttp410 { background: var(--http-410); color: white; }
-.badgeHttp422 { background: var(--http-422); color: #1a1a2e; }
-.badgeHttp429 { background: var(--http-429); color: #1a1a2e; }
-.badgeHttp4xx { background: var(--http-4xx); color: #1a1a2e; }
+/* 4xx Client Error */
+.badgeHttp400 { --badge-c: var(--http-400); }
+.badgeHttp401 { --badge-c: var(--http-401); }
+.badgeHttp403 { --badge-c: var(--http-403); }
+.badgeHttp404 { --badge-c: var(--http-404); }
+.badgeHttp405 { --badge-c: var(--http-405); }
+.badgeHttp408 { --badge-c: var(--http-408); }
+.badgeHttp409 { --badge-c: var(--http-409); }
+.badgeHttp410 { --badge-c: var(--http-410); }
+.badgeHttp422 { --badge-c: var(--http-422); }
+.badgeHttp429 { --badge-c: var(--http-429); }
+.badgeHttp4xx { --badge-c: var(--http-4xx); }
 
-/* 5xx Server Error codes - white text on red */
-.badgeHttp500 { background: var(--http-500); color: white; }
-.badgeHttp501 { background: var(--http-501); color: white; }
-.badgeHttp502 { background: var(--http-502); color: white; }
-.badgeHttp503 { background: var(--http-503); color: white; }
-.badgeHttp504 { background: var(--http-504); color: white; }
-.badgeHttp5xx { background: var(--http-5xx); color: white; }
+/* 5xx Server Error */
+.badgeHttp500 { --badge-c: var(--http-500); }
+.badgeHttp501 { --badge-c: var(--http-501); }
+.badgeHttp502 { --badge-c: var(--http-502); }
+.badgeHttp503 { --badge-c: var(--http-503); }
+.badgeHttp504 { --badge-c: var(--http-504); }
+.badgeHttp5xx { --badge-c: var(--http-5xx); }
 
 /* Action link in tables */
 .actionLink {
     background: none;
     border: none;
-    color: var(--color-info);
+    min-height: 24px; /* WCAG 2.5.8 target size */
+    color: var(--color-primary);
     cursor: pointer;
     text-decoration: none;
     font-size: var(--font-size-sm);

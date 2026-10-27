@@ -356,10 +356,10 @@ export function BandwidthHistogramChart({
             />
 
             {/* ── Direction labels (right edge) ─────────────────────── */}
-            <text x={xMax - 4} y={10} textAnchor="end" fontSize={8} fill="#888" pointerEvents="none">
+            <text x={xMax - 4} y={10} textAnchor="end" fontSize={10} fill="#888" pointerEvents="none">
               ↑ Upload
             </text>
-            <text x={xMax - 4} y={yMax - 4} textAnchor="end" fontSize={8} fill="#888" pointerEvents="none">
+            <text x={xMax - 4} y={yMax - 4} textAnchor="end" fontSize={10} fill="#888" pointerEvents="none">
               ↓ Download
             </text>
 
@@ -388,7 +388,7 @@ export function BandwidthHistogramChart({
                   x={xScale(buckets[0].timeLabel) ?? 0}
                   y={yMax + 16}
                   textAnchor="start"
-                  fontSize={9}
+                  fontSize={10}
                   fill="#666"
                   pointerEvents="none"
                 >
@@ -398,7 +398,7 @@ export function BandwidthHistogramChart({
                   x={(xScale(buckets[buckets.length - 1].timeLabel) ?? 0) + xScale.bandwidth()}
                   y={yMax + 16}
                   textAnchor="end"
-                  fontSize={9}
+                  fontSize={10}
                   fill="#666"
                   pointerEvents="none"
                 >
@@ -414,7 +414,7 @@ export function BandwidthHistogramChart({
               stroke="#666"
               tickStroke="#666"
               tickFormat={(value) => formatBytes(value.valueOf())}
-              tickLabelProps={() => ({ fill: '#666', fontSize: 10, textAnchor: 'end', dx: -4 })}
+              tickLabelProps={() => ({ fill: '#666', fontSize: 11, textAnchor: 'end', dx: -4 })}
             />
             {/* ── Y-axis: download half (below zero) ──────────────────── */}
             <AxisLeft
@@ -423,9 +423,9 @@ export function BandwidthHistogramChart({
               stroke="#666"
               tickStroke="#666"
               tickFormat={(value) => formatBytes(value.valueOf())}
-              tickLabelProps={() => ({ fill: '#666', fontSize: 10, textAnchor: 'end', dx: -4 })}
+              tickLabelProps={() => ({ fill: '#666', fontSize: 11, textAnchor: 'end', dx: -4 })}
             />
-            <text x={-8} y={zeroY + 4} textAnchor="end" fontSize={10} fill="#666" pointerEvents="none">0</text>
+            <text x={-8} y={zeroY + 4} textAnchor="end" fontSize={11} fill="#666" pointerEvents="none">0</text>
 
             {/* ── Selection mode: two cursor lines + highlighted band ── */}
             {isSelecting && selectionStart && selectionEnd && (
@@ -435,20 +435,21 @@ export function BandwidthHistogramChart({
                   y={0}
                   width={Math.abs(selectionEnd.x - selectionStart.x)}
                   height={yMax}
-                  fill="rgba(33, 150, 243, 0.2)"
+                  fill="var(--color-primary)"
+                  fillOpacity={0.2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selectionStart.x - margin.left, y: 0 }}
                   to={{ x: selectionStart.x - margin.left, y: yMax }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selectionEnd.x - margin.left, y: 0 }}
                   to={{ x: selectionEnd.x - margin.left, y: yMax }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
@@ -456,8 +457,8 @@ export function BandwidthHistogramChart({
                   x={selectionStart.x - margin.left}
                   y={yMax + 20}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#2196f3"
+                  fontSize={11}
+                  fill="var(--color-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -467,8 +468,8 @@ export function BandwidthHistogramChart({
                   x={selectionEnd.x - margin.left}
                   y={yMax + 20}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#2196f3"
+                  fontSize={11}
+                  fill="var(--color-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -492,7 +493,7 @@ export function BandwidthHistogramChart({
                   x={Math.max(10, Math.min(xMax - 10, cursorX - margin.left))}
                   y={yMax + 16}
                   textAnchor="middle"
-                  fontSize={10}
+                  fontSize={11}
                   fill="#333"
                   fontWeight="bold"
                   pointerEvents="none"
@@ -521,7 +522,7 @@ export function BandwidthHistogramChart({
                     x={Math.max(10, Math.min(xMax - 10, timeToX(externalCursorTime)))}
                     y={yMax + 16}
                     textAnchor="middle"
-                    fontSize={10}
+                    fontSize={11}
                     fill="#333"
                     fontWeight="bold"
                     pointerEvents="none"
@@ -549,20 +550,21 @@ export function BandwidthHistogramChart({
                       y={0}
                       width={selEndX - selStartX}
                       height={yMax}
-                      fill="rgba(33, 150, 243, 0.2)"
+                      fill="var(--color-primary)"
+                      fillOpacity={0.2}
                       pointerEvents="none"
                     />
                     <Line
                       from={{ x: selStartX, y: 0 }}
                       to={{ x: selStartX, y: yMax }}
-                      stroke="#2196f3"
+                      stroke="var(--color-primary)"
                       strokeWidth={2}
                       pointerEvents="none"
                     />
                     <Line
                       from={{ x: selEndX, y: 0 }}
                       to={{ x: selEndX, y: yMax }}
-                      stroke="#2196f3"
+                      stroke="var(--color-primary)"
                       strokeWidth={2}
                       pointerEvents="none"
                     />
@@ -570,8 +572,8 @@ export function BandwidthHistogramChart({
                       x={selStartX}
                       y={yMax + 20}
                       textAnchor="middle"
-                      fontSize={10}
-                      fill="#2196f3"
+                      fontSize={11}
+                      fill="var(--color-primary)"
                       fontWeight="bold"
                       pointerEvents="none"
                     >
@@ -581,8 +583,8 @@ export function BandwidthHistogramChart({
                       x={selEndX}
                       y={yMax + 20}
                       textAnchor="middle"
-                      fontSize={10}
-                      fill="#2196f3"
+                      fontSize={11}
+                      fill="var(--color-primary)"
                       fontWeight="bold"
                       pointerEvents="none"
                     >
@@ -608,7 +610,7 @@ export function BandwidthHistogramChart({
                 color: 'white',
                 padding: '4px 6px',
                 borderRadius: '3px',
-                fontSize: '10px',
+                fontSize: '11px',
                 pointerEvents: 'none',
                 lineHeight: '1.3',
                 zIndex: 1000,

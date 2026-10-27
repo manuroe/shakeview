@@ -349,8 +349,8 @@ describe('LogActivityChart', () => {
 
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Look for selection cursors (blue lines with #2196f3 color)
-    const blueLines = container.querySelectorAll('line[stroke="#2196f3"]');
+    // Look for selection cursors (lines in the primary colour)
+    const blueLines = container.querySelectorAll('line[stroke="var(--color-primary)"]');
     
     // Should have at least 2 blue lines during selection (start and end cursors)
     expect(blueLines.length).toBeGreaterThanOrEqual(2);
@@ -373,7 +373,7 @@ describe('LogActivityChart', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     // Look for blue text labels on selection cursors
-    const textElements = container.querySelectorAll('text[fill="#2196f3"]');
+    const textElements = container.querySelectorAll('text[fill="var(--color-primary)"]');
     
     // Should have time labels for start and end cursors
     expect(textElements.length).toBeGreaterThanOrEqual(2);
@@ -404,7 +404,7 @@ describe('LogActivityChart', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     // Selection cursors should exist (solid blue lines)
-    const selectionCursors = container.querySelectorAll('line[stroke="#2196f3"]');
+    const selectionCursors = container.querySelectorAll('line[stroke="var(--color-primary)"]');
     expect(selectionCursors.length).toBeGreaterThan(0);
   });
 
@@ -557,11 +557,11 @@ describe('LogActivityChart', () => {
     );
 
     // A blue selection band (rect with blue fill) should appear
-    const selectionBand = container.querySelector('rect[fill="rgba(33, 150, 243, 0.2)"]');
+    const selectionBand = container.querySelector('rect[fill="var(--color-primary)"][fill-opacity="0.2"]');
     expect(selectionBand).toBeInTheDocument();
 
     // Two blue cursor lines should also appear
-    const blueLines = container.querySelectorAll('line[stroke="#2196f3"]');
+    const blueLines = container.querySelectorAll('line[stroke="var(--color-primary)"]');
     expect(blueLines.length).toBeGreaterThanOrEqual(2);
   });
 

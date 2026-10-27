@@ -286,17 +286,17 @@ export function HttpConcurrencyChart({
               numTicks={4}
               tickLabelProps={() => ({
                 fill: '#666',
-                fontSize: 10,
+                fontSize: 11,
                 textAnchor: 'end',
                 dx: -4,
               })}
             />
 
             {/* Start/end time labels */}
-            <text x={0} y={yMax + 16} textAnchor="start" fontSize={9} fill="#666" pointerEvents="none">
+            <text x={0} y={yMax + 16} textAnchor="start" fontSize={10} fill="#666" pointerEvents="none">
               {formatTime(minTime)}
             </text>
-            <text x={xMax} y={yMax + 16} textAnchor="end" fontSize={9} fill="#666" pointerEvents="none">
+            <text x={xMax} y={yMax + 16} textAnchor="end" fontSize={10} fill="#666" pointerEvents="none">
               {formatTime(maxTime)}
             </text>
 
@@ -324,27 +324,28 @@ export function HttpConcurrencyChart({
                   y={0}
                   width={Math.abs(selectionEnd.x - selectionStart.x)}
                   height={yMax}
-                  fill="rgba(33, 150, 243, 0.2)"
+                  fill="var(--color-primary)"
+                  fillOpacity={0.2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selectionStart.x - MARGIN.left, y: 0 }}
                   to={{ x: selectionStart.x - MARGIN.left, y: yMax }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selectionEnd.x - MARGIN.left, y: 0 }}
                   to={{ x: selectionEnd.x - MARGIN.left, y: yMax }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
-                <text x={selectionStart.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                <text x={selectionStart.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                   {formatTime(selectionStart.time)}
                 </text>
-                <text x={selectionEnd.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                <text x={selectionEnd.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                   {formatTime(selectionEnd.time)}
                 </text>
               </>
@@ -361,7 +362,7 @@ export function HttpConcurrencyChart({
                   pointerEvents="none"
                   strokeDasharray="4,2"
                 />
-                <text x={activeCursorX} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#333" fontWeight="bold" pointerEvents="none">
+                <text x={activeCursorX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="#333" fontWeight="bold" pointerEvents="none">
                   {activeCursorTime}
                 </text>
               </>
@@ -378,7 +379,7 @@ export function HttpConcurrencyChart({
                   pointerEvents="none"
                   strokeDasharray="4,2"
                 />
-                <text x={timeToX(externalCursorTime)} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#333" fontWeight="bold" pointerEvents="none">
+                <text x={timeToX(externalCursorTime)} y={yMax + 20} textAnchor="middle" fontSize={11} fill="#333" fontWeight="bold" pointerEvents="none">
                   {formatTime(externalCursorTime)}
                 </text>
               </>
@@ -390,13 +391,13 @@ export function HttpConcurrencyChart({
               const selEndX = timeToX(Math.max(externalSelection.startUs, externalSelection.endUs));
               return (
                 <>
-                  <rect x={selStartX} y={0} width={selEndX - selStartX} height={yMax} fill="rgba(33, 150, 243, 0.2)" pointerEvents="none" />
-                  <Line from={{ x: selStartX, y: 0 }} to={{ x: selStartX, y: yMax }} stroke="#2196f3" strokeWidth={2} pointerEvents="none" />
-                  <Line from={{ x: selEndX, y: 0 }} to={{ x: selEndX, y: yMax }} stroke="#2196f3" strokeWidth={2} pointerEvents="none" />
-                  <text x={selStartX} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                  <rect x={selStartX} y={0} width={selEndX - selStartX} height={yMax} fill="var(--color-primary)" fillOpacity={0.2} pointerEvents="none" />
+                  <Line from={{ x: selStartX, y: 0 }} to={{ x: selStartX, y: yMax }} stroke="var(--color-primary)" strokeWidth={2} pointerEvents="none" />
+                  <Line from={{ x: selEndX, y: 0 }} to={{ x: selEndX, y: yMax }} stroke="var(--color-primary)" strokeWidth={2} pointerEvents="none" />
+                  <text x={selStartX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                     {formatTime(Math.min(externalSelection.startUs, externalSelection.endUs))}
                   </text>
-                  <text x={selEndX} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                  <text x={selEndX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                     {formatTime(Math.max(externalSelection.startUs, externalSelection.endUs))}
                   </text>
                 </>
@@ -416,7 +417,7 @@ export function HttpConcurrencyChart({
               color: 'white',
               padding: '4px 6px',
               borderRadius: '3px',
-              fontSize: '10px',
+              fontSize: '11px',
               pointerEvents: 'none',
               lineHeight: '1.3',
               zIndex: 1000,
@@ -425,10 +426,10 @@ export function HttpConcurrencyChart({
             {tooltipData.statusCounts.map(({ key, count }) => (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
                 <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: getBucketColor(key), borderRadius: '1px' }} />
-                <span style={{ fontSize: '9px' }}>{getBucketLabel(key)}: {count}</span>
+                <span style={{ fontSize: '10px' }}>{getBucketLabel(key)}: {count}</span>
               </div>
             ))}
-            <div style={{ marginTop: '2px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '9px' }}>
+            <div style={{ marginTop: '2px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '10px' }}>
               In-flight: {tooltipData.total}
             </div>
           </div>

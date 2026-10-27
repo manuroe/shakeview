@@ -205,10 +205,10 @@ export function FileUpload() {
         </svg>
         <h2>Drop Rageshake Here</h2>
         <p>or click to browse</p>
-        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Supports .log, .log.gz or .tar.gz archive files
         </p>
-        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
           All log data is processed locally in your browser. No server interaction
         </p>
         {validationError && (

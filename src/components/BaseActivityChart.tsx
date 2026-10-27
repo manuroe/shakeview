@@ -349,7 +349,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                     x={-6}
                     y={laneY + LANE_HEIGHT - 1}
                     textAnchor="end"
-                    fontSize={9}
+                    fontSize={10}
                     fill="var(--text-muted, #888)"
                     pointerEvents="none"
                   >
@@ -398,7 +398,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
               tickStroke="#666"
               tickLabelProps={() => ({
                 fill: '#666',
-                fontSize: 9,
+                fontSize: 10,
                 textAnchor: 'middle',
               })}
             />
@@ -411,7 +411,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={xScale(buckets[0].timeLabel) ?? 0}
                   y={axisTop + 16}
                   textAnchor="start"
-                  fontSize={9}
+                  fontSize={10}
                   fill="#666"
                   pointerEvents="none"
                 >
@@ -422,7 +422,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={(xScale(buckets[buckets.length - 1].timeLabel) ?? 0) + (xScale.bandwidth() ?? 0)}
                   y={axisTop + 16}
                   textAnchor="end"
-                  fontSize={9}
+                  fontSize={10}
                   fill="#666"
                   pointerEvents="none"
                 >
@@ -438,7 +438,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
               tickFormat={yAxisTickFormat}
               tickLabelProps={() => ({
                 fill: '#666',
-                fontSize: 10,
+                fontSize: 11,
                 textAnchor: 'end',
                 dx: -4,
               })}
@@ -453,14 +453,15 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   y={0}
                   width={Math.abs(selectionEnd.x - selectionStart.x)}
                   height={axisTop}
-                  fill="rgba(33, 150, 243, 0.2)"
+                  fill="var(--color-primary)"
+                  fillOpacity={0.2}
                   pointerEvents="none"
                 />
                 {/* Start cursor */}
                 <Line
                   from={{ x: selectionStart.x - margin.left, y: 0 }}
                   to={{ x: selectionStart.x - margin.left, y: axisTop }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
@@ -468,7 +469,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                 <Line
                   from={{ x: selectionEnd.x - margin.left, y: 0 }}
                   to={{ x: selectionEnd.x - margin.left, y: axisTop }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
@@ -477,8 +478,8 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={selectionStart.x - margin.left}
                   y={axisTop + 20}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#2196f3"
+                  fontSize={11}
+                  fill="var(--color-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -488,8 +489,8 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={selectionEnd.x - margin.left}
                   y={axisTop + 20}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#2196f3"
+                  fontSize={11}
+                  fill="var(--color-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -514,7 +515,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={cursorX - margin.left}
                   y={axisTop + 20}
                   textAnchor="middle"
-                  fontSize={10}
+                  fontSize={11}
                   fill="#333"
                   fontWeight="bold"
                   pointerEvents="none"
@@ -539,7 +540,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={timeToX(externalCursorTime)}
                   y={axisTop + 20}
                   textAnchor="middle"
-                  fontSize={10}
+                  fontSize={11}
                   fill="#333"
                   fontWeight="bold"
                   pointerEvents="none"
@@ -562,20 +563,21 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   y={0}
                   width={selEndX - selStartX}
                   height={axisTop}
-                  fill="rgba(33, 150, 243, 0.2)"
+                  fill="var(--color-primary)"
+                  fillOpacity={0.2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selStartX, y: 0 }}
                   to={{ x: selStartX, y: axisTop }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selEndX, y: 0 }}
                   to={{ x: selEndX, y: axisTop }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
@@ -583,8 +585,8 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={selStartX}
                   y={axisTop + 20}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#2196f3"
+                  fontSize={11}
+                  fill="var(--color-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -594,8 +596,8 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   x={selEndX}
                   y={axisTop + 20}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#2196f3"
+                  fontSize={11}
+                  fill="var(--color-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -618,7 +620,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
               color: 'white',
               padding: '4px 6px',
               borderRadius: '3px',
-              fontSize: '10px',
+              fontSize: '11px',
               pointerEvents: 'none',
               lineHeight: '1.3',
               zIndex: 1000,

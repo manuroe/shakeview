@@ -101,7 +101,7 @@
 /* A Reported count, the tracked metric: red, still a link. */
 .summaryTable .clickableHeading.reported {
     font-weight: 700;
-    color: var(--log-level-error);
+    color: var(--color-error);
 }
 
 .summarySection h3 {
@@ -209,7 +209,7 @@
     margin: 0;
     font: inherit;
     cursor: pointer;
-    color: var(--color-info);
+    color: var(--color-primary);
     transition: color var(--transition-slow);
 }
 
@@ -227,6 +227,12 @@
 
 .sentrySectionAlert h2 {
     color: var(--color-error);
+}
+
+/* Theme text, not the green link colour, on the red alert background. */
+.sentrySectionAlert a,
+.sentrySectionAlert button {
+    color: var(--text-primary);
 }
 
 /* Log Activity Chart */

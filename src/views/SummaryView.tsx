@@ -740,12 +740,12 @@ export function SummaryView() {
                             {formatDuration(req.duration)}
                           </span>
                         </td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#007acc' }}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
                           <a
                             href={`#/http_requests?request_id=${req.id}`}
                             className={styles.actionLink}
                             title={req.id}
-                            style={{ textDecoration: 'underline', color: '#007acc' }}
+                            style={{ textDecoration: 'underline' }}
                           >
                             {req.id}
                           </a>

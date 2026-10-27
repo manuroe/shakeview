@@ -160,6 +160,7 @@
 .logContextInput:focus {
     outline: none;
     background: var(--color-primary-light);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .logContextInput:disabled {
