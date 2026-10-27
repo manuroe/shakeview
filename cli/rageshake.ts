@@ -28,6 +28,16 @@ import { stripLogPrefix } from '../src/utils/logMessageUtils.ts';
 import { SPANS_MARKER } from '../src/utils/spansParser.ts';
 import { alignLogcatFiles, isLogcatFile } from '../src/utils/logcatClockAlign.ts';
 import { isoToMicros, microsToISO, getMinMaxTimestamps, formatDuration } from '../src/utils/timeUtils.ts';
+import { deviceFromLoadedLogs } from '../src/utils/crypto/loadDevice.ts';
+import { buildCryptoModel } from '../src/utils/crypto/buildCryptoModel.ts';
+import { scopeSessions } from '../src/utils/crypto/scope.ts';
+import { sessionTime } from '../src/utils/crypto/sessionList.ts';
+import { sessionLanes, shareRecipients } from '../src/utils/crypto/timeline.ts';
+import { buildJourney, type JourneyState } from '../src/utils/crypto/journey.ts';
+import { lateOutcomeKey, utdOutcomeKey } from '../src/utils/crypto/decryptionSummary.ts';
+import { describeStep } from '../src/utils/crypto/describeStep.ts';
+import { plural } from '../src/utils/crypto/format.ts';
+import type { CryptoDevice, LineRef, MegolmSession } from '../src/utils/crypto/types.ts';
 import { cmdServe } from './serve.ts';
 import type { LogParserResult, ParsedLogLine, LifecycleEvent, HttpRequest } from '../src/types/log.types.ts';
 import type { TimestampMicros, ISODateTimeString } from '../src/types/time.types.ts';
@@ -46,6 +56,13 @@ Commands:
   slice    <path>              All lines in a time window (use with --last/--since/--from).
   http     <path>              HTTP requests: time, method, uri, status, duration.
   cycles   <path>              App lifecycle: event counts, cold starts/crashes, app-state segments.
+  megolm   <path> [<path>...]  Megolm sessions (room keys) across rageshakes: the first is the main device,
+                               the others added devices — the sender's rageshake, typically. Lists every
+                               session, newest first, with each archive's outcome: utd:<reason>×N still
+                               failing, late:<how>×N decrypted later, outbound (it sent the key, and to how
+                               many devices), key_received. With --event or --session: that session's
+                               verdict, checklist, UTD events, recipients with delivery, and step timeline.
+                               Refs are what grep prints on that archive; "2:f3" = f3 of the 2nd archive.
   serve    [dir]               Serve the viewer + a directory of rageshakes on http://127.0.0.1:7357
                                (default dir: the working directory), so a log line can be opened by
                                URL: /#/logs?archive=/<path-under-dir>/x.tar.gz&file=<log>&line=<N>.
@@ -55,7 +72,7 @@ Commands:
                                resolve (drop it and all logs open merged instead). Runs until
                                stopped; starting it twice reuses the first server. Flag: --port <N>
 
-Time window (grep, slice, http, overview, lastseen, spans, cycles):
+Time window (grep, slice, http, overview, lastseen, spans, cycles, megolm list — on the main archive):
   --from <ISO>                 Start timestamp, e.g. 2026-01-15T10:00:00Z
   --to <ISO>                   End timestamp
   --since <anchor|ISO>         last-cold-start | last-foreground | last-background, or an ISO timestamp
@@ -68,6 +85,13 @@ Filters:
   --errors                     Only failed requests: HTTP >= 400 or transport error (http)
   --slowest <N>                N slowest requests, sorted by duration (http)
   --top <N|all>                Per-file table: N noisiest files or "all" (summary, default 5)
+  --utd                        Only sessions with a UTD on some device (megolm)
+  --event <id>                 The session of this UTD, in full (megolm). Ids here are aliases ($event-…,
+                               !room-…, @user-…) or any text holding one, e.g. a permalink: a raw id never
+                               matches. The user's bug report (summary userText) usually has them aliased
+  --session <id>               This session in full (megolm)
+  --room <id>                  Only sessions in this room (megolm)
+  --sender <id>                Only sessions this user sent (megolm)
 
 Pagination (all line/tree output is capped, never unbounded):
   --count                      Counts + a time distribution instead of lines (grep, slice). Probe with this
@@ -232,6 +256,11 @@ interface Flags {
   count?: boolean;
   width?: string;
   spans?: boolean;
+  utd?: boolean;
+  event?: string;
+  session?: string;
+  room?: string;
+  sender?: string;
 }
 
 const DUR_RE = /^(\d+)(s|m|h|d)$/;
@@ -681,12 +710,14 @@ export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
   const shownFiles = sortedFiles.slice(0, topN);
 
   return JSON.stringify({
-    // Identity fields (user_id, device_id) are deliberately omitted: device_id
-    // is not a Matrix identifier so the anonymizer never rewrites it, and precheck
-    // doesn't catch it — echoing it would leak a stable id into LLM-bound output.
-    // user_id is already an alias in the anonymized log lines, so it adds nothing.
     details: details && {
       userText: details.userText,
+      // Who the device is, so a UTD's sender and receiver can be told apart. The
+      // device id and curve key are not aliased, but the logs print both raw anyway
+      // (share recipients, setLoggedIn, sender_key), so this leaks nothing new.
+      userId: details.userId,
+      deviceId: details.deviceId,
+      deviceKeys: details.deviceKeys,
       app: details.appId,
       version: details.version,
       // Element Web sends no sdk_sha; its crypto-wasm lines name the SDK checkout.
@@ -1175,6 +1206,220 @@ export function cmdCycles(ing: Ingest, flags: Flags): string {
 }
 
 // ---------------------------------------------------------------------------
+// megolm
+// ---------------------------------------------------------------------------
+
+/** One archive given to `megolm`: the path as typed (for the next-command hints) and its ingest. */
+export interface MegolmArchive {
+  readonly path: string;
+  readonly ing: Ingest;
+}
+
+const ID_ALIAS_RE = { event: /\$event-[0-9a-f]{12}/, room: /!room-[0-9a-f]{12}/, sender: /@user-[0-9a-f]{12}/ } as const;
+const ID_SIGIL = { event: '$event-…', room: '!room-…', sender: '@user-…' } as const;
+
+/** An id without its domain alias: what an alias flag matches on, so `!room-x` finds `!room-x:domain-y.org`. */
+const idKey = (id: string | undefined): string | undefined => id?.split(':')[0];
+
+/**
+ * The alias an id flag names, taken from an alias or any text holding one (a
+ * permalink, percent-encoded or not). A raw id never matches the archive's
+ * aliases without the anonymizer's salt, which the CLI never has, so it is refused.
+ */
+function aliasFlag(text: string, kind: keyof typeof ID_ALIAS_RE): string {
+  const m = ID_ALIAS_RE[kind].exec(decodeIdentifier(text));
+  if (!m) throw new Error(`--${kind} needs an anonymized id (${ID_SIGIL[kind]}) or a permalink holding one: a raw id can never match the archive's aliases — alias it in shakeview first`);
+  return m[0];
+}
+
+const JOURNEY_MARK: Readonly<Record<JourneyState, string>> = { ok: '✓', fail: '✗', unknown: '?', note: '·' };
+
+/**
+ * Megolm sessions across one or more rageshakes: the first archive is the main
+ * device, the others added devices (the sender's rageshake, typically), as on
+ * /decryption?archive=A&archive=B. Without --event/--session, a list of sessions,
+ * newest first, with each archive's outcome; with one, that session's verdict,
+ * checklist, events, recipients and step timeline.
+ */
+export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {}): string {
+  // Every archive, not just the main one: the agent's precheck habit covers the main archive only.
+  for (const a of archives) {
+    const { ok, report } = cmdPrecheck(a.ing);
+    if (!ok) throw new Error(`${a.path} fails precheck — anonymize it with shakeview first:\n${report}`);
+  }
+  const devices = archives.map((a) => deviceFromLoadedLogs(basename(a.path), a.ing.merged.rawLogLines, a.ing.details));
+  if (new Set(devices.map((d) => d.id)).size < devices.length) throw new Error('two archives share a file name: rename one, the name tells devices apart');
+  const num = new Map(devices.map((d, i) => [d.id, i + 1]));
+  const model = buildCryptoModel(devices, { includeHealthy: true });
+
+  // Refs are what `grep` prints on that archive; an added archive's carry its position.
+  const tagsOf = archives.map((a) => (a.ing.files.length > 1 ? fileTags(a.ing) : null));
+  const cited = new Map<string, string>();
+  const ref = (r: LineRef): string => {
+    const i = (num.get(r.archive) ?? 1) - 1;
+    const tag = tagsOf[i]?.get(r.file);
+    const where = i === 0 ? tag ?? '' : `${i + 1}${tag ? `:${tag}` : ''}`;
+    if (tag) cited.set(i === 0 ? tag : where, i === 0 ? basename(r.file) : `${devices[i].id}/${basename(r.file)}`);
+    return `[${r.line - (archives[i].ing.offsets.get(r.file) ?? 0)}${where ? `|${where}` : ''}]`;
+  };
+
+  const out: string[] = [];
+  out.push(`# devices: ${devices.map((d, i) => {
+    const who = d.identity.userId ? `${d.identity.userId} ${d.identity.deviceId ?? '?'}` : 'identity unknown';
+    return `${i + 1}=${d.id} ${who}${i === 0 ? ' (main)' : ''}`;
+  }).join(' · ')}`);
+  const nexts = (what: string) => archives.map((a) => `# next: ./rs grep ${a.path} ${what}`);
+
+  if (flags.event || flags.session) {
+    let session: MegolmSession | undefined;
+    let mainId = devices[0].id;
+    if (flags.event) {
+      const ev = aliasFlag(flags.event, 'event');
+      for (const s of model) {
+        const u = s.utds.find((x) => idKey(x.eventId) === ev);
+        if (u) {
+          session = s;
+          // Judge the device that failed the event asked about: buildJourney keeps only its receiver's UTDs.
+          mainId = u.deviceId;
+          break;
+        }
+      }
+      if (!session) return [...out, `# no UTD for ${ev} in the loaded logs: it may have decrypted fine`, ...nexts(`'${ev}'`)].join('\n');
+    } else {
+      session = model.find((s) => s.sessionId === flags.session);
+      if (!session) return [...out, `# no megolm session ${flags.session} in the loaded logs`].join('\n');
+    }
+    emitMegolmSession(out, session, devices, mainId, num, ref, flags);
+    out.push(...nexts(session.sessionId));
+    if (cited.size > 0) out.splice(1, 0, `# files: ${[...cited].map(([t, f]) => `${t}=${f}`).join(' · ')}`);
+    return out.join('\n');
+  }
+
+  const range = resolveRange(archives[0].ing.merged, flags, (m) => out.push(m));
+  const room = flags.room ? aliasFlag(flags.room, 'room') : undefined;
+  const sender = flags.sender ? aliasFlag(flags.sender, 'sender') : undefined;
+  const sessions = (range ? scopeSessions(model, range.startUs, range.endUs) : model)
+    .filter((s) => !flags.utd || s.utds.length > 0)
+    .filter((s) => !room || idKey(s.roomId) === room)
+    .filter((s) => !sender || idKey(s.sender.userId) === sender || s.utds.some((u) => u.steps.some((x) => idKey(x.keys.userId) === sender)))
+    .map((s) => ({ s, ts: sessionTime(s) }))
+    .sort((a, b) => b.ts - a.ts);
+
+  const totals = devices.map((d, i) => {
+    const mine = sessions.filter(({ s }) => (s.stepsByDevice[d.id]?.length ?? 0) > 0);
+    const utds = mine.flatMap(({ s }) => s.utds.filter((u) => u.deviceId === d.id));
+    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')} (${utds.filter((u) => u.analytics.category === 'reported').length} seen)`;
+  });
+  out.push(`# ${plural(sessions.length, 'session')}${flags.utd ? ' with a UTD' : ''}, newest first · ${totals.join(' · ')}`);
+  out.push('# time room session · sender (archive, how found) · per archive: utd:<reason>×N still failing, late:<how>×N decrypted later (seen = reached the UI)');
+
+  const limit = intFlag(flags.limit, LINE_LIMIT);
+  const offset = intFlag(flags.offset, 0);
+  const page = sessions.slice(offset, offset + limit);
+  let lastDay = '';
+  for (const { s, ts } of page) {
+    lastDay = pushDayMarker(out, ts, lastDay);
+    const from = s.sender.loadedId ? `${num.get(s.sender.loadedId)}, by ${s.senderSource}` : 'not loaded';
+    const perArchive = devices.flatMap((d, i) => {
+      const outcome = archiveOutcome(s, d);
+      return outcome ? [`${i + 1}: ${outcome}`] : [];
+    });
+    out.push(`${clockOf(ts)} ${s.roomId ?? '?'} ${s.sessionId} · sender ${s.sender.userId ?? '?'}${s.sender.deviceId ? ` ${s.sender.deviceId}` : ''} (${from}) · ${perArchive.join(' · ')}`);
+  }
+  const remaining = sessions.length - offset - page.length;
+  if (remaining > 0) out.push(`# ${remaining} more sessions — next: --offset ${offset + page.length}`);
+  if (page.length === 0) {
+    out.push(sessions.length === 0 ? '# no megolm sessions' : `# --offset ${offset} is past the end (${sessions.length} sessions) — lower --offset`);
+  }
+  return out.join('\n');
+}
+
+/** One archive's part of a session row: outbound and how widely shared, its UTDs by outcome, or that it got the key. */
+function archiveOutcome(s: MegolmSession, d: CryptoDevice): string {
+  const parts: string[] = [];
+  if (s.sender.loadedId === d.id) {
+    const { deviceCount } = shareRecipients(s.stepsByDevice[d.id] ?? [], d.identity.userId);
+    parts.push(deviceCount > 0 ? `outbound, shared to ${plural(deviceCount, 'device')}` : 'outbound, no share logged');
+  }
+  const utds = s.utds.filter((u) => u.deviceId === d.id);
+  if (utds.length > 0) {
+    const byKey = new Map<string, number>();
+    for (const u of utds) {
+      const k = u.resolution.state === 'resolved' ? lateOutcomeKey(u.resolution.by) : utdOutcomeKey(u.reason);
+      byKey.set(k, (byKey.get(k) ?? 0) + 1);
+    }
+    const seen = utds.filter((u) => u.analytics.category === 'reported').length;
+    const unknown = utds.filter((u) => u.analytics.category === 'unknown').length;
+    parts.push(`${[...byKey].map(([k, n]) => `${k}×${n}`).join(' ')} (${seen} seen${unknown > 0 ? `, ${unknown} ?` : ''})`);
+  } else if (parts.length === 0 && (s.stepsByDevice[d.id] ?? []).some((x) => x.kind === 'roomkey.received')) {
+    parts.push('key_received');
+  }
+  return parts.join(' ');
+}
+
+/** One session in full: verdict and checklist (buildJourney), events, recipients with delivery, step timeline. */
+function emitMegolmSession(
+  out: string[], session: MegolmSession, devices: readonly CryptoDevice[], mainId: string,
+  num: ReadonlyMap<string, number>, ref: (r: LineRef) => string, flags: Flags,
+): void {
+  const limit = intFlag(flags.limit, LINE_LIMIT);
+  const offset = intFlag(flags.offset, 0);
+  const { sender, receiver } = sessionLanes(session, devices, mainId);
+  const j = buildJourney(session, sender, receiver);
+  const who = (d: CryptoDevice | undefined) => (d ? `${num.get(d.id)} ${d.identity.userId ?? '?'} ${d.identity.deviceId ?? '?'}` : 'not loaded');
+  out.push(`# session ${session.sessionId} · room ${session.roomId ?? '?'}`);
+  out.push(`# sender ${sender ? who(sender) : `${session.sender.userId ?? '?'} ${session.sender.deviceId ?? '?'} (not loaded)`} (by ${session.senderSource}) · receiver ${who(receiver)}`);
+  out.push(`verdict: ${j.verdict}`);
+  out.push(`basis: ${j.basis}`);
+  for (const l of j.lines) {
+    out.push(`${JOURNEY_MARK[l.state]} ${l.label} — ${l.detail}${l.ref ? ` ${ref(l.ref)}` : ''}${l.decisive ? ' ← decisive' : ''}`);
+  }
+
+  // `from` given = paged by --offset (the timeline, the longest section); else capped only.
+  const capped = <T>(title: string, items: readonly T[], line: (x: T) => string, from?: number): void => {
+    if (items.length === 0) return;
+    out.push(title);
+    const start = from ?? 0;
+    const page = items.slice(start, start + limit);
+    for (const x of page) out.push(line(x));
+    const more = items.length - start - page.length;
+    if (more > 0) out.push(`# ${more} more${from !== undefined ? ` — next: --offset ${start + page.length}` : ''}`);
+  };
+
+  capped(`events (${j.events.length}, first failure first):`, j.events, (e) => `${e.ok ? '✓' : '✗'} ${clockOf(e.ts)} ${e.eventId} ${e.text} ${ref(e.ref)}`);
+
+  if (sender) {
+    const steps = session.stepsByDevice[sender.id] ?? [];
+    const shares = steps.filter((x) => x.kind === 'share.encrypt');
+    const { users, deviceCount } = shareRecipients(steps, sender.identity.userId);
+    const recipients = users.flatMap(([userId, ids]) => ids.map((deviceId) => ({ userId, deviceId })));
+    capped(`recipients (${plural(deviceCount, 'device')}, from archive ${num.get(sender.id)}'s shares):`, recipients, ({ userId, deviceId }) => {
+      const share = shares.filter((x) => x.keys.recipients?.some(([u, d]) => u === userId && d === deviceId)).pop();
+      const link = session.deliveries.filter((x) => x.userId === userId && x.deviceId === deviceId).pop();
+      const parts = [`${userId} ${deviceId}`, `shared ${share ? `${clockOf(share.ts)} ${ref(share.line)}` : '?'}`];
+      if (link) {
+        parts.push(`msgid ${link.messageId}`);
+        if (link.http) parts.push(`/sendToDevice ${link.http.keys.status ?? '?'}`);
+        if (link.received) parts.push(`received by ${num.get(link.receiverId ?? '')} ${clockOf(link.received.ts)} ${ref(link.received.line)}`);
+        else if (link.receiverId) parts.push(`not in archive ${num.get(link.receiverId)}'s logs`);
+      }
+      return parts.join(' · ');
+    });
+    if (recipients.length > 0) out.push('# withheld codes per device are not logged; shares older than the logs are not visible');
+  }
+
+  const decisive = j.lines.find((l) => l.decisive)?.ref;
+  const timeline = Object.values(session.stepsByDevice).flat().sort((a, b) => a.ts - b.ts);
+  let lastDay = '';
+  capped(`timeline (${plural(timeline.length, 'step')}, time order: time archive step):`, timeline, (x) => {
+    const marker: string[] = [];
+    lastDay = pushDayMarker(marker, x.ts, lastDay);
+    const mark = decisive && decisive.archive === x.line.archive && decisive.file === x.line.file && decisive.line === x.line.line ? ' ← decisive' : '';
+    return [...marker, `${clockOf(x.ts)} ${num.get(x.line.archive)} ${describeStep(x)} ${ref(x.line)}${mark}`].join('\n');
+  }, offset);
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
@@ -1199,19 +1444,24 @@ export function run(argv: string[]): { code: number; output: string } {
       count: { type: 'boolean' },
       width: { type: 'string' },
       spans: { type: 'boolean' },
+      utd: { type: 'boolean' },
+      event: { type: 'string' },
+      session: { type: 'string' },
+      room: { type: 'string' },
+      sender: { type: 'string' },
     },
   });
   const [cmd, path] = positionals;
   // Every positional after the path is a grep pattern: one call can carry the
   // whole candidate set, instead of a shell loop that re-reads, gunzips and
-  // re-parses the entire archive once per pattern.
+  // re-parses the entire archive once per pattern. For megolm, more archives.
   const patterns = positionals.slice(2);
   if (!cmd || !path) return { code: 2, output: USAGE };
   const flags = values as Flags;
 
   // Validate the command (and grep's pattern) before touching the filesystem, so
   // a typo'd command surfaces the usage message rather than a parse/IO error.
-  const known = ['precheck', 'summary', 'overview', 'lastseen', 'spans', 'grep', 'slice', 'http', 'cycles'];
+  const known = ['precheck', 'summary', 'overview', 'lastseen', 'spans', 'grep', 'slice', 'http', 'cycles', 'megolm'];
   if (!known.includes(cmd)) return { code: 2, output: `unknown command "${cmd}"\n\n${USAGE}` };
   if (cmd === 'grep' && patterns.length === 0) return { code: 2, output: 'grep needs at least one pattern: rageshake grep <path> <pattern>...' };
 
@@ -1228,6 +1478,7 @@ export function run(argv: string[]): { code: number; output: string } {
     case 'grep': return { code: 0, output: cmdGrep(ing, patterns, flags) };
     case 'slice': return { code: 0, output: cmdSlice(ing, flags) };
     case 'http': return { code: 0, output: cmdHttp(ing, flags) };
+    case 'megolm': return { code: 0, output: cmdMegolm([{ path, ing }, ...patterns.map((p) => ({ path: p, ing: loadInput(p) }))], flags) };
     default: return { code: 0, output: cmdCycles(ing, flags) };
   }
 }
