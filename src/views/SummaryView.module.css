@@ -38,6 +38,28 @@
     composes: section from '../components/Card.module.css';
 }
 
+/* A card per domain (Logs, Decryption, HTTP, Sync) so the page reads as
+   sections rather than one long column. */
+.group {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-2xl);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+}
+
+.group > :last-child,
+.group > :last-child > :last-child {
+    margin-bottom: 0;
+}
+
+.groupTitle {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 12px;
+}
+
 .fileName {
     font-size: var(--font-size-sm);
     color: var(--text-muted);
@@ -51,8 +73,8 @@
 }
 
 .summarySection h2 {
-    font-size: var(--font-size-base);
-    font-weight: 500;
+    font-size: var(--font-size-md);
+    font-weight: 600;
     margin-bottom: 8px;
     color: var(--text-secondary);
 }
@@ -198,6 +220,16 @@
 
 .actionLink {
     composes: actionLink from '../components/Table.module.css';
+}
+
+/* A status badge that navigates: keeps the badge look, drops button chrome. */
+.badgeButton {
+    border: none;
+    cursor: pointer;
+}
+
+.badgeButton:hover {
+    text-decoration: underline;
 }
 
 .clickableHeading {

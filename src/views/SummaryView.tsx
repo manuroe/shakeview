@@ -322,389 +322,73 @@ export function SummaryView() {
       </div>
 
       <div className="content">
-        {/* Log Overview */}
-        <section className={styles.summarySection}>
-          <h2>Logs: {stats.totalLogLines} lines</h2>
-          
-          {/* Activity Chart */}
-          <div className={styles.activityChartContainer}>
-            <LogActivityChart
-              logLines={stats.filteredLogLines}
-              sentryEvents={stats.sentryEvents}
-              markers={stats.lifecycleEvents}
-              onTimeRangeSelected={handleTimeRangeSelected}
-              onResetZoom={handleResetZoom}
-              externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
-              externalSelection={enableChartSync ? sharedSelection : undefined}
-              onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
-              onSelectionChange={enableChartSync ? setSharedSelection : undefined}
-            />
-          </div>
-        </section>
-
-        {/* Sentry Reports Section */}
-        {stats.sentryEvents.length > 0 && (
-          <section className={styles.sentrySectionAlert}>
-            <div className={styles.summaryTableContainer}>
-              <table className={styles.summaryTable}>
-                <thead>
-                  <tr>
-                    <th>
-                      Sentry Reports (
-                      <button
-                        type="button"
-                        className={styles.clickableHeading}
-                        onClick={() => navigate('/logs?filter=sentry')}
-                        aria-label="View Sentry reports in logs"
-                      >
-                        {stats.sentryEvents.length}
-                      </button>
-                      )
-                    </th>
-                    <th>Sentry ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.sentryEvents.map((event) => (
-                    <tr key={event.sentryId ?? `line-${event.lineNumber}`}>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/logs?filter=${encodeURIComponent(event.sentryId ?? 'Sending error to Sentry')}`)}
-                          className={styles.actionLink}
-                          style={{ textAlign: 'left', whiteSpace: 'normal' }}
-                        >
-                          {event.message.substring(0, 150)}
-                        </button>
-                      </td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                        {event.sentryUrl && event.sentryId ? (
-                          <a
-                            href={event.sentryUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.actionLink}
-                          >
-                            {event.sentryId}
-                          </a>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {/* Errors & Warnings Section */}
-        <div className={styles.errorsWarningsGrid}>
-          {/* Errors Section */}
-          {stats.errors > 0 && (
-            <section className={styles.summarySection}>
-              {stats.errorsByType.length > 0 && (
-                <div className={styles.summaryTableContainer}>
-                  <table className={styles.summaryTable}>
-                    <thead>
-                      <tr>
-                        <th>
-                          Top Errors (
-                          <span
-                            className={styles.clickableHeading}
-                            onClick={() => navigate('/logs?filter=ERROR')}
-                          >
-                            {stats.errors}
-                          </span>
-                          )
-                        </th>
-                        <th style={{ textAlign: 'right' }}>Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stats.errorsByType.map((error, idx) => (
-                        <tr key={idx}>
-                          <td>
-                            <button
-                              className={styles.actionLink}
-                              title={error.type}
-                              onClick={() =>
-                                navigate(
-                                  `/logs?filter=${encodeURIComponent(
-                                    messageGroupFilter(error.type)
-                                  )}`
-                                )
-                              }
-                              style={{ textAlign: 'left', whiteSpace: 'normal' }}
-                            >
-                              {error.type.substring(0, 100)}
-                            </button>
-                          </td>
-                          <td className={styles.alignRight}>{error.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Warnings Section */}
-          {stats.warnings > 0 && (
-            <section className={styles.summarySection}>
-              {stats.warningsByType.length > 0 && (
-                <div className={styles.summaryTableContainer}>
-                  <table className={styles.summaryTable}>
-                    <thead>
-                      <tr>
-                        <th>
-                          Top Warnings (
-                          <span
-                            className={styles.clickableHeading}
-                            onClick={() => navigate('/logs?filter=WARN')}
-                          >
-                            {stats.warnings}
-                          </span>
-                          )
-                        </th>
-                        <th style={{ textAlign: 'right' }}>Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stats.warningsByType.map((warning, idx) => (
-                        <tr key={idx}>
-                          <td>
-                            <button
-                              className={styles.actionLink}
-                              title={warning.type}
-                              onClick={() =>
-                                navigate(
-                                  `/logs?filter=${encodeURIComponent(
-                                    messageGroupFilter(warning.type)
-                                  )}`
-                                )
-                              }
-                              style={{ textAlign: 'left', whiteSpace: 'normal' }}
-                            >
-                              {warning.type.substring(0, 100)}
-                            </button>
-                          </td>
-                          <td className={styles.alignRight}>{warning.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          )}
-        </div>
-
-        <DecryptionActivityCard
-          rawLogLines={rawLogLines}
-          filteredLogLines={stats.filteredLogLines}
-          onTimeRangeSelected={handleTimeRangeSelected}
-          onResetZoom={handleResetZoom}
-          externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
-          externalSelection={enableChartSync ? sharedSelection : undefined}
-          onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
-          onSelectionChange={enableChartSync ? setSharedSelection : undefined}
-        />
-
-        {/* HTTP Activity — unified section for requests + bandwidth charts */}
-        {hasHttpActivityData && (
+        {/* Logs: activity, Sentry reports, top errors and warnings */}
+        <div className={styles.group}>
+          <h2 className={styles.groupTitle}>Logs: {stats.totalLogLines} lines</h2>
           <section className={styles.summarySection}>
-            <div className={styles.httpActivityHeader}>
-              <h2>HTTP Activity</h2>
-              <select
-                className={styles.chartModeSelect}
-                aria-label="Chart display mode"
-                value={displayMode}
-                onChange={(e) => setDisplayMode(e.target.value as 'histogram' | 'stepArea')}
-                title="Starts: histogram of request initiations per time bucket. In-flight: step-function showing how many requests are simultaneously active at each moment."
-              >
-                <option value="histogram">Starts</option>
-                <option value="stepArea">In-flight</option>
-              </select>
-              <label className={styles.chartOption}>
-                <input
-                  type="checkbox"
-                  checked={showIncomplete}
-                  onChange={(e) => setShowIncomplete(e.target.checked)}
-                />
-                <span title="Show or hide requests that have not yet received a response (no status code).">
-                  Incomplete
-                </span>
-              </label>
-              <label className={styles.chartOption}>
-                <input
-                  type="checkbox"
-                  checked={showSync}
-                  onChange={(e) => setShowSync(e.target.checked)}
-                />
-                <span title="Show or hide Matrix /sync requests (catch-up and long-poll).">
-                  Sync
-                </span>
-              </label>
-              <label className={styles.chartOption}>
-                <input
-                  type="checkbox"
-                  checked={showMedia}
-                  onChange={(e) => setShowMedia(e.target.checked)}
-                />
-                <span title="Show or hide media upload/download requests (paths containing /media/). These are typically large and can compress the bandwidth scale.">
-                  Media
-                </span>
-              </label>
+            {/* Activity Chart */}
+            <div className={styles.activityChartContainer}>
+              <LogActivityChart
+                logLines={stats.filteredLogLines}
+                sentryEvents={stats.sentryEvents}
+                markers={stats.lifecycleEvents}
+                onTimeRangeSelected={handleTimeRangeSelected}
+                onResetZoom={handleResetZoom}
+                externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
+                externalSelection={enableChartSync ? sharedSelection : undefined}
+                onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
+                onSelectionChange={enableChartSync ? setSharedSelection : undefined}
+              />
             </div>
-            {stats.httpRequestsWithTimestamps.length > 0 && (
-              <>
-                <h3>
-                  Requests: {stats.httpRequestCount}
-                  {stats.incompleteRequestCount > 0 ? ` (Incomplete: ${stats.incompleteRequestCount})` : ''}
-                </h3>
-                <div className={styles.activityChartContainer}>
-                  <HttpActivityChart
-                    httpRequests={httpRequestsForChart}
-                    httpRequestSpans={httpRequestSpansForChart}
-                    displayMode={displayMode}
-                    timeRange={stats.chartTimeRange}
-                    markers={stats.lifecycleEvents}
-                    onTimeRangeSelected={handleTimeRangeSelected}
-                    onResetZoom={handleResetZoom}
-                    externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
-                    externalSelection={enableChartSync ? sharedSelection : undefined}
-                    onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
-                    onSelectionChange={enableChartSync ? setSharedSelection : undefined}
-                  />
-                </div>
-              </>
-            )}
-            {(stats.httpRequestsWithBandwidth.length > 0 || stats.bandwidthRequestSpans.length > 0) && (
-              <>
-                <h3>
-                  Overall bandwidth: ↑ {formatBytes(stats.totalUploadBytes)} / ↓ {formatBytes(stats.totalDownloadBytes)}
-                </h3>
-                <div className={styles.activityChartContainer}>
-                  <BandwidthChart
-                    requests={bandwidthRequestsForChart}
-                    bandwidthRequestSpans={bandwidthSpansForChart}
-                    displayMode={displayMode}
-                    timeRange={stats.chartTimeRange}
-                    markers={stats.lifecycleEvents}
-                    onTimeRangeSelected={handleTimeRangeSelected}
-                    onResetZoom={handleResetZoom}
-                    externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
-                    externalSelection={enableChartSync ? sharedSelection : undefined}
-                    onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
-                    onSelectionChange={enableChartSync ? setSharedSelection : undefined}
-                  />
-                </div>
-              </>
-            )}
           </section>
-        )}
 
-        {/* HTTP Errors Grid */}
-        <div className={styles.errorsWarningsGrid}>
-          {/* TOP HTTP Errors Section */}
-          {stats.topFailedUrls.length > 0 && (
-            <section className={styles.summarySection}>
-              <div className={styles.summaryTableContainer}>
-                  <table className={styles.summaryTable}>
-                    <thead>
-                      <tr>
-                        <th>
-                          Top Failed URLs (
-                          <span
-                            className={styles.clickableHeading}
-                            onClick={() => {
-                              const statuses = stats.httpErrorsByStatus.map(e => e.status);
-                              const hasClientErrors = stats.topFailedUrls.some(u => u.statuses.includes('Client Error'));
-                              if (hasClientErrors) statuses.push('Client Error');
-                              void navigate(`/http_requests?status=${encodeURIComponent(statuses.join(','))}`);
-                            }}
-                          >
-                            {stats.topFailedUrls.reduce((sum, e) => sum + e.count, 0)}
-                          </span>
-                          )
-                        </th>
-                        <th>Status</th>
-                        <th className={styles.alignRight}>Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        return stats.topFailedUrls.map((item, idx) => (
-                          <tr key={idx}>
-                            <td>
-                              <button
-                                className={styles.actionLink}
-                                title={item.uri}
-                                onClick={() => {
-                                  // Find all requests matching this URI with error status or client error
-                                  const matchingRequests = allHttpRequests.filter(req => {
-                                    if (req.uri !== item.uri) return false;
-                                    if (req.clientError) return true;
-                                    if (!req.status) return false;
-                                    const statusCode = parseInt(req.status, 10);
-                                    return statusCode >= 400;
-                                  });
-                                  
-                                  // If single occurrence, open with request_id param; else use filter param
-                                  if (matchingRequests.length === 1) {
-                                    void navigate(`/http_requests?request_id=${encodeURIComponent(matchingRequests[0].requestId)}`);
-                                  } else {
-                                    void navigate(`/http_requests?filter=${encodeURIComponent(item.uri)}`);
-                                  }
-                                }}
-                                style={{ textAlign: 'left', whiteSpace: 'normal' }}
-                              >
-                                {stripMatrixClientPath(item.uri)}
-                              </button>
-                            </td>
-                            <td>
-                              {item.statuses.map((status, i) => (
-                                <span key={status} className={`${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(status)}`]}`}>
-                                  {status}{i < item.statuses.length - 1 ? ' ' : ''}
-                                </span>
-                              ))}
-                            </td>
-                            <td className={styles.alignRight}>{item.count}</td>
-                          </tr>
-                        ));
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-            </section>
-          )}
-
-          {/* HTTP Errors Section */}
-          {stats.httpErrorsByStatus.length > 0 && (
-            <section className={styles.summarySection}>
+          {/* Sentry Reports Section */}
+          {stats.sentryEvents.length > 0 && (
+            <section className={styles.sentrySectionAlert}>
               <div className={styles.summaryTableContainer}>
                 <table className={styles.summaryTable}>
                   <thead>
                     <tr>
-                      <th>HTTP Error Codes</th>
-                      <th style={{ textAlign: 'right' }}>Count</th>
+                      <th>
+                        Sentry Reports (
+                        <button
+                          type="button"
+                          className={styles.clickableHeading}
+                          onClick={() => navigate('/logs?filter=sentry')}
+                          aria-label="View Sentry reports in logs"
+                        >
+                          {stats.sentryEvents.length}
+                        </button>
+                        )
+                      </th>
+                      <th>Sentry ID</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.httpErrorsByStatus.map((error, idx) => (
-                      <tr key={idx}>
-                        <td>
+                    {stats.sentryEvents.map((event) => (
+                      <tr key={event.sentryId ?? `line-${event.lineNumber}`}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                           <button
-                            className={`${styles.actionLink} ${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(error.status)}`]}`}
-                            onClick={() =>
-                              void navigate(`/http_requests?status=${error.status}`)
-                            }
+                            type="button"
+                            onClick={() => navigate(`/logs?filter=${encodeURIComponent(event.sentryId ?? 'Sending error to Sentry')}`)}
+                            className={styles.actionLink}
+                            style={{ textAlign: 'left', whiteSpace: 'normal' }}
                           >
-                            {error.status}
+                            {event.message.substring(0, 150)}
                           </button>
                         </td>
-                        <td className={styles.alignRight}>{error.count}</td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {event.sentryUrl && event.sentryId ? (
+                            <a
+                              href={event.sentryUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={styles.actionLink}
+                            >
+                              {event.sentryId}
+                            </a>
+                          ) : null}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -712,66 +396,393 @@ export function SummaryView() {
               </div>
             </section>
           )}
+
+          {/* Errors & Warnings Section */}
+          <div className={styles.errorsWarningsGrid}>
+            {/* Errors Section */}
+            {stats.errors > 0 && (
+              <section className={styles.summarySection}>
+                {stats.errorsByType.length > 0 && (
+                  <div className={styles.summaryTableContainer}>
+                    <table className={styles.summaryTable}>
+                      <thead>
+                        <tr>
+                          <th>
+                            Top Errors (
+                            <span
+                              className={styles.clickableHeading}
+                              onClick={() => navigate('/logs?filter=ERROR')}
+                            >
+                              {stats.errors}
+                            </span>
+                            )
+                          </th>
+                          <th style={{ textAlign: 'right' }}>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.errorsByType.map((error, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <button
+                                className={styles.actionLink}
+                                title={error.type}
+                                onClick={() =>
+                                  navigate(
+                                    `/logs?filter=${encodeURIComponent(
+                                      messageGroupFilter(error.type)
+                                    )}`
+                                  )
+                                }
+                                style={{ textAlign: 'left', whiteSpace: 'normal' }}
+                              >
+                                {error.type.substring(0, 100)}
+                              </button>
+                            </td>
+                            <td className={styles.alignRight}>{error.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Warnings Section */}
+            {stats.warnings > 0 && (
+              <section className={styles.summarySection}>
+                {stats.warningsByType.length > 0 && (
+                  <div className={styles.summaryTableContainer}>
+                    <table className={styles.summaryTable}>
+                      <thead>
+                        <tr>
+                          <th>
+                            Top Warnings (
+                            <span
+                              className={styles.clickableHeading}
+                              onClick={() => navigate('/logs?filter=WARN')}
+                            >
+                              {stats.warnings}
+                            </span>
+                            )
+                          </th>
+                          <th style={{ textAlign: 'right' }}>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.warningsByType.map((warning, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <button
+                                className={styles.actionLink}
+                                title={warning.type}
+                                onClick={() =>
+                                  navigate(
+                                    `/logs?filter=${encodeURIComponent(
+                                      messageGroupFilter(warning.type)
+                                    )}`
+                                  )
+                                }
+                                style={{ textAlign: 'left', whiteSpace: 'normal' }}
+                              >
+                                {warning.type.substring(0, 100)}
+                              </button>
+                            </td>
+                            <td className={styles.alignRight}>{warning.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
         </div>
 
-        {/* Slowest URLs Section */}
-        {stats.slowestHttpRequests.length > 0 && (
-          <section className={styles.summarySection}>
-            <h2>Slowest URLs</h2>
-            <div className={styles.summaryTableContainer}>
-              <table className={styles.summaryTable}>
-                <thead>
-                  <tr>
-                    <th>Duration</th>
-                    <th>Request</th>
-                    <th>URI</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const filtered = stats.slowestHttpRequests;
-                    return filtered.map((req) => {
-                      const badgeClass = req.status ? `badge${getHttpStatusBadgeClass(req.status)}` : 'badgeIncomplete';
-                      return (
-                      <tr key={req.id}>
-                        <td>
-                          <span className={styles.durationBadge}>
-                            {formatDuration(req.duration)}
-                          </span>
-                        </td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
-                          <a
-                            href={`#/http_requests?request_id=${req.id}`}
-                            className={styles.actionLink}
-                            title={req.id}
-                            style={{ textDecoration: 'underline' }}
-                          >
-                            {req.id}
-                          </a>
-                        </td>
-                        <td className={styles.uriCell}>
-                          {stripMatrixClientPath(req.uri)}
-                        </td>
-                        <td>
-                          <span className={`${tableStyles.badge} ${tableStyles[badgeClass]}`}>
-                            {req.status || 'incomplete'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                    });
-                  })()}
-                </tbody>
-              </table>
+        {/* Decryption: megolm keys, UTDs, late decryptions */}
+        <div className={styles.group}>
+          <h2 className={styles.groupTitle}>Decryption</h2>
+          <DecryptionActivityCard
+            rawLogLines={rawLogLines}
+            filteredLogLines={stats.filteredLogLines}
+            onTimeRangeSelected={handleTimeRangeSelected}
+            onResetZoom={handleResetZoom}
+            externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
+            externalSelection={enableChartSync ? sharedSelection : undefined}
+            onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
+            onSelectionChange={enableChartSync ? setSharedSelection : undefined}
+          />
+        </div>
+
+        {/* HTTP: activity, failures, slowest requests */}
+        {(hasHttpActivityData || stats.topFailedUrls.length > 0 || stats.httpErrorsByStatus.length > 0 || stats.slowestHttpRequests.length > 0) && (
+          <div className={styles.group}>
+            <h2 className={styles.groupTitle}>HTTP requests</h2>
+            {/* HTTP Activity — unified section for requests + bandwidth charts */}
+            {hasHttpActivityData && (
+              <section className={styles.summarySection}>
+                <div className={styles.httpActivityHeader}>
+                  <h2>HTTP Activity</h2>
+                  <select
+                    className={styles.chartModeSelect}
+                    aria-label="Chart display mode"
+                    value={displayMode}
+                    onChange={(e) => setDisplayMode(e.target.value as 'histogram' | 'stepArea')}
+                    title="Starts: histogram of request initiations per time bucket. In-flight: step-function showing how many requests are simultaneously active at each moment."
+                  >
+                    <option value="histogram">Starts</option>
+                    <option value="stepArea">In-flight</option>
+                  </select>
+                  <label className={styles.chartOption}>
+                    <input
+                      type="checkbox"
+                      checked={showIncomplete}
+                      onChange={(e) => setShowIncomplete(e.target.checked)}
+                    />
+                    <span title="Show or hide requests that have not yet received a response (no status code).">
+                      Incomplete
+                    </span>
+                  </label>
+                  <label className={styles.chartOption}>
+                    <input
+                      type="checkbox"
+                      checked={showSync}
+                      onChange={(e) => setShowSync(e.target.checked)}
+                    />
+                    <span title="Show or hide Matrix /sync requests (catch-up and long-poll).">
+                      Sync
+                    </span>
+                  </label>
+                  <label className={styles.chartOption}>
+                    <input
+                      type="checkbox"
+                      checked={showMedia}
+                      onChange={(e) => setShowMedia(e.target.checked)}
+                    />
+                    <span title="Show or hide media upload/download requests (paths containing /media/). These are typically large and can compress the bandwidth scale.">
+                      Media
+                    </span>
+                  </label>
+                </div>
+                {stats.httpRequestsWithTimestamps.length > 0 && (
+                  <>
+                    <h3>
+                      Requests: {stats.httpRequestCount}
+                      {stats.incompleteRequestCount > 0 ? ` (Incomplete: ${stats.incompleteRequestCount})` : ''}
+                    </h3>
+                    <div className={styles.activityChartContainer}>
+                      <HttpActivityChart
+                        httpRequests={httpRequestsForChart}
+                        httpRequestSpans={httpRequestSpansForChart}
+                        displayMode={displayMode}
+                        timeRange={stats.chartTimeRange}
+                        markers={stats.lifecycleEvents}
+                        onTimeRangeSelected={handleTimeRangeSelected}
+                        onResetZoom={handleResetZoom}
+                        externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
+                        externalSelection={enableChartSync ? sharedSelection : undefined}
+                        onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
+                        onSelectionChange={enableChartSync ? setSharedSelection : undefined}
+                      />
+                    </div>
+                  </>
+                )}
+                {(stats.httpRequestsWithBandwidth.length > 0 || stats.bandwidthRequestSpans.length > 0) && (
+                  <>
+                    <h3>
+                      Overall bandwidth: ↑ {formatBytes(stats.totalUploadBytes)} / ↓ {formatBytes(stats.totalDownloadBytes)}
+                    </h3>
+                    <div className={styles.activityChartContainer}>
+                      <BandwidthChart
+                        requests={bandwidthRequestsForChart}
+                        bandwidthRequestSpans={bandwidthSpansForChart}
+                        displayMode={displayMode}
+                        timeRange={stats.chartTimeRange}
+                        markers={stats.lifecycleEvents}
+                        onTimeRangeSelected={handleTimeRangeSelected}
+                        onResetZoom={handleResetZoom}
+                        externalCursorTime={enableChartSync ? sharedCursorTime : undefined}
+                        externalSelection={enableChartSync ? sharedSelection : undefined}
+                        onCursorMove={enableChartSync ? setSharedCursorTime : undefined}
+                        onSelectionChange={enableChartSync ? setSharedSelection : undefined}
+                      />
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
+
+            {/* HTTP Errors Grid */}
+            <div className={styles.errorsWarningsGrid}>
+              {/* TOP HTTP Errors Section */}
+              {stats.topFailedUrls.length > 0 && (
+                <section className={styles.summarySection}>
+                  <div className={styles.summaryTableContainer}>
+                      <table className={styles.summaryTable}>
+                        <thead>
+                          <tr>
+                            <th>
+                              Top Failed URLs (
+                              <span
+                                className={styles.clickableHeading}
+                                onClick={() => {
+                                  const statuses = stats.httpErrorsByStatus.map(e => e.status);
+                                  const hasClientErrors = stats.topFailedUrls.some(u => u.statuses.includes('Client Error'));
+                                  if (hasClientErrors) statuses.push('Client Error');
+                                  void navigate(`/http_requests?status=${encodeURIComponent(statuses.join(','))}`);
+                                }}
+                              >
+                                {stats.topFailedUrls.reduce((sum, e) => sum + e.count, 0)}
+                              </span>
+                              )
+                            </th>
+                            <th>Status</th>
+                            <th className={styles.alignRight}>Count</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            return stats.topFailedUrls.map((item, idx) => (
+                              <tr key={idx}>
+                                <td>
+                                  <button
+                                    className={styles.actionLink}
+                                    title={item.uri}
+                                    onClick={() => {
+                                      // Find all requests matching this URI with error status or client error
+                                      const matchingRequests = allHttpRequests.filter(req => {
+                                        if (req.uri !== item.uri) return false;
+                                        if (req.clientError) return true;
+                                        if (!req.status) return false;
+                                        const statusCode = parseInt(req.status, 10);
+                                        return statusCode >= 400;
+                                      });
+                                  
+                                      // If single occurrence, open with request_id param; else use filter param
+                                      if (matchingRequests.length === 1) {
+                                        void navigate(`/http_requests?request_id=${encodeURIComponent(matchingRequests[0].requestId)}`);
+                                      } else {
+                                        void navigate(`/http_requests?filter=${encodeURIComponent(item.uri)}`);
+                                      }
+                                    }}
+                                    style={{ textAlign: 'left', whiteSpace: 'normal' }}
+                                  >
+                                    {stripMatrixClientPath(item.uri)}
+                                  </button>
+                                </td>
+                                <td>
+                                  {item.statuses.map((status, i) => (
+                                    <span key={status} className={`${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(status)}`]}`}>
+                                      {status}{i < item.statuses.length - 1 ? ' ' : ''}
+                                    </span>
+                                  ))}
+                                </td>
+                                <td className={styles.alignRight}>{item.count}</td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                </section>
+              )}
+
+              {/* HTTP Errors Section */}
+              {stats.httpErrorsByStatus.length > 0 && (
+                <section className={styles.summarySection}>
+                  <div className={styles.summaryTableContainer}>
+                    <table className={styles.summaryTable}>
+                      <thead>
+                        <tr>
+                          <th>HTTP Error Codes</th>
+                          <th style={{ textAlign: 'right' }}>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.httpErrorsByStatus.map((error, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <button
+                                className={`${styles.badgeButton} ${tableStyles.badge} ${tableStyles[`badge${getHttpStatusBadgeClass(error.status)}`]}`}
+                                onClick={() =>
+                                  void navigate(`/http_requests?status=${error.status}`)
+                                }
+                              >
+                                {error.status}
+                              </button>
+                            </td>
+                            <td className={styles.alignRight}>{error.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
             </div>
-          </section>
+
+            {/* Slowest URLs Section */}
+            {stats.slowestHttpRequests.length > 0 && (
+              <section className={styles.summarySection}>
+                <h2>Slowest URLs</h2>
+                <div className={styles.summaryTableContainer}>
+                  <table className={styles.summaryTable}>
+                    <thead>
+                      <tr>
+                        <th>Duration</th>
+                        <th>Request</th>
+                        <th>URI</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const filtered = stats.slowestHttpRequests;
+                        return filtered.map((req) => {
+                          const badgeClass = req.status ? `badge${getHttpStatusBadgeClass(req.status)}` : 'badgeIncomplete';
+                          return (
+                          <tr key={req.id}>
+                            <td>
+                              <span className={styles.durationBadge}>
+                                {formatDuration(req.duration)}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
+                              <a
+                                href={`#/http_requests?request_id=${req.id}`}
+                                className={styles.actionLink}
+                                title={req.id}
+                                style={{ textDecoration: 'underline' }}
+                              >
+                                {req.id}
+                              </a>
+                            </td>
+                            <td className={styles.uriCell}>
+                              {stripMatrixClientPath(req.uri)}
+                            </td>
+                            <td>
+                              <span className={`${tableStyles.badge} ${tableStyles[badgeClass]}`}>
+                                {req.status || 'incomplete'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </div>
         )}
 
         {/* Sync Requests by Connection Section */}
         {stats.syncRequestsByConnection.length > 0 && (
-          <section className={styles.summarySection}>
-            <h2>Sync Requests by Connection</h2>
+          <section className={styles.group}>
+            <h2 className={styles.groupTitle}>Sync Requests by Connection</h2>
             <div className={styles.summaryTableContainer}>
               <table className={styles.summaryTable}>
                 <thead>
