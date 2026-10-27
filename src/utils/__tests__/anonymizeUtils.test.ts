@@ -105,6 +105,20 @@ describe('buildAnonymizationDictionary', () => {
     expect(dict.reverse[alias]).toBe('!VkdmKnrz9stD0mzv2QrS3sP');
   });
 
+  it('keeps the slash after a modern room ID, so `<room>/<event>` aliases the room as everywhere else', async () => {
+    // Element X Android logs `## handling pushData: ${roomId}/${eventId}`; a v12 room ID is URL-safe base64, never `/`.
+    const text = '## handling pushData: !VkdmKnrz9stD0mzv2QrS3sP/$Q2xvdWRzQXJlV2hpdGVBbmRCbHVl · room_id="!VkdmKnrz9stD0mzv2QrS3sP"';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const room = dict.forward['!VkdmKnrz9stD0mzv2QrS3sP'];
+    expect(dict.forward['!VkdmKnrz9stD0mzv2QrS3sP/']).toBeUndefined();
+    expect(applyAnonymization(text, dict)).toBe(
+      `## handling pushData: ${room}/${dict.forward['$Q2xvdWRzQXJlV2hpdGVBbmRCbHVl']} · room_id="${room}"`,
+    );
+    // Percent-encoded, as in a permalink inside a URL query: `%21<room>%2F%24<event>`.
+    const encoded = await buildAnonymizationDictionaryFromTexts(['via=%21VkdmKnrz9stD0mzv2QrS3sP%2F%24Q2xvdWRzQXJlV2hpdGVBbmRCbHVl'], SALT);
+    expect(Object.keys(encoded.forward)).not.toContain('%21VkdmKnrz9stD0mzv2QrS3sP%2F');
+  });
+
   it('replaces an event ID (with domain) with the $event-<hash>:domain-<hash>.org format', async () => {
     const dict = await buildAnonymizationDictionary([makeLine(0, '$ev1:example.org')], SALT);
     const alias = dict.forward['$ev1:example.org'];
@@ -278,12 +292,12 @@ describe('buildAnonymizationDictionary — percent-encoded identifiers', () => {
   });
 
   it('decodes escaped localpart characters and ports before hashing', async () => {
-    // Modern (domainless) room ids are base64: `+` and `/` arrive as %2B / %2F.
+    // Modern (domainless) room ids are URL-safe base64 (room version 12): only the sigil arrives escaped.
     const dict = await buildAnonymizationDictionaryFromTexts([
-      '!AbCdEf+gh/IjKl @bob:example.org:8448',
-      'roomId=%21AbCdEf%2Bgh%2FIjKl userId=%40bob%3Aexample.org%3A8448',
+      '!AbCdEf-gh_IjKl @bob:example.org:8448',
+      'roomId=%21AbCdEf-gh_IjKl userId=%40bob%3Aexample.org%3A8448',
     ], SALT);
-    expectLinked(dict, '%21AbCdEf%2Bgh%2FIjKl', '!AbCdEf+gh/IjKl');
+    expectLinked(dict, '%21AbCdEf-gh_IjKl', '!AbCdEf-gh_IjKl');
     expectLinked(dict, '%40bob%3Aexample.org%3A8448', '@bob:example.org:8448');
   });
 
