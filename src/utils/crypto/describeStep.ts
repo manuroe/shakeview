@@ -70,6 +70,10 @@ export function describeStep(s: CryptoStep): string {
       return 'still failing after a key arrived';
     case 'timeline.handled':
       return `timeline handled ${id(k.eventId)}`;
+    case 'redecrypt.keys':
+      return `redecryptor took up ${plural(k.sessionIds?.length ?? 0, 'new key')}`;
+    case 'redecrypt.request':
+      return `redecryption requested for ${plural(k.sessionIds?.length ?? 0, 'UTD session')}`;
     case 'utd.reported':
       return `analytics: reported ${id(k.eventId)} · ${k.timeToDecryptMs !== undefined && k.timeToDecryptMs >= 0 ? `decrypted after ${formatUs(k.timeToDecryptMs * 1000)}` : 'never decrypted'}`;
   }

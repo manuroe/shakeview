@@ -7,6 +7,7 @@ import { buildTar } from '../src/utils/tarWriter';
 import { ingest, cmdPrecheck, cmdSummary, cmdGrep, cmdSlice, cmdOverview, cmdHttp, cmdCycles, resolveRange, run } from './rageshake';
 import { resolveServePath, parseServeArgs, DEFAULT_PORT } from './serve';
 import type { LogParserResult } from '../src/types/log.types';
+import { RECEIVER_DETAILS, RECEIVER_LATE_LINES, RECEIVER_LOG, SENDER_DETAILS, SENDER_LOG } from '../src/utils/crypto/__tests__/fixtures';
 
 const RAW_LOG = [
   '2026-01-15T10:00:00.000000Z  INFO [matrix-rust-sdk] Sentry configured (enabled: true)',
@@ -50,7 +51,10 @@ const CYCLE_LOG = [
 const DETAILS = JSON.stringify({
   user_text: 'App crashed on launch',
   report_url: 'https://domain-0a0b0c0d.org/element-hq/element-ios/issues/1234',
-  data: { user_id: '@user-0123456789ab:domain-01234567.org', Version: '25.1.0', sdk_sha: 'abc1234' },
+  data: {
+    user_id: '@user-0123456789ab:domain-01234567.org', device_id: 'DEVICEID', device_keys: 'curve25519:CURVEKEY, ed25519:EDKEY',
+    Version: '25.1.0', sdk_sha: 'abc1234',
+  },
 });
 
 function buildArchive(logText: string): Uint8Array {
@@ -152,10 +156,11 @@ describe('rageshake CLI', () => {
     expect(summary.files[0].errors).toBe(1);
     expect(summary.totals.warnings).toBe(1);
     expect(summary.lifecycle.lastColdStart).toContain('2026-01-15T10:00:00');
-    // Identity fields are omitted to avoid leaking a stable device_id (which the
-    // anonymizer never rewrites) into LLM-bound output.
-    expect(summary.details.deviceId).toBeUndefined();
-    expect(summary.details.userId).toBeUndefined();
+    // Dated, not bare clocks: a log spanning a day would otherwise read as seconds.
+    expect(summary.timeSpan).toEqual({ start: '2026-01-15T10:00:00.000000Z', end: '2026-01-15T10:00:02.000000Z' });
+    expect(summary.details.userId).toBe('@user-0123456789ab:domain-01234567.org');
+    expect(summary.details.deviceId).toBe('DEVICEID');
+    expect(summary.details.deviceKeys).toBe('curve25519:CURVEKEY, ed25519:EDKEY');
     // Nothing was dropped by the anonymizer, so the key stays out of the output.
     expect(summary.removedFiles).toBeUndefined();
   });
@@ -630,6 +635,8 @@ describe('rageshake CLI', () => {
     writeFileSync(file, buildArchive(ANON_LOG));
     const { code, output } = run(['grep', file, 'retry scheduled', 'Sentry configured', '--count']);
     expect(code).toBe(0);
+    // When each pattern happens, so one call picks each pattern's window.
+    expect(output).toContain('# when: "retry scheduled" 10:00:02 → 10:00:02 · "Sentry configured" 10:00:00 → 10:00:00');
     expect(output).toContain('"retry scheduled" 1');
     expect(output).toContain('"Sentry configured" 1');
   });
@@ -707,6 +714,172 @@ describe('rageshake CLI', () => {
     expect(eventCacheAt).toBeLessThan(slidingSyncAt);
     expect(output).toContain('silent');
     expect(output).toContain('(2 lines)');
+  });
+});
+
+describe('megolm', () => {
+  // The crypto fixtures, aliased like an anonymized rageshake so precheck passes:
+  // Alice's ALICEPHONE shares SESS with BOBLAPTOP only; Bob's BOBPHONE fails $ev1
+  // (SESS), fails $ev2 (SESS2) until a late key, and gets SESS3 from Carol cleanly.
+  const ALICE_ID = '@user-aaaaaaaaaaaa:domain-aaaaaaaa.org';
+  const BOB_ID = '@user-bbbbbbbbbbbb:domain-bbbbbbbb.org';
+  const ROOM = '!room-111111111111:domain-aaaaaaaa.org';
+  const OTHER_ROOM = '!room-222222222222:domain-aaaaaaaa.org';
+  const EV1 = '$event-eeeeeeeeeee1';
+  const anon = (text: string) => text
+    .replaceAll('@alice:a.org', ALICE_ID).replaceAll('@bob:b.org', BOB_ID)
+    .replaceAll('!r:a.org', ROOM).replaceAll('$ev1', EV1).replaceAll('$ev2', '$event-eeeeeeeeeee2')
+    .replaceAll('https://a.org', 'https://domain-aaaaaaaa.org');
+  const CAROL_KEY_LINE = `2026-09-08T06:57:00.000000Z  INFO matrix_sdk_crypto::store: Received a new megolm room key | crates/matrix-sdk-crypto/src/store/mod.rs:703 | spans: receive_to_device_event{sender="@user-cccccccccccc:domain-cccccccc.org" event_type="m.room.encrypted" message_id="msg7"} > handle_decrypted_to_device_event{sender_key="curve25519:CAROLKEY" event_type="m.room_key"} > add_room_key{algorithm="m.megolm.v1.aes-sha2"} > handle_key{room_id="${OTHER_ROOM}" session_id="SESS3" message_index=0 shared_history=false}`;
+  const [sync, utdLine, stillSyncing] = anon(RECEIVER_LOG).split('\n');
+  // Element X Android logs its own analytics report: $ev1 counts as reported.
+  const REPORT_LINE = `2026-09-08T06:55:27.000000Z  INFO elementx: onUtd for event ${EV1}, timeToDecryptMs: null`;
+  const receiverLog = ['# [shakeview-anonymized]', sync, utdLine, REPORT_LINE, CAROL_KEY_LINE, stillSyncing, anon(RECEIVER_LATE_LINES)].join('\n');
+  const senderLog = `# [shakeview-anonymized]\n${anon(SENDER_LOG)}`;
+
+  function cryptoArchive(name: string, details: string, log: string): string {
+    const path = join(mkdtempSync(join(tmpdir(), 'rageshake-cli-')), name);
+    writeFileSync(path, gzipSync(buildTar([
+      { name: 'details.json', data: strToU8(details) },
+      { name: 'console.2026-09-08-06.log.gz', data: gzipSync(strToU8(log)) },
+    ])));
+    return path;
+  }
+  const bob = cryptoArchive('bob.tar.gz', anon(RECEIVER_DETAILS), receiverLog);
+  const alice = cryptoArchive('alice.tar.gz', anon(SENDER_DETAILS), senderLog);
+  const megolm = (...args: string[]) => run(['megolm', ...args]).output;
+  const rowOf = (out: string, session: string) => out.split('\n').find((l) => l.includes(` ${session} `)) ?? '';
+
+  it('lists every session, newest first, with each archive\'s outcome and a devices legend', () => {
+    const out = megolm(bob, alice);
+    expect(out).toContain(`1=bob.tar.gz ${BOB_ID} BOBPHONE (main)`);
+    expect(out).toContain(`2=alice.tar.gz ${ALICE_ID} ALICEPHONE`);
+    const at = (s: string) => out.indexOf(` ${s} `);
+    expect(at('SESS2')).toBeGreaterThan(-1);
+    expect(at('SESS2')).toBeLessThan(at('SESS3'));
+    expect(at('SESS3')).toBeLessThan(at('SESS'));
+    expect(rowOf(out, 'SESS')).toContain(ROOM);
+    expect(rowOf(out, 'SESS')).toContain('1: utd:missing_key×1 (1 reported)');
+    expect(rowOf(out, 'SESS')).toContain('2: outbound, shared to 1 device');
+    expect(rowOf(out, 'SESS')).toContain(`sender ${ALICE_ID} ALICEPHONE (2, by share)`);
+    expect(rowOf(out, 'SESS2')).toContain('1: late:late_key×1 (1 unknown)');
+    expect(out).toContain('1: 3 sessions, 2 UTDs (1 reported, 1 unknown)');
+    expect(out).toContain('A UTD counts as reported when');
+    expect(rowOf(out, 'SESS3')).toContain('1: key_received');
+    expect(rowOf(out, 'SESS3')).toContain('(not loaded)');
+  });
+
+  it('--utd keeps only sessions with a UTD', () => {
+    const out = megolm(bob, alice, '--utd');
+    expect(rowOf(out, 'SESS')).not.toBe('');
+    expect(rowOf(out, 'SESS2')).not.toBe('');
+    expect(rowOf(out, 'SESS3')).toBe('');
+  });
+
+  it('--analytics keeps sessions with a UTD of that analytics value', () => {
+    const out = megolm(bob, '--analytics', 'reported');
+    expect(rowOf(out, 'SESS')).not.toBe('');
+    expect(rowOf(out, 'SESS2')).toBe('');
+    expect(rowOf(out, 'SESS3')).toBe('');
+    expect(rowOf(megolm(bob, '--analytics', 'unknown'), 'SESS2')).not.toBe('');
+    expect(() => megolm(bob, '--analytics', 'seen')).toThrow(/reported \| not_reported \| unknown/);
+  });
+
+  it('--room takes a permalink and --sender an alias', () => {
+    const byRoom = megolm(bob, '--room', 'https://matrix.to/#/%21room-222222222222%3Adomain-aaaaaaaa.org?via=x');
+    expect(rowOf(byRoom, 'SESS3')).not.toBe('');
+    expect(rowOf(byRoom, 'SESS')).toBe('');
+    // Alice's rageshake is not loaded: the UTD lines name her.
+    const bySender = megolm(bob, '--sender', ALICE_ID);
+    expect(rowOf(bySender, 'SESS')).not.toBe('');
+    expect(rowOf(bySender, 'SESS2')).not.toBe('');
+    expect(rowOf(bySender, 'SESS3')).toBe('');
+  });
+
+  it('cuts the list to the window of the main archive', () => {
+    const out = megolm(bob, alice, '--from', '2026-09-08T06:58:30Z');
+    expect(out).toContain('# range: 2026-09-08T06:58:30');
+    expect(rowOf(out, 'SESS2')).not.toBe('');
+    expect(rowOf(out, 'SESS')).toBe('');
+    expect(rowOf(out, 'SESS3')).toBe('');
+  });
+
+  it('pages the list', () => {
+    const out = megolm(bob, '--limit', '1');
+    expect(rowOf(out, 'SESS2')).not.toBe('');
+    expect(rowOf(out, 'SESS3')).toBe('');
+    expect(out).toContain('next: --offset 1');
+  });
+
+  it('takes an alias prefix, and names the rooms with UTDs when a room matches nothing', () => {
+    expect(rowOf(megolm(bob, '--room', '!room-2222222222'), 'SESS3')).not.toBe('');
+    const none = megolm(bob, '--room', '!room-99999999');
+    expect(none).toContain('# no session in !room-99999999');
+    expect(none).toContain(`rooms with a UTD: ${ROOM} (2 sessions)`);
+    expect(() => megolm(bob, '--room', '!room-12')).toThrow(/at least 6 hex/);
+  });
+
+  it('refuses a raw id: without the salt it can never match', () => {
+    expect(() => megolm(bob, '--event', '$abcdef:matrix.org')).toThrow(/anonymized/);
+  });
+
+  it('refuses an added archive that fails precheck', () => {
+    const raw = cryptoArchive('raw.tar.gz', SENDER_DETAILS, SENDER_LOG);
+    expect(() => megolm(bob, raw)).toThrow(/precheck/);
+  });
+
+  it('--event prints the verdict, checklist, events, recipients, timeline and next hints', () => {
+    const out = megolm(bob, alice, '--event', `https://matrix.to/#/${ROOM}/${EV1}`);
+    expect(out).toContain('# session SESS ');
+    expect(out).toContain('verdict: Likely this device was left out of the key share');
+    expect(out).toContain('basis:');
+    expect(out).toMatch(/✗ This device in the share .*\[\d+\|2\]/);
+    expect(out).toMatch(new RegExp(`✗ \\d\\d:\\d\\d:\\d\\d\\.\\d{3} \\${EV1} .*\\[\\d+\\]`));
+    expect(out).toMatch(new RegExp(`${BOB_ID} BOBLAPTOP · shared .* · msgid msg1 · /sendToDevice 200`));
+    expect(out).toMatch(/timeline \(\d+ steps/);
+    expect(out).toMatch(/ 2 share to 1 device · index 0 \[\d+\|2\]/);
+    expect(out).toContain(`# next: ./rs grep ${bob} SESS`);
+    expect(out).toContain(`# next: ./rs grep ${alice} SESS`);
+  });
+
+  it('names an unloaded sender in the drill-down header', () => {
+    expect(megolm(bob, '--event', EV1)).toContain(`# sender: ${ALICE_ID} ? (not loaded) · found by unknown · receiver: 1 ${BOB_ID} BOBPHONE`);
+  });
+
+  it('folds a run of same steps in the timeline', () => {
+    const burst = ['# [shakeview-anonymized]', ...['1', '2', '3'].map((n) => utdLine.replace(EV1, `$event-eeeeeeeeeee${n}`).replace('06:55:22.130', `06:55:22.13${n}`))].join('\n');
+    const out = megolm(cryptoArchive('burst.tar.gz', anon(RECEIVER_DETAILS), burst), '--session', 'SESS');
+    expect(out).toMatch(/06:55:22\.131 1 UTD \$event-eeeee… · MissingMegolmSession ×3 to 06:55:22\.133 \[\d+\]/);
+  });
+
+  it('--event on a UTD only an added archive logged judges that archive', () => {
+    const out = megolm(alice, bob, '--event', EV1);
+    expect(out).toContain('verdict: Likely this device was left out of the key share');
+  });
+
+  it('--event refuses a prefix naming several UTD events', () => {
+    // $ev1 (SESS) and $ev2 (SESS2) share the prefix $event-eeeeeeeeeee.
+    expect(megolm(bob, '--event', '$event-eeeeeeeeeee')).toContain(`# 2 UTD events start with $event-eeeeeeeeeee: ${EV1} · $event-eeeeeeeeeee2`);
+  });
+
+  it('--event without a matching UTD says so and points at grep', () => {
+    const out = megolm(bob, '--event', '$event-0000000000ff');
+    expect(out).toContain('no UTD for $event-0000000000ff');
+    expect(out).toContain(`./rs grep ${bob} '$event-0000000000ff'`);
+  });
+
+  it('--session takes a unique prefix of 6+ characters, and lists the sessions an ambiguous one names', () => {
+    const keyLine = (sid: string) => CAROL_KEY_LINE.replace('session_id="SESS3"', `session_id="${sid}"`);
+    const two = cryptoArchive('two.tar.gz', anon(RECEIVER_DETAILS), ['# [shakeview-anonymized]', keyLine('Abcdef1xyz'), keyLine('Abcdef2xyz')].join('\n'));
+    expect(megolm(two, '--session', 'Abcdef1')).toContain('# session Abcdef1xyz ');
+    expect(megolm(two, '--session', 'Abcdef')).toContain('# 2 sessions start with Abcdef: Abcdef1xyz · Abcdef2xyz');
+    expect(megolm(two, '--session', 'Abcd')).toContain('no megolm session Abcd');
+  });
+
+  it('--session drills into a session without UTD, ignoring the window', () => {
+    const out = megolm(bob, '--session', 'SESS3', '--from', '2026-09-08T06:58:30Z');
+    expect(out).toContain('verdict: Likely fine: key received, no UTD in the loaded logs');
+    expect(megolm(bob, '--session', 'NOPE')).toContain('no megolm session NOPE');
   });
 });
 

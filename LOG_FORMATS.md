@@ -93,4 +93,5 @@ format); Element Web adds a few matrix-js-sdk lines.
 | Key received (`Received a new megolm room key`, direct vs forwarded) | ✓ | ✓ |
 | Key backup lookup / import | `Performing backup download`, per-session `GET /room_keys/keys/<room>/<session>` (200 found, 404 not in backup), `Successfully imported room keys` | `[PerSessionKeyBackupDownloader] …`, `Successfully imported room keys` |
 | Re-decryption success | `Successfully redecrypted events` (trace level): "confirmed" when the log level keeps it, else "inferred" | `Decrypted event on retry`, so "confirmed" |
+| Redecryptor taking up keys / retry requests | `Received new room keys`, `Received a redecryption request` (event cache redecryptor, trace level) | — |
 | Device identity | `details.json` | `details.json`, else `setLoggedIn: mxid: … deviceId: …` |

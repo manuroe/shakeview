@@ -88,6 +88,18 @@ const STEP_TABLE: readonly StepRule[] = [
     match: /onUtd for event (\S+), timeToDecryptMs: (\d+|null)/,
     extract: (_l, m) => ({ eventId: m[1], timeToDecryptMs: m[2] === 'null' ? -1 : Number(m[2]) }),
   },
+  // The Rust event cache's redecryptor: when it gets to a new key (it works through one batch at
+  // a time, so this can lag the key's arrival), and when a timeline asks it to retry UTD sessions.
+  {
+    kind: 'redecrypt.keys', role: 'receiver',
+    match: /Received new room keys room_keys=\[/,
+    extract: (l) => ({ sessionIds: [...l.message.matchAll(/session_id: "([^"]+)"/g)].map((x) => x[1]) }),
+  },
+  {
+    kind: 'redecrypt.request', role: 'receiver',
+    match: /Received a redecryption request request=DecryptionRetryRequest \{ room_id: "([^"]+)", utd_session_ids: \{([^}]*)\}/,
+    extract: (_l, m) => ({ roomId: m[1], sessionIds: [...m[2].matchAll(/"([^"]+)"/g)].map((x) => x[1]) }),
+  },
   {
     kind: 'redecrypt.failed', role: 'receiver',
     match: /Failed to redecrypt an event despite receiving a room key/,

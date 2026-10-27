@@ -21,6 +21,8 @@ describe('describeStep', () => {
     [st('a', 'backup.download', 1, {}), 'backup lookup'],
     [st('a', 'backup.imported', 1, { sessionIds: ['S'] }), 'imported 1 key'],
     [st('a', 'withheld.received', 1, { withheldCode: 'Unverified' }), 'withheld (Unverified)'],
+    [st('a', 'redecrypt.keys', 1, { sessionIds: ['S1', 'S2'] }), 'redecryptor took up 2 new keys'],
+    [st('a', 'redecrypt.request', 1, { sessionIds: ['S1'] }), 'redecryption requested for 1 UTD session'],
   ])('%#', (step, text) => {
     expect(describeStep(step)).toBe(text);
   });
