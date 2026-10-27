@@ -14,64 +14,65 @@
   color-scheme: light dark;
 
   /* -------------------------------------------------------------------------
-     Primary Colors
+     Primary Colors (Compound accent green; light/dark handled by Compound)
      ------------------------------------------------------------------------- */
-  --color-primary: #0066cc;
-  --color-primary-hover: #0052a3;
-  --color-primary-light: #e8f4ff;
-  --color-primary-muted: rgba(0, 102, 204, 0.1);
-  --color-visited: #6b21a8;
+  --color-primary: var(--cpd-color-bg-accent-rest);
+  --color-primary-hover: var(--cpd-color-bg-accent-hovered);
+  --color-primary-light: var(--cpd-color-bg-accent-subtle);
+  --color-primary-muted: var(--cpd-color-alpha-green-300);
+  --color-on-primary: var(--cpd-color-text-on-solid-primary);
+  --color-visited: var(--cpd-color-purple-1100);
 
   /* -------------------------------------------------------------------------
      Semantic Colors
      ------------------------------------------------------------------------- */
-  --color-success: #28a745;
-  --color-success-bg: #d4edda;
-  --color-success-text: #155724;
+  --color-success: var(--cpd-color-text-success-primary);
+  --color-success-bg: var(--cpd-color-bg-success-subtle);
+  --color-success-text: var(--cpd-color-text-success-primary);
 
-  --color-error: #dc3545;
-  --color-error-bg: #f8d7da;
-  --color-error-text: #721c24;
-  --color-error-light: #fee;
+  --color-error: var(--cpd-color-text-critical-primary);
+  --color-error-bg: var(--cpd-color-bg-critical-subtle);
+  --color-error-text: var(--cpd-color-text-critical-primary);
+  --color-error-light: var(--cpd-color-bg-critical-subtle);
 
-  --color-warning: #ff9800;
-  --color-warning-bg: #fff3cd;
-  --color-warning-text: #856404;
+  --color-warning: var(--cpd-color-text-warning-primary);
+  --color-warning-bg: #fff3cd;  /* Compound has no warning-subtle token */
+  --color-warning-text: var(--cpd-color-text-warning-primary);
 
-  --color-info: #007acc;
-  --color-info-bg: #e3f2fd;
-  --color-info-text: #1565c0;
+  --color-info: var(--cpd-color-text-info-primary);
+  --color-info-bg: var(--cpd-color-bg-info-subtle);
+  --color-info-text: var(--cpd-color-text-info-primary);
 
   --color-sentry: #ec4899;
 
   /* -------------------------------------------------------------------------
      Text Colors
      ------------------------------------------------------------------------- */
-  --text-primary: #333;
-  --text-secondary: #555;
-  --text-tertiary: #666;
-  --text-muted: #888;
-  --text-placeholder: #999;
+  --text-primary: var(--cpd-color-text-primary);
+  --text-secondary: var(--cpd-color-text-secondary);
+  --text-tertiary: var(--cpd-color-text-secondary);
+  --text-muted: var(--cpd-color-text-secondary);
+  --text-placeholder: var(--cpd-color-text-disabled);
 
   /* -------------------------------------------------------------------------
      Background Colors
      ------------------------------------------------------------------------- */
-  --bg-primary: #fff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #fafafa;
-  --bg-input: #fff;
-  --bg-hover: #f5f5f5;
-  --bg-selected: #e8f4ff;
-  --bg-code: #f6f8fa;
+  --bg-primary: var(--cpd-color-bg-canvas-default);
+  --bg-secondary: var(--cpd-color-bg-subtle-secondary);
+  --bg-tertiary: var(--cpd-color-bg-subtle-secondary);
+  --bg-input: var(--cpd-color-bg-canvas-default);
+  --bg-hover: var(--cpd-color-bg-subtle-primary);
+  --bg-selected: var(--cpd-color-bg-accent-subtle);
+  --bg-code: var(--cpd-color-bg-subtle-secondary);
 
   /* -------------------------------------------------------------------------
      Border Colors
      ------------------------------------------------------------------------- */
-  --border-light: #ddd;
-  --border-default: #ccc;
-  --border-medium: #bbb;
-  --border-dark: #999;
-  --border-code: #e1e4e8;
+  --border-light: var(--cpd-color-separator-primary);
+  --border-default: var(--cpd-color-border-interactive-secondary);
+  --border-medium: var(--cpd-color-border-interactive-primary);
+  --border-dark: var(--cpd-color-border-interactive-hovered);
+  --border-code: var(--cpd-color-separator-primary);
 
   /* -------------------------------------------------------------------------
      Log Viewer Colors (dark by design)
@@ -112,8 +113,8 @@
   /* -------------------------------------------------------------------------
      Typography
      ------------------------------------------------------------------------- */
-  --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-system: var(--cpd-font-family-sans);
+  --font-mono: var(--cpd-font-family-mono);
 
   /* Font Sizes */
   --font-size-xs: 10px;
@@ -232,10 +233,10 @@
   /* -------------------------------------------------------------------------
      Row Backgrounds (used for zebra striping)
      ------------------------------------------------------------------------- */
-  --row-bg-odd: #fafafa;
-  --row-bg-even: #ffffff;
-  --row-bg-hover: #e8f4fd;
-  --row-bg-expanded: #d4e8f7;
+  --row-bg-odd: var(--cpd-color-bg-subtle-secondary);
+  --row-bg-even: var(--cpd-color-bg-canvas-default);
+  --row-bg-hover: var(--cpd-color-bg-subtle-primary);
+  --row-bg-expanded: var(--cpd-color-bg-accent-subtle);
 }
 
 /* ==========================================================================
@@ -251,64 +252,13 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Primary Colors */
-  --color-primary: #4da3ff;
-  --color-primary-hover: #6bb3ff;
-  --color-primary-light: #1a3a5c;
-  --color-primary-muted: rgba(77, 163, 255, 0.15);
-  --color-visited: #c084fc;
-
-  /* Semantic Colors */
-  --color-success: #4caf50;
-  --color-success-bg: #1b3d20;
-  --color-success-text: #81c784;
-
-  --color-error: #f44336;
-  --color-error-bg: #3d1a1a;
-  --color-error-text: #ef9a9a;
-  --color-error-light: #2d1a1a;
-
-  --color-warning: #ffb74d;
+  /* Warning background (no Compound token) */
   --color-warning-bg: #3d3020;
-  --color-warning-text: #ffe082;
-
-  --color-info: #29b6f6;
-  --color-info-bg: #1a3a4d;
-  --color-info-text: #81d4fa;
-
-  /* Text Colors */
-  --text-primary: #e0e0e0;
-  --text-secondary: #b0b0b0;
-  --text-tertiary: #909090;
-  --text-muted: #9e9e9e;
-  --text-placeholder: #606060;
-
-  /* Background Colors */
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252525;
-  --bg-tertiary: #2d2d2d;
-  --bg-input: #2d2d2d;
-  --bg-hover: #3d3d3d;
-  --bg-selected: #1a3a5c;
-  --bg-code: #2d2d2d;
-
-  /* Border Colors */
-  --border-light: #3d3d3d;
-  --border-default: #4d4d4d;
-  --border-medium: #5d5d5d;
-  --border-dark: #6d6d6d;
-  --border-code: #4d4d4d;
 
   /* Shadows (more subtle in dark mode) */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-
-  /* Row Backgrounds */
-  --row-bg-odd: #252525;
-  --row-bg-even: #1e1e1e;
-  --row-bg-hover: #2a3d4d;
-  --row-bg-expanded: #1a3a5c;
 
   /* Sync Request Colors */
   --sync-catchup-success: #a3e635;     /* Brighter lime for dark mode visibility */
@@ -362,64 +312,13 @@
 /* Auto dark mode (respects system preference when no explicit theme is set) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    /* Primary Colors */
-    --color-primary: #4da3ff;
-    --color-primary-hover: #6bb3ff;
-    --color-primary-light: #1a3a5c;
-    --color-primary-muted: rgba(77, 163, 255, 0.15);
-    --color-visited: #c084fc;
-
-    /* Semantic Colors */
-    --color-success: #4caf50;
-    --color-success-bg: #1b3d20;
-    --color-success-text: #81c784;
-
-    --color-error: #f44336;
-    --color-error-bg: #3d1a1a;
-    --color-error-text: #ef9a9a;
-    --color-error-light: #2d1a1a;
-
-    --color-warning: #ffb74d;
+    /* Warning background (no Compound token) */
     --color-warning-bg: #3d3020;
-    --color-warning-text: #ffe082;
-
-    --color-info: #29b6f6;
-    --color-info-bg: #1a3a4d;
-    --color-info-text: #81d4fa;
-
-    /* Text Colors */
-    --text-primary: #e0e0e0;
-    --text-secondary: #b0b0b0;
-    --text-tertiary: #909090;
-    --text-muted: #9e9e9e;
-    --text-placeholder: #606060;
-
-    /* Background Colors */
-    --bg-primary: #1e1e1e;
-    --bg-secondary: #252525;
-    --bg-tertiary: #2d2d2d;
-    --bg-input: #2d2d2d;
-    --bg-hover: #3d3d3d;
-    --bg-selected: #1a3a5c;
-    --bg-code: #2d2d2d;
-
-    /* Border Colors */
-    --border-light: #3d3d3d;
-    --border-default: #4d4d4d;
-    --border-medium: #5d5d5d;
-    --border-dark: #6d6d6d;
-    --border-code: #4d4d4d;
 
     /* Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-
-    /* Row Backgrounds */
-    --row-bg-odd: #252525;
-    --row-bg-even: #1e1e1e;
-    --row-bg-hover: #2a3d4d;
-    --row-bg-expanded: #1a3a5c;
 
     /* Sync Request Colors */
     --sync-catchup-success: #a3e635;
@@ -481,8 +380,16 @@
   box-sizing: border-box;
 }
 
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono);
+}
+
 body {
   font-family: var(--font-system);
+  accent-color: var(--color-primary);
   background: var(--bg-secondary);
   color: var(--text-primary);
   margin: 0;
@@ -516,7 +423,7 @@ body {
 
 .btn-primary {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   border-color: var(--color-primary);
 }
 

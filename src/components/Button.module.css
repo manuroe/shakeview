@@ -22,7 +22,7 @@
 /* Active state for pill buttons - use with .active class in JS */
 .pillButtonActive {
     background: var(--color-primary);
-    color: white;
+    color: var(--color-on-primary);
     border-color: var(--color-primary);
 }
 

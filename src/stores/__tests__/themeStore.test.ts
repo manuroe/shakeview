@@ -60,6 +60,19 @@ describe('themeStore', () => {
       useThemeStore.getState().setTheme('system');
       expect(document.documentElement.getAttribute('data-theme')).toBeNull();
     });
+
+    it('toggles the Compound theme class', () => {
+      const { classList } = document.documentElement;
+      useThemeStore.getState().setTheme('light');
+      expect(classList.contains('cpd-theme-light')).toBe(true);
+
+      useThemeStore.getState().setTheme('dark');
+      expect(classList.contains('cpd-theme-dark')).toBe(true);
+      expect(classList.contains('cpd-theme-light')).toBe(false);
+
+      useThemeStore.getState().setTheme('system');
+      expect(classList.contains('cpd-theme-dark')).toBe(false);
+    });
   });
 
   describe('persistence', () => {

@@ -85,6 +85,8 @@ async function main(): Promise<void> {
   async function setTheme(theme: 'light' | 'dark'): Promise<void> {
     await page.evaluate((t) => {
       document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.classList.remove('cpd-theme-light', 'cpd-theme-dark');
+      document.documentElement.classList.add(`cpd-theme-${t}`);
     }, theme);
     // Let CSS transitions settle
     await page.waitForTimeout(300);
