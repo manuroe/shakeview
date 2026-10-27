@@ -64,6 +64,8 @@ const ENC_USER_CHAR = `(?:[A-Za-z0-9._\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
 const ENC_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
 const ENC_ALIAS_CHAR = `(?:[A-Za-z0-9._~\\-]|${ESC}(?:2[Bb]|[89A-Fa-f][0-9A-Fa-f]))`;
 const ENC_BASE64_CHAR = `(?:[A-Za-z0-9_\\-]|${ESC}(?:2[BbFf]|3[Dd]))`;
+/** A modern (v12) room ID is URL-safe base64: `/`, `+` and `=` end it, so `!room%2F%24event` keeps its separator. */
+const ENC_URLSAFE_CHAR = '[A-Za-z0-9_\\-]';
 const ENC_SERVER_NAME_PAT =
   `${ENC_COLON}(?:${ESC}5[Bb](?:[0-9A-Fa-f.]|${ENC_COLON})+${ESC}5[Dd]|${HOST_PAT})(?:${ENC_COLON}\\d{1,5})?`;
 
@@ -98,12 +100,14 @@ export const MATRIX_IDENTIFIER_RE = new RegExp(
     `(?:${ESC}40|@)${ENC_USER_CHAR}+${ENC_SERVER_NAME_PAT}`,
     `(?:${ESC}2[14]|[!$])${ENC_CHAR}+${ENC_SERVER_NAME_PAT}`,
     `(?:${ESC}23|#)${ENC_ALIAS_CHAR}+${ENC_SERVER_NAME_PAT}`,
-    // Percent-encoded modern room/event ID (no domain, base64, min 10 chars)
-    `${ESC}2[14]${ENC_BASE64_CHAR}{10,}`,
+    // Percent-encoded modern room ID (no domain, URL-safe base64, min 10 chars) and event ID (base64)
+    `${ESC}21${ENC_URLSAFE_CHAR}{10,}`,
+    `${ESC}24${ENC_BASE64_CHAR}{10,}`,
     // Modern event ID (no domain, base64url, min 10 chars to reduce false positives)
     `\\$[A-Za-z0-9+/=_\\-]{10,}`,
-    // Modern room ID (no domain, base64url, min 10 chars)
-    `![A-Za-z0-9+/=_\\-]{10,}`,
+    // Modern room ID (no domain, min 10 chars). Room version 12 makes it URL-safe base64, so `/` ends
+    // it: Element X logs `<room>/<event>`, and swallowing the `/` gave the room a second alias.
+    `![A-Za-z0-9_\\-]{10,}`,
   ].join('|'),
   'g',
 );
