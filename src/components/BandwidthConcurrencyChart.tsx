@@ -15,6 +15,7 @@ import type { StepPoint } from '../utils/concurrencyUtils';
 import { getCountAtTime } from '../utils/concurrencyUtils';
 import { useStepChartInteraction } from '../hooks/useStepChartInteraction';
 import { getBucketKey, getBucketColor, getBucketLabel, sortStatusCodes } from '../utils/httpStatusBuckets';
+import { useElementWidth } from '../hooks/useElementWidth';
 
 interface BandwidthConcurrencyChartProps {
   /** Per-request time spans, each with precise start/end timestamps and byte counts. */
@@ -178,7 +179,8 @@ export function BandwidthConcurrencyChart({
   height = 140,
 }: BandwidthConcurrencyChartProps) {
   const { minTime, maxTime } = timeRange;
-  const xMax = SVG_WIDTH - MARGIN.left - MARGIN.right;
+  const [widthRef, svgWidth] = useElementWidth(SVG_WIDTH);
+  const xMax = svgWidth - MARGIN.left - MARGIN.right;
   const yMax = height - MARGIN.top - MARGIN.bottom;
 
   // ── Ordered status keys from all spans ───────────────────────────────────
@@ -375,7 +377,7 @@ export function BandwidthConcurrencyChart({
     hasExternalSelection,
   } = useStepChartInteraction({
     xMax,
-    svgWidth: SVG_WIDTH,
+    svgWidth: svgWidth,
     marginLeft: MARGIN.left,
     minTime,
     maxTime,
@@ -404,12 +406,12 @@ export function BandwidthConcurrencyChart({
 
   return (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div ref={widthRef} style={{ flex: 1, minWidth: 0 }}>
         <svg
           ref={svgRef}
           width="100%"
           height={height}
-          viewBox={`0 0 ${SVG_WIDTH} ${height}`}
+          viewBox={`0 0 ${svgWidth} ${height}`}
           style={{ display: 'block' }}
         >
           <Group left={MARGIN.left} top={MARGIN.top}>
@@ -557,7 +559,7 @@ export function BandwidthConcurrencyChart({
                     y={yMax + 16}
                     textAnchor="middle"
                     fontSize={11}
-                    fill="#333"
+                    fill="var(--text-primary)"
                     fontWeight="bold"
                     pointerEvents="none"
                   >
@@ -583,7 +585,7 @@ export function BandwidthConcurrencyChart({
                   y={yMax + 16}
                   textAnchor="middle"
                   fontSize={11}
-                  fill="#333"
+                  fill="var(--text-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >

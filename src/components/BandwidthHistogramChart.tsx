@@ -13,6 +13,7 @@ import { formatBytes } from '../utils/sizeUtils';
 import type { BandwidthBucket } from './BandwidthChartTooltip';
 import type { LifecycleEvent } from '../types/log.types';
 import { LifecycleMarkers } from './LifecycleMarkers';
+import { useElementWidth } from '../hooks/useElementWidth';
 
 const SVG_WIDTH = 800;
 
@@ -105,7 +106,8 @@ export function BandwidthHistogramChart({
     [marginLeft],
   );
 
-  const xMax = SVG_WIDTH - margin.left - margin.right;
+  const [widthRef, svgWidth] = useElementWidth(SVG_WIDTH);
+  const xMax = svgWidth - margin.left - margin.right;
   const yMax = height - margin.top - margin.bottom;
 
   const formatTime = useCallback((timestampUs: number): string => {
@@ -232,7 +234,7 @@ export function BandwidthHistogramChart({
 
     if (tooltipScreenX === null || tooltipScreenY === null) {
       const svgRect = svg.getBoundingClientRect();
-      const scale = svgRect.width / SVG_WIDTH;
+      const scale = svgRect.width / svgWidth;
       tooltipScreenX = svgRect.left + viewBoxX * scale;
       tooltipScreenY = svgRect.top;
     }
@@ -246,6 +248,7 @@ export function BandwidthHistogramChart({
     externalCursorTime,
     hasExternalSelection,
     isSelecting,
+    svgWidth,
     cursorX,
     getBucketAtExternalTime,
     timeToX,
@@ -265,12 +268,12 @@ export function BandwidthHistogramChart({
 
   return (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div ref={widthRef} style={{ flex: 1, minWidth: 0 }}>
         <svg
           ref={svgRef}
           width="100%"
           height={height}
-          viewBox={`0 0 ${SVG_WIDTH} ${height}`}
+          viewBox={`0 0 ${svgWidth} ${height}`}
           style={{ display: 'block' }}
         >
           <Group left={margin.left} top={margin.top}>
@@ -494,7 +497,7 @@ export function BandwidthHistogramChart({
                   y={yMax + 16}
                   textAnchor="middle"
                   fontSize={11}
-                  fill="#333"
+                  fill="var(--text-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -523,7 +526,7 @@ export function BandwidthHistogramChart({
                     y={yMax + 16}
                     textAnchor="middle"
                     fontSize={11}
-                    fill="#333"
+                    fill="var(--text-primary)"
                     fontWeight="bold"
                     pointerEvents="none"
                   >

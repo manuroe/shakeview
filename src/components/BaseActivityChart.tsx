@@ -10,6 +10,7 @@ import { useChartInteraction } from '../hooks/useChartInteraction';
 import type { SelectionRange } from '../hooks/useChartInteraction';
 import type { LifecycleEvent } from '../types/log.types';
 import { LifecycleMarkers } from './LifecycleMarkers';
+import { useElementWidth } from '../hooks/useElementWidth';
 
 /** Generic bucket structure for activity charts */
 export interface ActivityBucket {
@@ -139,7 +140,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
     return date.toISOString().split('T')[1].split('.')[0]; // Gets HH:MM:SS in UTC
   }, []);
 
-  const width = 800;
+  const [widthRef, width] = useElementWidth(800);
   const margin = useMemo(() => ({ top: 10, right: 10, bottom: 30, left: marginLeft }), [marginLeft]);
   const xMax = width - margin.left - margin.right;
   const yMax = height - margin.top - margin.bottom;
@@ -301,7 +302,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
 
   return (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div ref={widthRef} style={{ flex: 1, minWidth: 0 }}>
         <svg ref={svgRef} width="100%" height={svgHeight} viewBox={`0 0 ${width} ${svgHeight}`} style={{ display: 'block' }}>
           <Group left={margin.left} top={margin.top}>
             {/* Render stacked bars */}
@@ -516,7 +517,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   y={axisTop + 20}
                   textAnchor="middle"
                   fontSize={11}
-                  fill="#333"
+                  fill="var(--text-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -541,7 +542,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
                   y={axisTop + 20}
                   textAnchor="middle"
                   fontSize={11}
-                  fill="#333"
+                  fill="var(--text-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >

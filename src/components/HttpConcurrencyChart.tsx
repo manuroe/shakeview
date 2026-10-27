@@ -13,6 +13,7 @@ import { LifecycleMarkers } from './LifecycleMarkers';
 import { computeStepPoints, getCountAtTime } from '../utils/concurrencyUtils';
 import { getBucketKey, getBucketColor, getBucketLabel, sortStatusCodes } from '../utils/httpStatusBuckets';
 import { useStepChartInteraction } from '../hooks/useStepChartInteraction';
+import { useElementWidth } from '../hooks/useElementWidth';
 
 // Re-export for consumers that need the type alongside the component.
 export type { StepPoint } from '../utils/concurrencyUtils';
@@ -78,7 +79,8 @@ export function HttpConcurrencyChart({
 }: HttpConcurrencyChartProps) {
   const { minTime, maxTime } = timeRange;
 
-  const xMax = SVG_WIDTH - MARGIN.left - MARGIN.right;
+  const [widthRef, svgWidth] = useElementWidth(SVG_WIDTH);
+  const xMax = svgWidth - MARGIN.left - MARGIN.right;
   const yMax = height - MARGIN.top - MARGIN.bottom;
 
   // ── Step-function data preparation ───────────────────────────────────────
@@ -219,7 +221,7 @@ export function HttpConcurrencyChart({
     hasExternalSelection,
   } = useStepChartInteraction({
     xMax,
-    svgWidth: SVG_WIDTH,
+    svgWidth: svgWidth,
     marginLeft: MARGIN.left,
     minTime,
     maxTime,
@@ -248,12 +250,12 @@ export function HttpConcurrencyChart({
 
   return (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div ref={widthRef} style={{ flex: 1, minWidth: 0 }}>
         <svg
           ref={svgRef}
           width="100%"
           height={height}
-          viewBox={`0 0 ${SVG_WIDTH} ${height}`}
+          viewBox={`0 0 ${svgWidth} ${height}`}
           style={{ display: 'block' }}
         >
           <Group left={MARGIN.left} top={MARGIN.top}>
@@ -362,7 +364,7 @@ export function HttpConcurrencyChart({
                   pointerEvents="none"
                   strokeDasharray="4,2"
                 />
-                <text x={activeCursorX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="#333" fontWeight="bold" pointerEvents="none">
+                <text x={activeCursorX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--text-primary)" fontWeight="bold" pointerEvents="none">
                   {activeCursorTime}
                 </text>
               </>
@@ -379,7 +381,7 @@ export function HttpConcurrencyChart({
                   pointerEvents="none"
                   strokeDasharray="4,2"
                 />
-                <text x={timeToX(externalCursorTime)} y={yMax + 20} textAnchor="middle" fontSize={11} fill="#333" fontWeight="bold" pointerEvents="none">
+                <text x={timeToX(externalCursorTime)} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--text-primary)" fontWeight="bold" pointerEvents="none">
                   {formatTime(externalCursorTime)}
                 </text>
               </>
