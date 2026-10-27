@@ -40,7 +40,9 @@ export type StepKind =
   | 'event.redecrypted'
   | 'redecrypt.failed'
   | 'timeline.handled'
-  | 'utd.reported';
+  | 'utd.reported'
+  | 'redecrypt.keys'
+  | 'redecrypt.request';
 
 /** Why an event failed to decrypt, coarse enough to count and to pick a journey for. */
 export type UtdReason = 'missing_key' | 'unknown_index' | 'trust_requirement' | 'invalid_payload' | 'other';

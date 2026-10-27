@@ -156,6 +156,8 @@ describe('rageshake CLI', () => {
     expect(summary.files[0].errors).toBe(1);
     expect(summary.totals.warnings).toBe(1);
     expect(summary.lifecycle.lastColdStart).toContain('2026-01-15T10:00:00');
+    // Dated, not bare clocks: a log spanning a day would otherwise read as seconds.
+    expect(summary.timeSpan).toEqual({ start: '2026-01-15T10:00:00.000000Z', end: '2026-01-15T10:00:02.000000Z' });
     expect(summary.details.userId).toBe('@user-0123456789ab:domain-01234567.org');
     expect(summary.details.deviceId).toBe('DEVICEID');
     expect(summary.details.deviceKeys).toBe('curve25519:CURVEKEY, ed25519:EDKEY');
@@ -633,6 +635,8 @@ describe('rageshake CLI', () => {
     writeFileSync(file, buildArchive(ANON_LOG));
     const { code, output } = run(['grep', file, 'retry scheduled', 'Sentry configured', '--count']);
     expect(code).toBe(0);
+    // When each pattern happens, so one call picks each pattern's window.
+    expect(output).toContain('# when: "retry scheduled" 10:00:02 → 10:00:02 · "Sentry configured" 10:00:00 → 10:00:00');
     expect(output).toContain('"retry scheduled" 1');
     expect(output).toContain('"Sentry configured" 1');
   });
@@ -806,6 +810,14 @@ describe('megolm', () => {
     expect(out).toContain('next: --offset 1');
   });
 
+  it('takes an alias prefix, and names the rooms with UTDs when a room matches nothing', () => {
+    expect(rowOf(megolm(bob, '--room', '!room-2222222222'), 'SESS3')).not.toBe('');
+    const none = megolm(bob, '--room', '!room-99999999');
+    expect(none).toContain('# no session in !room-99999999');
+    expect(none).toContain(`rooms with a UTD: ${ROOM} (2 sessions)`);
+    expect(() => megolm(bob, '--room', '!room-12')).toThrow(/at least 6 hex/);
+  });
+
   it('refuses a raw id: without the salt it can never match', () => {
     expect(() => megolm(bob, '--event', '$abcdef:matrix.org')).toThrow(/anonymized/);
   });
@@ -827,6 +839,16 @@ describe('megolm', () => {
     expect(out).toMatch(/ 2 share to 1 device · index 0 \[\d+\|2\]/);
     expect(out).toContain(`# next: ./rs grep ${bob} SESS`);
     expect(out).toContain(`# next: ./rs grep ${alice} SESS`);
+  });
+
+  it('names an unloaded sender in the drill-down header', () => {
+    expect(megolm(bob, '--event', EV1)).toContain(`# sender: ${ALICE_ID} ? (not loaded) · found by unknown · receiver: 1 ${BOB_ID} BOBPHONE`);
+  });
+
+  it('folds a run of same steps in the timeline', () => {
+    const burst = ['# [shakeview-anonymized]', ...['1', '2', '3'].map((n) => utdLine.replace(EV1, `$event-eeeeeeeeeee${n}`).replace('06:55:22.130', `06:55:22.13${n}`))].join('\n');
+    const out = megolm(cryptoArchive('burst.tar.gz', anon(RECEIVER_DETAILS), burst), '--session', 'SESS');
+    expect(out).toMatch(/06:55:22\.131 1 UTD \$event-eeeee… · MissingMegolmSession ×3 to 06:55:22\.133 \[\d+\]/);
   });
 
   it('--event on a UTD only an added archive logged judges that archive', () => {

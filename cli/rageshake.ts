@@ -38,7 +38,7 @@ import { lateOutcomeKey, matchesOutcomes, sessionEventKeys, utdOutcomeKey } from
 import { ANALYTICS_CATEGORIES, REPORTED_MEANING } from '../src/utils/crypto/labels.ts';
 import { describeStep } from '../src/utils/crypto/describeStep.ts';
 import { plural } from '../src/utils/crypto/format.ts';
-import type { AnalyticsCategory, CryptoDevice, LineRef, MegolmSession, UtdEvent } from '../src/utils/crypto/types.ts';
+import type { AnalyticsCategory, CryptoDevice, CryptoStep, LineRef, MegolmSession, UtdEvent } from '../src/utils/crypto/types.ts';
 import { cmdServe } from './serve.ts';
 import type { LogParserResult, ParsedLogLine, LifecycleEvent, HttpRequest } from '../src/types/log.types.ts';
 import type { TimestampMicros, ISODateTimeString } from '../src/types/time.types.ts';
@@ -91,8 +91,9 @@ Filters:
                                reported | not_reported | unknown. Reported = still not decrypted 4 s after
                                the app first tried to show it, i.e. the UTDs the user saw
   --event <id>                 The session of this UTD, in full (megolm). Ids here are aliases ($event-…,
-                               !room-…, @user-…) or any text holding one, e.g. a permalink: a raw id never
-                               matches. The user's bug report (summary userText) usually has them aliased
+                               !room-…, @user-…), a prefix of 6+ hex of one, or any text holding one, e.g. a
+                               permalink: a raw id never matches. The user's bug report (summary userText)
+                               usually has them aliased. A --room matching nothing lists the rooms with a UTD
   --session <id>               This session in full (megolm)
   --room <id>                  Only sessions in this room (megolm)
   --sender <id>                Only sessions this user sent (megolm)
@@ -694,6 +695,7 @@ export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
   for (const e of events) lifecycleCounts[e.kind] = (lifecycleCounts[e.kind] ?? 0) + 1;
   const coldStart = lastColdStartUs(events);
   const foreground = lastForegroundUs(events);
+  const span = getMinMaxTimestamps(merged.rawLogLines);
 
   const perFile = files.map(({ name, result }) => {
     let errors = 0;
@@ -735,7 +737,8 @@ export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
     // Dropped by the anonymizer, so the content is gone but its existence isn't:
     // a screenshot here is worth asking the user to describe. Key omitted when empty.
     ...(removedEntries.length ? { removedFiles: removedEntries } : {}),
-    timeSpan: stats.timeSpan,
+    // Dated: bare clocks make a log spanning a day read as seconds.
+    timeSpan: span.max > 0 ? { start: microsToISO(span.min as TimestampMicros), end: microsToISO(span.max as TimestampMicros) } : null,
     totals: {
       lines: stats.totalLogLines,
       errors: stats.errors,
@@ -954,6 +957,8 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
   // One pass yields both the counts and the match set: lowercasing each line
   // once per pattern would scan the selection P+1 times for the same answer.
   const counts = new Array<number>(queries.length).fill(0);
+  const firstUs = new Array<number>(queries.length).fill(0);
+  const lastUs = new Array<number>(queries.length).fill(0);
   const matches: number[] = [];
   for (const i of indices) {
     const text = lines[i].rawText.toLowerCase();
@@ -962,6 +967,11 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
       if (text.includes(queries[k])) {
         counts[k]++;
         hit = true;
+        const t = lines[i].timestampUs;
+        if (t > 0) {
+          if (firstUs[k] === 0) firstUs[k] = t;
+          lastUs[k] = t;
+        }
       }
     }
     if (hit) matches.push(i);
@@ -982,6 +992,14 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
   out.push(...hints);
 
   if (flags.count) {
+    // One histogram mixes the patterns: say when each one happens, so each gets its own window.
+    if (queries.length > 1) {
+      const stamped = firstUs.filter((t) => t > 0);
+      const sameDay = new Set([...stamped, ...lastUs.filter((t) => t > 0)].map((t) => microsToISO(t as TimestampMicros).slice(0, 10))).size <= 1;
+      const at = (us: number) => microsToISO(us as TimestampMicros).slice(sameDay ? 11 : 5, sameDay ? 19 : 16);
+      const when = patterns.flatMap((p, k) => (firstUs[k] > 0 ? [`"${p}" ${at(firstUs[k])} → ${at(lastUs[k])}`] : []));
+      if (when.length > 0) out.push(`# when: ${when.join(' · ')}`);
+    }
     emitDistribution(out, lines, matches);
     return out.join('\n');
   }
@@ -1220,11 +1238,15 @@ export interface MegolmArchive {
   readonly ing: Ingest;
 }
 
-const ID_ALIAS_RE = { event: /\$event-[0-9a-f]{12}/, room: /!room-[0-9a-f]{12}/, sender: /@user-[0-9a-f]{12}/ } as const;
+const ID_ALIAS_RE = { event: /\$event-[0-9a-f]+/, room: /!room-[0-9a-f]+/, sender: /@user-[0-9a-f]+/ } as const;
+/** Hex digits an alias prefix needs: fewer would match unrelated ids. */
+const MIN_ALIAS_HEX = 6;
 const ID_SIGIL = { event: '$event-…', room: '!room-…', sender: '@user-…' } as const;
 
 /** An id without its domain alias: what an alias flag matches on, so `!room-x` finds `!room-x:domain-y.org`. */
 const idKey = (id: string | undefined): string | undefined => id?.split(':')[0];
+/** An id names the alias a flag gave, or starts with it: people quote ids cut short. */
+const isAlias = (id: string | undefined, alias: string): boolean => idKey(id)?.startsWith(alias) ?? false;
 
 /**
  * The alias an id flag names, taken from an alias or any text holding one (a
@@ -1233,9 +1255,14 @@ const idKey = (id: string | undefined): string | undefined => id?.split(':')[0];
  */
 function aliasFlag(text: string, kind: keyof typeof ID_ALIAS_RE): string {
   const m = ID_ALIAS_RE[kind].exec(decodeIdentifier(text));
-  if (!m) throw new Error(`--${kind} needs an anonymized id (${ID_SIGIL[kind]}) or a permalink holding one: a raw id can never match the archive's aliases — alias it in shakeview first`);
+  if (!m || m[0].length - m[0].indexOf('-') - 1 < MIN_ALIAS_HEX) {
+    throw new Error(`--${kind} needs an anonymized id (${ID_SIGIL[kind]}, at least ${MIN_ALIAS_HEX} hex of it) or a permalink holding one: a raw id can never match the archive's aliases — alias it in shakeview first`);
+  }
   return m[0];
 }
+
+/** Same steps in a row on one device from which the timeline folds them into one line. */
+const FOLD_RUN = 3;
 
 const JOURNEY_MARK: Readonly<Record<JourneyState, string>> = { ok: '✓', fail: '✗', unknown: '?', note: '·' };
 
@@ -1281,7 +1308,7 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
     if (flags.event) {
       const ev = aliasFlag(flags.event, 'event');
       for (const s of model) {
-        const u = s.utds.find((x) => idKey(x.eventId) === ev);
+        const u = s.utds.find((x) => isAlias(x.eventId, ev));
         if (u) {
           session = s;
           // Judge the device that failed the event asked about: buildJourney keeps only its receiver's UTDs.
@@ -1305,11 +1332,12 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   const sender = flags.sender ? aliasFlag(flags.sender, 'sender') : undefined;
   const analytics = flags.analytics as AnalyticsCategory | undefined;
   if (analytics && !ANALYTICS_CATEGORIES.includes(analytics)) throw new Error(`invalid --analytics "${flags.analytics}" (use ${ANALYTICS_CATEGORIES.join(' | ')})`);
-  const sessions = (range ? scopeSessions(model, range.startUs, range.endUs) : model)
+  const unroomed = (range ? scopeSessions(model, range.startUs, range.endUs) : model)
     .filter((s) => !flags.utd || s.utds.length > 0)
     .filter((s) => !analytics || matchesOutcomes(sessionEventKeys(s), null, analytics))
-    .filter((s) => !room || idKey(s.roomId) === room)
-    .filter((s) => !sender || idKey(s.sender.userId) === sender || s.utds.some((u) => u.steps.some((x) => idKey(x.keys.userId) === sender)))
+    .filter((s) => !sender || isAlias(s.sender.userId, sender) || s.utds.some((u) => u.steps.some((x) => isAlias(x.keys.userId, sender))));
+  const sessions = unroomed
+    .filter((s) => !room || isAlias(s.roomId, room))
     .map((s) => ({ s, ts: sessionTime(s) }))
     .sort((a, b) => b.ts - a.ts);
 
@@ -1337,9 +1365,14 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   }
   const remaining = sessions.length - offset - page.length;
   if (remaining > 0) out.push(`# ${remaining} more sessions — next: --offset ${offset + page.length}`);
-  if (page.length === 0) {
-    out.push(sessions.length === 0 ? '# no megolm sessions' : `# --offset ${offset} is past the end (${sessions.length} sessions) — lower --offset`);
-  }
+  if (page.length === 0 && sessions.length > 0) out.push(`# --offset ${offset} is past the end (${sessions.length} sessions) — lower --offset`);
+  else if (sessions.length === 0 && room) {
+    // A room quoted from a report may be mistyped or aliased under another salt: show what is there.
+    const byRoom = new Map<string, number>();
+    for (const s of unroomed) if (s.utds.length > 0 && s.roomId) byRoom.set(s.roomId, (byRoom.get(s.roomId) ?? 0) + 1);
+    const rooms = [...byRoom].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([r, n]) => `${r} (${plural(n, 'session')})`);
+    out.push(`# no session in ${room}; rooms with a UTD: ${rooms.join(' · ') || 'none'}`);
+  } else if (sessions.length === 0) out.push('# no megolm sessions');
   return out.join('\n');
 }
 
@@ -1384,7 +1417,8 @@ function emitMegolmSession(
   const j = buildJourney(session, sender, receiver);
   const who = (d: CryptoDevice | undefined) => (d ? `${num.get(d.id)} ${d.identity.userId ?? '?'} ${d.identity.deviceId ?? '?'}` : 'not loaded');
   out.push(`# session ${session.sessionId} · room ${session.roomId ?? '?'}`);
-  out.push(`# sender ${sender ? who(sender) : `${session.sender.userId ?? '?'} ${session.sender.deviceId ?? '?'} (not loaded)`} (by ${session.senderSource}) · receiver ${who(receiver)}`);
+  const senderText = sender ? who(sender) : `${session.sender.userId ?? '?'} ${session.sender.deviceId ?? '?'} (not loaded)`;
+  out.push(`# sender: ${senderText} · found by ${session.senderSource} · receiver: ${who(receiver)}`);
   out.push(`verdict: ${j.verdict}`);
   out.push(`basis: ${j.basis}`);
   for (const l of j.lines) {
@@ -1425,13 +1459,23 @@ function emitMegolmSession(
   }
 
   const decisive = j.lines.find((l) => l.decisive)?.ref;
+  const isDecisive = (x: CryptoStep) => decisive?.archive === x.line.archive && decisive.file === x.line.file && decisive.line === x.line.line;
   const timeline = Object.values(session.stepsByDevice).flat().sort((a, b) => a.ts - b.ts);
+  // A burst of the same step on one device (ten UTDs in a row) reads as one line.
+  const runs: CryptoStep[][] = [];
+  for (const x of timeline) {
+    const last = runs[runs.length - 1];
+    if (last && last[0].kind === x.kind && last[0].line.archive === x.line.archive) last.push(x);
+    else runs.push([x]);
+  }
+  const rows = runs.flatMap((r) => (r.length >= FOLD_RUN ? [r] : r.map((x) => [x])));
   let lastDay = '';
-  capped(`timeline (${plural(timeline.length, 'step')}, time order: time archive step):`, timeline, (x) => {
+  capped(`timeline (${plural(timeline.length, 'step')}, time order: time archive step):`, rows, (r) => {
     const marker: string[] = [];
-    lastDay = pushDayMarker(marker, x.ts, lastDay);
-    const mark = decisive && decisive.archive === x.line.archive && decisive.file === x.line.file && decisive.line === x.line.line ? ' ← decisive' : '';
-    return [...marker, `${clockOf(x.ts)} ${num.get(x.line.archive)} ${describeStep(x)} ${ref(x.line)}${mark}`].join('\n');
+    lastDay = pushDayMarker(marker, r[0].ts, lastDay);
+    const fold = r.length > 1 ? ` ×${r.length} to ${clockOf(r[r.length - 1].ts)}` : '';
+    const mark = r.some(isDecisive) ? ' ← decisive' : '';
+    return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${describeStep(r[0])}${fold} ${ref(r[0].line)}${mark}`].join('\n');
   }, offset);
 }
 

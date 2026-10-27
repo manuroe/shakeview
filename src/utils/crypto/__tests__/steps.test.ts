@@ -252,6 +252,14 @@ describe('extractSteps — receiver side', () => {
     expect(only('2026-10-15T17:42:26.936000Z DEBUG elementx: onUtd for event $ev1, timeToDecryptMs: null |  |').keys.timeToDecryptMs).toBe(-1);
   });
 
+  it('redecrypt.keys and redecrypt.request: when the redecryptor gets to a key, and a retry request', () => {
+    expect(only('2026-10-15T17:41:04.225000Z TRACE matrix_sdk::event_cache::redecryptor: Received new room keys room_keys=[RoomKeyInfo { algorithm: "m.megolm.v1.aes-sha2", room_id: "!r:a.org", sender_key: "curve25519:K1", session_id: "S1" }, RoomKeyInfo { algorithm: "m.megolm.v1.aes-sha2", room_id: "!r2", sender_key: "curve25519:K2", session_id: "S2" }] | crates/matrix-sdk/src/event_cache/redecryptor.rs:1080'))
+      .toMatchObject({ kind: 'redecrypt.keys', role: 'receiver', keys: { sessionIds: ['S1', 'S2'] } });
+    // Only the UTD sessions: a refresh_info session is not one the request retries.
+    expect(only('2026-10-15T17:41:26.792000Z TRACE matrix_sdk::event_cache::redecryptor: Received a redecryption request request=DecryptionRetryRequest { room_id: "!r", utd_session_ids: {"S1", "S3"}, refresh_info_session_ids: {"S4"} } | crates/matrix-sdk/src/event_cache/redecryptor.rs:1058'))
+      .toMatchObject({ kind: 'redecrypt.request', keys: { roomId: '!r', sessionIds: ['S1', 'S3'] } });
+  });
+
   it('a js-sdk failure is marked as such (Element Web analytics rules)', () => {
     expect(only('2026-09-08T06:55:22.132Z W Error decrypting event (id=$ev1 type=m.room.encrypted sender=@alice:a.org room=!r:a.org ts=2026-09-08T06:55:13.756Z): DecryptionError[msg: x, sender_key: K, session_id: S]').text)
       .toMatch(/^Error decrypting event/);
