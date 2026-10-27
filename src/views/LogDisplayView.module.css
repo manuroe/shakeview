@@ -71,7 +71,7 @@
 
 .btnToolbar.active {
     background: var(--color-primary);
-    color: white;
+    color: var(--color-on-primary);
     border-color: var(--color-primary);
 }
 
@@ -82,7 +82,7 @@
 /** Applied to the anonymize toolbar button when the log is in anonymized state. */
 .btnActive {
     background: var(--color-primary);
-    color: white;
+    color: var(--color-on-primary);
     border-color: var(--color-primary);
 }
 
@@ -160,6 +160,7 @@
 .logContextInput:focus {
     outline: none;
     background: var(--color-primary-light);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .logContextInput:disabled {

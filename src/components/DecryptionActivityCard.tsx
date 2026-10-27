@@ -28,7 +28,7 @@ const KEY_NAME: Readonly<Record<KeySource, string>> = {
   outbound: 'outbound session',
 };
 const KEY_COLORS: Readonly<Record<KeySource, string>> = {
-  ['room_key']: 'var(--color-success)', ['room_key_late']: 'var(--log-level-warn)', forwarded: 'var(--color-info)', bundle: 'var(--color-sentry)', backup: 'var(--color-visited)',
+  ['room_key']: 'var(--color-success)', ['room_key_late']: 'var(--color-warning)', forwarded: 'var(--color-info)', bundle: 'var(--color-sentry)', backup: 'var(--color-visited)',
   outbound: 'var(--text-secondary)',
 };
 
@@ -37,7 +37,7 @@ const UTD_CATEGORIES = [...ANALYTICS_CATEGORIES];
 // Opaque tints of the page background: still visible on the dark tooltip, in both themes.
 const grey = (pct: number) => `color-mix(in srgb, var(--text-muted) ${pct}%, var(--bg-primary))`;
 /** Reported in red, so the tracked metric stands out; the rest in greys. */
-const UTD_COLORS: Readonly<Record<AnalyticsCategory, string>> = { reported: 'var(--log-level-error)', ['not_reported']: grey(70), unknown: grey(40) };
+const UTD_COLORS: Readonly<Record<AnalyticsCategory, string>> = { reported: 'var(--color-error)', ['not_reported']: grey(70), unknown: grey(40) };
 
 /** A tooltip line: a category with its chart colour and an optional muted detail under it. */
 interface TooltipRow { readonly key: string; readonly color: string; readonly text: string; readonly count: number; readonly detail?: string }

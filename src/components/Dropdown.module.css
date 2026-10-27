@@ -33,7 +33,7 @@
 .button:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-muted);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 /* Base dropdown panel */

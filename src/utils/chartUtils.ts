@@ -56,3 +56,10 @@ export function snapToEdge(
     maxTime - rawEnd < bucketTimeSpan ? maxTime : rawEnd;
   return [startTime, endTime];
 }
+
+/**
+ * Left margin of every time-axis chart, wide enough for the widest y-axis
+ * labels ("976.6 KB"). Shared so stacked charts on a page start their time
+ * axes at the same x and line up.
+ */
+export const CHART_MARGIN_LEFT = 60;

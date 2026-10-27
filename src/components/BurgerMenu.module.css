@@ -137,6 +137,7 @@
 .saltInput:focus {
     outline: none;
     border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .saltReset {
@@ -209,6 +210,6 @@
 .themeButton.active {
     background: var(--color-primary);
     border-color: var(--color-primary);
-    color: white;
+    color: var(--color-on-primary);
     font-weight: 600;
 }

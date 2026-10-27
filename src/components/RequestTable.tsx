@@ -581,7 +581,7 @@ export function RequestTable({
           <div className="stats-compact">
             <span id="shown-count">{displayedRequests.length}</span> / <span id="total-count">{totalCount}</span>
             {(totalUploadBytes > 0 || totalDownloadBytes > 0) && (
-              <span style={{ marginLeft: '8px', opacity: 0.8 }}>
+              <span style={{ marginLeft: '8px', color: 'var(--text-secondary)' }}>
                 &mdash; ↑ {formatBytes(totalUploadBytes)} / ↓ {formatBytes(totalDownloadBytes)}
               </span>
             )}
@@ -754,7 +754,7 @@ export function RequestTable({
                 </div>
 
                 {/* Right panel - waterfall */}
-                <div data-testid="request-table-right-scroll" className={styles.timelineRowsRight} ref={waterfallContainerRef}>
+                <div data-testid="request-table-right-scroll" className={styles.timelineRowsRight} ref={waterfallContainerRef} tabIndex={0} role="region" aria-label="Request timeline">
                   {/* Spacer div establishes the full scrollable height and contains absolutely-positioned rows + gap overlays. */}
                   <div style={{ width: `${timeline.totalWidthPx}px`, height: `${totalVirtualHeight}px`, position: 'relative' }}>
                     {virtualRows.map((vRow) => {

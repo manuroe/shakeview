@@ -46,8 +46,8 @@ const OUTCOMES: readonly Omit<OutcomeOption, 'count'>[] = [
   { key: 'key_received', label: 'Key received', group: 'No UTD', color: 'var(--color-success)' },
   // A session a loaded device started (Rust's `OutboundGroupSession`), counted as on the /summary keys chart.
   { key: 'outbound', label: 'Outbound session', group: 'No UTD', color: 'var(--text-secondary)' },
-  ...UTD_REASONS.map((r) => ({ key: utdOutcomeKey(r), label: REASON_NAME[r], group: 'UTD', color: 'var(--log-level-error)' })),
-  ...RESOLUTION_MECHANISMS.map((m) => ({ key: lateOutcomeKey(m), label: m, group: 'Late decryption', color: 'var(--log-level-warn)' })),
+  ...UTD_REASONS.map((r) => ({ key: utdOutcomeKey(r), label: REASON_NAME[r], group: 'UTD', color: 'var(--color-error)' })),
+  ...RESOLUTION_MECHANISMS.map((m) => ({ key: lateOutcomeKey(m), label: m, group: 'Late decryption', color: 'var(--color-warning)' })),
 ];
 /** The second filter, one value at a time: did UTD analytics receive a UTD of the session. /summary links to `reported`. */
 const ANALYTICS_PARAM = 'analytics';
@@ -76,7 +76,7 @@ function OutcomeTags({ counts }: { counts: ReadonlyMap<string, number> }) {
   return OUTCOMES.filter((o) => counts.has(o.key)).map((o) => {
     const n = o.group === 'No UTD' ? 0 : counts.get(o.key)!;
     return (
-      <span key={o.key} className={styles.tag} style={{ color: o.color, background: `color-mix(in srgb, ${o.color} 15%, transparent)` }}
+      <span key={o.key} className={styles.tag} style={{ background: `color-mix(in srgb, ${o.color} 15%, transparent)`, boxShadow: `inset 0 0 0 1px ${o.color}` }}
         title={n > 1 ? `${n} UTDs` : undefined}>
         {n > 1 && `${n} `}{o.label}
       </span>

@@ -35,39 +35,39 @@ export function getHttpStatusColorVar(status: string | number): string {
 
 // Fallback colors matching foundation.css light theme (using Map for eslint compliance)
 const codeFallbackColors = new Map<number, string>([
-  [200, '#28a745'],
-  [201, '#2ecc71'],
-  [202, '#27ae60'],
-  [204, '#1abc9c'],
-  [301, '#17a2b8'],
-  [302, '#20c997'],
-  [304, '#6610f2'],
-  [307, '#0dcaf0'],
-  [308, '#0d6efd'],
-  [400, '#fd7e14'],
-  [401, '#e65100'],
-  [403, '#ff5722'],
-  [404, '#f39c12'],
-  [405, '#e67e22'],
-  [408, '#d35400'],
-  [409, '#f57c00'],
-  [410, '#ef6c00'],
-  [422, '#ff8f00'],
-  [429, '#ff6f00'],
-  [500, '#dc3545'],
-  [501, '#c0392b'],
-  [502, '#e74c3c'],
-  [503, '#b71c1c'],
-  [504, '#d32f2f'],
+  [200, '#166534'],
+  [201, '#1e8b47'],
+  [202, '#229e51'],
+  [204, '#1a783e'],
+  [301, '#127e8f'],
+  [302, '#1490a4'],
+  [304, '#17a2b8'],
+  [307, '#0f6c7b'],
+  [308, '#0d5a66'],
+  [400, '#d97706'],
+  [401, '#b66405'],
+  [403, '#a55a05'],
+  [404, '#c86d06'],
+  [405, '#5f3403'],
+  [408, '#4e2b02'],
+  [409, '#824704'],
+  [410, '#3d2102'],
+  [422, '#713e03'],
+  [429, '#945104'],
+  [500, '#a855f7'],
+  [501, '#7b0be5'],
+  [502, '#9d3ff6'],
+  [503, '#9229f5'],
+  [504, '#8613f4'],
 ]);
 
 // Category fallback colors
 const categoryFallbackColors = new Map<string, string>([
-  ['success', '#28a745'],
+  ['success', '#166534'],
   ['redirect', '#17a2b8'],
-  ['clientError', '#fd7e14'],
-  ['serverError', '#dc3545'],
-  ['incomplete', '#6c757d'],
+  ['clientError', '#d97706'],
+  ['serverError', '#a855f7'],
+  ['incomplete', '#7b8667'],
 ]);
 
 /**
@@ -90,7 +90,7 @@ export function getHttpStatusColor(status: string | number): string {
   }
 
   const category = getHttpStatusCategory(status);
-  return categoryFallbackColors.get(category) ?? '#6c757d';
+  return categoryFallbackColors.get(category) ?? '#7b8667';
 }
 
 /**

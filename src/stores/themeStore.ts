@@ -15,10 +15,13 @@ function applyTheme(theme: Theme) {
   try {
     const root = document.documentElement;
     
+    // Compound tokens follow prefers-color-scheme unless a cpd-theme-* class forces one.
+    root.classList.remove('cpd-theme-light', 'cpd-theme-dark');
     if (theme === 'system') {
       root.removeAttribute('data-theme');
     } else {
       root.setAttribute('data-theme', theme);
+      root.classList.add(`cpd-theme-${theme}`);
     }
   } catch {
     // document may not be available in tests

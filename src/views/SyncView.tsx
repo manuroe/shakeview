@@ -133,6 +133,7 @@ export function SyncView() {
     <>
       <select
         id="conn-filter"
+        aria-label="Connection"
         value={selectedConnId}
         onChange={(e) => setSelectedConnId(e.target.value)}
         className="select-compact"
@@ -147,6 +148,7 @@ export function SyncView() {
       {availableTimeouts.length >= 1 && (
         <select
           id="timeout-filter"
+          aria-label="Sync timeout"
           value={selectedTimeout ?? ''}
           onChange={(e) => {
             const val = e.target.value === '' ? null : parseInt(e.target.value, 10);

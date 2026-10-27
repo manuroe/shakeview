@@ -115,7 +115,7 @@
 .widthInput:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-muted);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .widthInput:disabled {
@@ -141,7 +141,7 @@
 .textInput:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-muted);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 /* -------------------------------------------------------------------------
@@ -220,7 +220,7 @@
 .textArea:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-muted);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .textAreaLabel {

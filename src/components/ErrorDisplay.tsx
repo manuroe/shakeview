@@ -51,7 +51,7 @@ export default function ErrorDisplay({ error, onDismiss, className = '' }: Error
           style={{
             background: 'none',
             border: 'none',
-            color: '#6b7280',
+            color: 'var(--text-secondary)',
             cursor: 'pointer',
             fontSize: '14px',
             marginLeft: '8px',

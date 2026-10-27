@@ -59,7 +59,7 @@ export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElem
     <>
       {uploadEntries.length > 0 && (
         <>
-          <div style={{ fontSize: '9px', color: '#aaa', marginBottom: '1px' }}>↑ Upload</div>
+          <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '1px' }}>↑ Upload</div>
           {uploadEntries.map(([statusKey, bytes]) => (
             <div key={statusKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
               <span
@@ -72,7 +72,7 @@ export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElem
                   flexShrink: 0,
                 }}
               />
-              <span style={{ fontSize: '9px' }}>{getBucketLabel(statusKey)}: {formatBytes(bytes)}</span>
+              <span style={{ fontSize: '10px' }}>{getBucketLabel(statusKey)}: {formatBytes(bytes)}</span>
             </div>
           ))}
         </>
@@ -80,7 +80,7 @@ export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElem
 
       {downloadEntries.length > 0 && (
         <>
-          <div style={{ fontSize: '9px', color: '#aaa', marginTop: uploadEntries.length > 0 ? '3px' : 0, marginBottom: '1px' }}>↓ Download</div>
+          <div style={{ fontSize: '10px', color: '#aaa', marginTop: uploadEntries.length > 0 ? '3px' : 0, marginBottom: '1px' }}>↓ Download</div>
           {downloadEntries.map(([statusKey, bytes]) => (
             <div key={statusKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
               <span
@@ -93,7 +93,7 @@ export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElem
                   flexShrink: 0,
                 }}
               />
-              <span style={{ fontSize: '9px' }}>{getBucketLabel(statusKey)}: {formatBytes(bytes)}</span>
+              <span style={{ fontSize: '10px' }}>{getBucketLabel(statusKey)}: {formatBytes(bytes)}</span>
             </div>
           ))}
         </>
@@ -105,7 +105,7 @@ export function renderBandwidthTooltip(bucket: BandwidthBucket): React.ReactElem
             marginTop: '3px',
             paddingTop: '2px',
             borderTop: '1px solid #555',
-            fontSize: '9px',
+            fontSize: '10px',
           }}
         >
           Total: {formatBytes(bucket.total)}

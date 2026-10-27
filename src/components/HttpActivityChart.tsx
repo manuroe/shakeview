@@ -171,13 +171,13 @@ export function HttpActivityChart({
                   borderRadius: '1px',
                 }}
               />
-              <span style={{ fontSize: '9px' }}>
+              <span style={{ fontSize: '10px' }}>
                 {getBucketLabel(code)}: {count}
               </span>
             </div>
           );
         })}
-        <div style={{ marginTop: '2px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '9px' }}>
+        <div style={{ marginTop: '2px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '10px' }}>
           Total: {bucket.total}
         </div>
       </>

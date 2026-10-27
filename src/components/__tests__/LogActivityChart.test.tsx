@@ -97,7 +97,7 @@ describe('LogActivityChart', () => {
     const { container } = render(<LogActivityChart logLines={logs} />);
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
 
-    // clientX=150 → adjustedX=100 (past marginLeft=50): falls on a real bucket
+    // clientX=150 → adjustedX=90 (past CHART_MARGIN_LEFT=60): falls on a real bucket
     fireEvent.mouseMove(overlay, { clientX: 150, clientY: 50 });
 
     // showTooltip fires in the same handleMouseMove call as setCursorX,
@@ -349,11 +349,11 @@ describe('LogActivityChart', () => {
 
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Look for selection cursors (blue lines with #2196f3 color)
-    const blueLines = container.querySelectorAll('line[stroke="#2196f3"]');
+    // Look for selection cursors (lines in the primary colour)
+    const cursorLines = container.querySelectorAll('line[stroke="var(--color-primary)"]');
     
-    // Should have at least 2 blue lines during selection (start and end cursors)
-    expect(blueLines.length).toBeGreaterThanOrEqual(2);
+    // Should have at least 2 cursor lines during selection (start and end)
+    expect(cursorLines.length).toBeGreaterThanOrEqual(2);
   });
 
   it('displays time labels on selection cursors', async () => {
@@ -372,8 +372,8 @@ describe('LogActivityChart', () => {
 
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Look for blue text labels on selection cursors
-    const textElements = container.querySelectorAll('text[fill="#2196f3"]');
+    // Look for the time labels on the selection cursors
+    const textElements = container.querySelectorAll('text[fill="var(--color-primary)"]');
     
     // Should have time labels for start and end cursors
     expect(textElements.length).toBeGreaterThanOrEqual(2);
@@ -403,8 +403,8 @@ describe('LogActivityChart', () => {
 
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // Selection cursors should exist (solid blue lines)
-    const selectionCursors = container.querySelectorAll('line[stroke="#2196f3"]');
+    // Selection cursors should exist (solid primary-colour lines)
+    const selectionCursors = container.querySelectorAll('line[stroke="var(--color-primary)"]');
     expect(selectionCursors.length).toBeGreaterThan(0);
   });
 
@@ -556,13 +556,13 @@ describe('LogActivityChart', () => {
       <LogActivityChart logLines={logs} externalSelection={{ startUs, endUs }} />
     );
 
-    // A blue selection band (rect with blue fill) should appear
-    const selectionBand = container.querySelector('rect[fill="rgba(33, 150, 243, 0.2)"]');
+    // A selection band (primary-colour rect) should appear
+    const selectionBand = container.querySelector('rect[fill="var(--color-primary)"][fill-opacity="0.2"]');
     expect(selectionBand).toBeInTheDocument();
 
-    // Two blue cursor lines should also appear
-    const blueLines = container.querySelectorAll('line[stroke="#2196f3"]');
-    expect(blueLines.length).toBeGreaterThanOrEqual(2);
+    // Two cursor lines should also appear
+    const cursorLines = container.querySelectorAll('line[stroke="var(--color-primary)"]');
+    expect(cursorLines.length).toBeGreaterThanOrEqual(2);
   });
 
   it('does not show mirrored tooltip content while a mirrored selection is active', () => {

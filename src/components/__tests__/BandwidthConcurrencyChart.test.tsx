@@ -164,7 +164,7 @@ describe('BandwidthConcurrencyChart interaction', () => {
         externalSelection={{ startUs: 2_000 * MICROS_PER_MILLISECOND, endUs: 7_000 * MICROS_PER_MILLISECOND }}
       />,
     );
-    const solidLines = container.querySelectorAll('line[stroke="#2196f3"]');
+    const solidLines = container.querySelectorAll('line[stroke="var(--color-primary)"]');
     expect(solidLines.length).toBeGreaterThan(0);
   });
 
@@ -254,7 +254,7 @@ describe('BandwidthConcurrencyChart interaction', () => {
     // Start a drag without releasing — selection band should appear
     fireEvent.mouseDown(overlay, { clientX: 200, clientY: 50 });
     fireEvent.mouseMove(overlay, { clientX: 500, clientY: 50 });
-    const selectionBand = container.querySelector('rect[fill="rgba(33, 150, 243, 0.2)"]');
+    const selectionBand = container.querySelector('rect[fill="var(--color-primary)"][fill-opacity="0.2"]');
     expect(selectionBand).toBeInTheDocument();
   });
 });

@@ -247,7 +247,7 @@
 
 .collapseToggle:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--color-primary-muted);
+    box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .collapseToggleActive {

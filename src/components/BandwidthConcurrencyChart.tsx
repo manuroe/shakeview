@@ -15,6 +15,8 @@ import type { StepPoint } from '../utils/concurrencyUtils';
 import { getCountAtTime } from '../utils/concurrencyUtils';
 import { useStepChartInteraction } from '../hooks/useStepChartInteraction';
 import { getBucketKey, getBucketColor, getBucketLabel, sortStatusCodes } from '../utils/httpStatusBuckets';
+import { useElementWidth } from '../hooks/useElementWidth';
+import { CHART_MARGIN_LEFT } from '../utils/chartUtils';
 
 interface BandwidthConcurrencyChartProps {
   /** Per-request time spans, each with precise start/end timestamps and byte counts. */
@@ -62,7 +64,7 @@ interface TooltipData {
 }
 
 const SVG_WIDTH = 800;
-const MARGIN = { top: 10, right: 10, bottom: 30, left: 60 };
+const MARGIN = { top: 10, right: 10, bottom: 30, left: CHART_MARGIN_LEFT };
 
 function computeStepSeries(
   spans: readonly BandwidthRequestSpan[],
@@ -115,32 +117,32 @@ function renderConcurrencyTooltip(data: TooltipData): React.ReactElement {
     <>
       {data.statusEntries.filter((e) => e.uploadBytes > 0).length > 0 && (
         <>
-          <div style={{ fontSize: '9px', color: '#aaa', marginBottom: '1px' }}>↑ Upload</div>
+          <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '1px' }}>↑ Upload</div>
           {data.statusEntries
             .filter((e) => e.uploadBytes > 0)
             .map((entry) => (
               <div key={`ul-${entry.key}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
                 <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: getBucketColor(entry.key), borderRadius: '1px', flexShrink: 0 }} />
-                <span style={{ fontSize: '9px' }}>{getBucketLabel(entry.key)}: {formatBytes(entry.uploadBytes)}</span>
+                <span style={{ fontSize: '10px' }}>{getBucketLabel(entry.key)}: {formatBytes(entry.uploadBytes)}</span>
               </div>
             ))}
         </>
       )}
       {data.statusEntries.filter((e) => e.downloadBytes > 0).length > 0 && (
         <>
-          <div style={{ fontSize: '9px', color: '#aaa', marginTop: data.statusEntries.some((e) => e.uploadBytes > 0) ? '3px' : 0, marginBottom: '1px' }}>↓ Download</div>
+          <div style={{ fontSize: '10px', color: '#aaa', marginTop: data.statusEntries.some((e) => e.uploadBytes > 0) ? '3px' : 0, marginBottom: '1px' }}>↓ Download</div>
           {data.statusEntries
             .filter((e) => e.downloadBytes > 0)
             .map((entry) => (
               <div key={`dl-${entry.key}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
                 <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: getBucketColor(entry.key), borderRadius: '1px', flexShrink: 0 }} />
-                <span style={{ fontSize: '9px' }}>{getBucketLabel(entry.key)}: {formatBytes(entry.downloadBytes)}</span>
+                <span style={{ fontSize: '10px' }}>{getBucketLabel(entry.key)}: {formatBytes(entry.downloadBytes)}</span>
               </div>
             ))}
         </>
       )}
       {(data.totalDownload > 0 || data.totalUpload > 0) && (
-        <div style={{ marginTop: '3px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '9px' }}>
+        <div style={{ marginTop: '3px', paddingTop: '2px', borderTop: '1px solid #555', fontSize: '10px' }}>
           {data.totalDownload > 0 && <span>↓ {formatBytes(data.totalDownload)}</span>}
           {data.totalDownload > 0 && data.totalUpload > 0 && <span style={{ margin: '0 4px', color: '#aaa' }}>·</span>}
           {data.totalUpload > 0 && <span>↑ {formatBytes(data.totalUpload)}</span>}
@@ -178,7 +180,8 @@ export function BandwidthConcurrencyChart({
   height = 140,
 }: BandwidthConcurrencyChartProps) {
   const { minTime, maxTime } = timeRange;
-  const xMax = SVG_WIDTH - MARGIN.left - MARGIN.right;
+  const [widthRef, svgWidth] = useElementWidth(SVG_WIDTH);
+  const xMax = svgWidth - MARGIN.left - MARGIN.right;
   const yMax = height - MARGIN.top - MARGIN.bottom;
 
   // ── Ordered status keys from all spans ───────────────────────────────────
@@ -375,7 +378,7 @@ export function BandwidthConcurrencyChart({
     hasExternalSelection,
   } = useStepChartInteraction({
     xMax,
-    svgWidth: SVG_WIDTH,
+    svgWidth: svgWidth,
     marginLeft: MARGIN.left,
     minTime,
     maxTime,
@@ -404,12 +407,12 @@ export function BandwidthConcurrencyChart({
 
   return (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div ref={widthRef} style={{ flex: 1, minWidth: 0 }}>
         <svg
           ref={svgRef}
           width="100%"
           height={height}
-          viewBox={`0 0 ${SVG_WIDTH} ${height}`}
+          viewBox={`0 0 ${svgWidth} ${height}`}
           style={{ display: 'block' }}
         >
           <Group left={MARGIN.left} top={MARGIN.top}>
@@ -456,10 +459,10 @@ export function BandwidthConcurrencyChart({
             />
 
             {/* ── Direction labels (right edge) ───────────────────────── */}
-            <text x={xMax - 4} y={10} textAnchor="end" fontSize={8} fill="#888" pointerEvents="none">
+            <text x={xMax - 4} y={10} textAnchor="end" fontSize={10} fill="#888" pointerEvents="none">
               ↑ Upload
             </text>
-            <text x={xMax - 4} y={yMax - 4} textAnchor="end" fontSize={8} fill="#888" pointerEvents="none">
+            <text x={xMax - 4} y={yMax - 4} textAnchor="end" fontSize={10} fill="#888" pointerEvents="none">
               ↓ Download
             </text>
 
@@ -469,7 +472,7 @@ export function BandwidthConcurrencyChart({
               stroke="#666"
               tickStroke="#666"
               tickFormat={(value) => formatBytes(value.valueOf())}
-              tickLabelProps={() => ({ fill: '#666', fontSize: 10, textAnchor: 'end', dx: -4 })}
+              tickLabelProps={() => ({ fill: '#666', fontSize: 11, textAnchor: 'end', dx: -4 })}
             />
             <AxisLeft
               scale={downloadScale}
@@ -477,16 +480,16 @@ export function BandwidthConcurrencyChart({
               stroke="#666"
               tickStroke="#666"
               tickFormat={(value) => formatBytes(value.valueOf())}
-              tickLabelProps={() => ({ fill: '#666', fontSize: 10, textAnchor: 'end', dx: -4 })}
+              tickLabelProps={() => ({ fill: '#666', fontSize: 11, textAnchor: 'end', dx: -4 })}
             />
-            <text x={-8} y={zeroY + 4} textAnchor="end" fontSize={10} fill="#666" pointerEvents="none">0</text>
+            <text x={-8} y={zeroY + 4} textAnchor="end" fontSize={11} fill="#666" pointerEvents="none">0</text>
 
             {/* Start/end time labels */}
             <line x1={0} y1={yMax} x2={xMax} y2={yMax} stroke="#666" strokeWidth={1} pointerEvents="none" />
-            <text x={0} y={yMax + 16} textAnchor="start" fontSize={9} fill="#666" pointerEvents="none">
+            <text x={0} y={yMax + 16} textAnchor="start" fontSize={10} fill="#666" pointerEvents="none">
               {formatTime(minTime)}
             </text>
-            <text x={xMax} y={yMax + 16} textAnchor="end" fontSize={9} fill="#666" pointerEvents="none">
+            <text x={xMax} y={yMax + 16} textAnchor="end" fontSize={10} fill="#666" pointerEvents="none">
               {formatTime(maxTime)}
             </text>
 
@@ -514,27 +517,28 @@ export function BandwidthConcurrencyChart({
                   y={0}
                   width={Math.abs(selectionEnd.x - selectionStart.x)}
                   height={yMax}
-                  fill="rgba(33, 150, 243, 0.2)"
+                  fill="var(--color-primary)"
+                  fillOpacity={0.2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selectionStart.x - MARGIN.left, y: 0 }}
                   to={{ x: selectionStart.x - MARGIN.left, y: yMax }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
                 <Line
                   from={{ x: selectionEnd.x - MARGIN.left, y: 0 }}
                   to={{ x: selectionEnd.x - MARGIN.left, y: yMax }}
-                  stroke="#2196f3"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   pointerEvents="none"
                 />
-                <text x={selectionStart.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                <text x={selectionStart.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                   {formatTime(selectionStart.time)}
                 </text>
-                <text x={selectionEnd.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                <text x={selectionEnd.x - MARGIN.left} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                   {formatTime(selectionEnd.time)}
                 </text>
               </>
@@ -555,8 +559,8 @@ export function BandwidthConcurrencyChart({
                     x={Math.max(10, Math.min(xMax - 10, activeCursorX))}
                     y={yMax + 16}
                     textAnchor="middle"
-                    fontSize={10}
-                    fill="#333"
+                    fontSize={11}
+                    fill="var(--text-primary)"
                     fontWeight="bold"
                     pointerEvents="none"
                   >
@@ -581,8 +585,8 @@ export function BandwidthConcurrencyChart({
                   x={Math.max(10, Math.min(xMax - 10, timeToX(externalCursorTime)))}
                   y={yMax + 16}
                   textAnchor="middle"
-                  fontSize={10}
-                  fill="#333"
+                  fontSize={11}
+                  fill="var(--text-primary)"
                   fontWeight="bold"
                   pointerEvents="none"
                 >
@@ -597,13 +601,13 @@ export function BandwidthConcurrencyChart({
               const selEndX = timeToX(Math.max(externalSelection.startUs, externalSelection.endUs));
               return (
                 <>
-                  <rect x={selStartX} y={0} width={selEndX - selStartX} height={yMax} fill="rgba(33, 150, 243, 0.2)" pointerEvents="none" />
-                  <Line from={{ x: selStartX, y: 0 }} to={{ x: selStartX, y: yMax }} stroke="#2196f3" strokeWidth={2} pointerEvents="none" />
-                  <Line from={{ x: selEndX, y: 0 }} to={{ x: selEndX, y: yMax }} stroke="#2196f3" strokeWidth={2} pointerEvents="none" />
-                  <text x={selStartX} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                  <rect x={selStartX} y={0} width={selEndX - selStartX} height={yMax} fill="var(--color-primary)" fillOpacity={0.2} pointerEvents="none" />
+                  <Line from={{ x: selStartX, y: 0 }} to={{ x: selStartX, y: yMax }} stroke="var(--color-primary)" strokeWidth={2} pointerEvents="none" />
+                  <Line from={{ x: selEndX, y: 0 }} to={{ x: selEndX, y: yMax }} stroke="var(--color-primary)" strokeWidth={2} pointerEvents="none" />
+                  <text x={selStartX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                     {formatTime(Math.min(externalSelection.startUs, externalSelection.endUs))}
                   </text>
-                  <text x={selEndX} y={yMax + 20} textAnchor="middle" fontSize={10} fill="#2196f3" fontWeight="bold" pointerEvents="none">
+                  <text x={selEndX} y={yMax + 20} textAnchor="middle" fontSize={11} fill="var(--color-primary)" fontWeight="bold" pointerEvents="none">
                     {formatTime(Math.max(externalSelection.startUs, externalSelection.endUs))}
                   </text>
                 </>
@@ -623,7 +627,7 @@ export function BandwidthConcurrencyChart({
               color: 'white',
               padding: '4px 6px',
               borderRadius: '3px',
-              fontSize: '10px',
+              fontSize: '11px',
               pointerEvents: 'none',
               lineHeight: '1.3',
               zIndex: 1000,

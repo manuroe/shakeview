@@ -245,7 +245,7 @@ describe('HttpConcurrencyChart', () => {
         />,
       );
       // External selection band: a filled rect + 2 lines (not dashed)
-      const solidLines = container.querySelectorAll('line[stroke="#2196f3"]');
+      const solidLines = container.querySelectorAll('line[stroke="var(--color-primary)"]');
       expect(solidLines.length).toBeGreaterThan(0);
     });
 

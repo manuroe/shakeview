@@ -263,8 +263,8 @@ describe('BandwidthChart', () => {
           }}
         />,
       );
-      // External selection band renders a semi-transparent blue rect
-      const selectionRect = container.querySelector('rect[fill="rgba(33, 150, 243, 0.2)"]');
+      // External selection band renders a semi-transparent primary-colour rect
+      const selectionRect = container.querySelector('rect[fill="var(--color-primary)"][fill-opacity="0.2"]');
       expect(selectionRect).toBeInTheDocument();
     });
 
@@ -304,7 +304,7 @@ describe('BandwidthChart', () => {
       // Start a drag without releasing — selection band should appear
       fireEvent.mouseDown(overlay, { clientX: 200, clientY: 50 });
       fireEvent.mouseMove(overlay, { clientX: 500, clientY: 50 });
-      const selectionBand = container.querySelector('rect[fill="rgba(33, 150, 243, 0.2)"]');
+      const selectionBand = container.querySelector('rect[fill="var(--color-primary)"][fill-opacity="0.2"]');
       expect(selectionBand).toBeInTheDocument();
     });
 
