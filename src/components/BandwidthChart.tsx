@@ -192,7 +192,6 @@ export function BandwidthChart({
       renderTooltipContent={renderTooltipContent}
       onTimeRangeSelected={onTimeRangeSelected}
       onResetZoom={onResetZoom}
-      marginLeft={60}
       externalCursorTime={externalCursorTime}
       externalSelection={externalSelection}
       onCursorMove={onCursorMove}

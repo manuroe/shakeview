@@ -11,6 +11,7 @@ import type { SelectionRange } from '../hooks/useChartInteraction';
 import type { LifecycleEvent } from '../types/log.types';
 import { LifecycleMarkers } from './LifecycleMarkers';
 import { useElementWidth } from '../hooks/useElementWidth';
+import { CHART_MARGIN_LEFT } from '../utils/chartUtils';
 
 /** Generic bucket structure for activity charts */
 export interface ActivityBucket {
@@ -123,7 +124,7 @@ export function BaseActivityChart<TBucket extends ActivityBucket, TCategory exte
   emptyMessage = 'No data to display',
   height = 120,
   yAxisTickFormat,
-  marginLeft = 50,
+  marginLeft = CHART_MARGIN_LEFT,
   externalCursorTime,
   externalSelection,
   onCursorMove,

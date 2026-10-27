@@ -97,7 +97,7 @@ describe('LogActivityChart', () => {
     const { container } = render(<LogActivityChart logLines={logs} />);
     const overlay = container.querySelector('rect[fill="transparent"]') as SVGElement;
 
-    // clientX=150 → adjustedX=100 (past marginLeft=50): falls on a real bucket
+    // clientX=150 → adjustedX=90 (past CHART_MARGIN_LEFT=60): falls on a real bucket
     fireEvent.mouseMove(overlay, { clientX: 150, clientY: 50 });
 
     // showTooltip fires in the same handleMouseMove call as setCursorX,

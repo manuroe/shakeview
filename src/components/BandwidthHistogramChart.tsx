@@ -14,6 +14,7 @@ import type { BandwidthBucket } from './BandwidthChartTooltip';
 import type { LifecycleEvent } from '../types/log.types';
 import { LifecycleMarkers } from './LifecycleMarkers';
 import { useElementWidth } from '../hooks/useElementWidth';
+import { CHART_MARGIN_LEFT } from '../utils/chartUtils';
 
 const SVG_WIDTH = 800;
 
@@ -38,8 +39,6 @@ interface BandwidthHistogramChartProps {
   readonly onResetZoom?: () => void;
   /** Chart height in pixels. */
   readonly height?: number;
-  /** Left margin in pixels — increase for wider y-axis byte labels. */
-  readonly marginLeft?: number;
   /** Mirrored cursor time from a sibling chart (microseconds). */
   readonly externalCursorTime?: number | null;
   /** Mirrored selection from a sibling chart. */
@@ -89,7 +88,6 @@ export function BandwidthHistogramChart({
   onTimeRangeSelected,
   onResetZoom,
   height = 140,
-  marginLeft = 60,
   externalCursorTime,
   externalSelection,
   onCursorMove,
@@ -102,8 +100,8 @@ export function BandwidthHistogramChart({
   const tooltipOffsetLeft = 12;
 
   const margin = useMemo(
-    () => ({ top: 10, right: 10, bottom: 30, left: marginLeft }),
-    [marginLeft],
+    () => ({ top: 10, right: 10, bottom: 30, left: CHART_MARGIN_LEFT }),
+    [],
   );
 
   const [widthRef, svgWidth] = useElementWidth(SVG_WIDTH);

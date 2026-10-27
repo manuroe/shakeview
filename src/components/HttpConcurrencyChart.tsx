@@ -14,6 +14,7 @@ import { computeStepPoints, getCountAtTime } from '../utils/concurrencyUtils';
 import { getBucketKey, getBucketColor, getBucketLabel, sortStatusCodes } from '../utils/httpStatusBuckets';
 import { useStepChartInteraction } from '../hooks/useStepChartInteraction';
 import { useElementWidth } from '../hooks/useElementWidth';
+import { CHART_MARGIN_LEFT } from '../utils/chartUtils';
 
 // Re-export for consumers that need the type alongside the component.
 export type { StepPoint } from '../utils/concurrencyUtils';
@@ -55,7 +56,7 @@ interface TooltipData {
 
 
 const SVG_WIDTH = 800;
-const MARGIN = { top: 10, right: 10, bottom: 30, left: 50 };
+const MARGIN = { top: 10, right: 10, bottom: 30, left: CHART_MARGIN_LEFT };
 
 /**
  * Step-function area chart for the "Show in-flight" concurrent mode on the /summary screen.

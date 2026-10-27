@@ -16,6 +16,7 @@ import { getCountAtTime } from '../utils/concurrencyUtils';
 import { useStepChartInteraction } from '../hooks/useStepChartInteraction';
 import { getBucketKey, getBucketColor, getBucketLabel, sortStatusCodes } from '../utils/httpStatusBuckets';
 import { useElementWidth } from '../hooks/useElementWidth';
+import { CHART_MARGIN_LEFT } from '../utils/chartUtils';
 
 interface BandwidthConcurrencyChartProps {
   /** Per-request time spans, each with precise start/end timestamps and byte counts. */
@@ -63,7 +64,7 @@ interface TooltipData {
 }
 
 const SVG_WIDTH = 800;
-const MARGIN = { top: 10, right: 10, bottom: 30, left: 60 };
+const MARGIN = { top: 10, right: 10, bottom: 30, left: CHART_MARGIN_LEFT };
 
 function computeStepSeries(
   spans: readonly BandwidthRequestSpan[],
