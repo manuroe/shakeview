@@ -255,6 +255,10 @@ describe('rageshake CLI', () => {
     const absent = cmdGrep(ing, ['never-logged'], { since: '2026-01-15T10:00:02Z' });
     expect(absent).toContain('never logged');
     expect(absent).not.toContain('widen');
+    // A regex alternation in a window gets the literal-substring hint only, not "never logged" too.
+    const alternation = cmdGrep(ing, ['retry|Sentry'], { since: '2026-01-15T10:00:02Z' });
+    expect(alternation).toContain('patterns are literal substrings');
+    expect(alternation).not.toContain('never logged');
     // Unfiltered, a zero result gets no hint at all: there is no window to blame.
     expect(cmdGrep(ing, ['never-logged'], {})).not.toContain('in full log');
   });

@@ -987,16 +987,17 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
   const narrowed = range !== null || flags.level !== undefined || flags.file !== undefined;
   const hints: string[] = [];
   for (const [k, n] of counts.entries()) {
-    if (n > 0 || !narrowed) continue;
+    if (n > 0) continue;
+    // Unnarrowed, the selection is the full log: its zero is the full-log count.
     let inLog = 0;
-    for (const l of lines) if (l.rawText.toLowerCase().includes(queries[k])) inLog++;
-    hints.push(inLog > 0
-      ? `# "${patterns[k]}" 0 in range, ${inLog} in full log — widen --last/--since/--from, or drop --level/--file`
-      : `# "${patterns[k]}" 0 in range and 0 in full log — the pattern is never logged`);
-  }
-  // A regex alternation finds nothing, and "never logged" would send the caller the wrong way.
-  for (const [k, n] of counts.entries()) {
-    if (n === 0 && patterns[k].includes('|')) hints.push(`# "${patterns[k]}": patterns are literal substrings, not regexes — pass alternatives as separate arguments`);
+    if (narrowed) for (const l of lines) if (l.rawText.toLowerCase().includes(queries[k])) inLog++;
+    // A regex alternation finds nothing, and "never logged" would send the caller the wrong way.
+    if (inLog === 0 && patterns[k].includes('|')) hints.push(`# "${patterns[k]}": patterns are literal substrings, not regexes — pass alternatives as separate arguments`);
+    else if (narrowed) {
+      hints.push(inLog > 0
+        ? `# "${patterns[k]}" 0 in range, ${inLog} in full log — widen --last/--since/--from, or drop --level/--file`
+        : `# "${patterns[k]}" 0 in range and 0 in full log — the pattern is never logged`);
+    }
   }
   const summary = counts.map((n, k) => `"${patterns[k]}" ${n}`).join(' · ');
   out.push(`# ${summary}${queries.length > 1 ? ` — ${matches.length} lines` : ` line${counts[0] === 1 ? '' : 's'}`}`);
