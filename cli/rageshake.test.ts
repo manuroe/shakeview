@@ -255,6 +255,10 @@ describe('rageshake CLI', () => {
     const absent = cmdGrep(ing, ['never-logged'], { since: '2026-01-15T10:00:02Z' });
     expect(absent).toContain('never logged');
     expect(absent).not.toContain('widen');
+    // A regex alternation in a window gets the literal-substring hint only, not "never logged" too.
+    const alternation = cmdGrep(ing, ['retry|Sentry'], { since: '2026-01-15T10:00:02Z' });
+    expect(alternation).toContain('patterns are literal substrings');
+    expect(alternation).not.toContain('never logged');
     // Unfiltered, a zero result gets no hint at all: there is no window to blame.
     expect(cmdGrep(ing, ['never-logged'], {})).not.toContain('in full log');
   });
@@ -635,6 +639,8 @@ describe('rageshake CLI', () => {
     writeFileSync(file, buildArchive(ANON_LOG));
     const { code, output } = run(['grep', file, 'retry scheduled', 'Sentry configured', '--count']);
     expect(code).toBe(0);
+    // A regex alternation matches nothing: say patterns are literal rather than "never logged".
+    expect(run(['grep', file, 'retry|Sentry']).output).toContain('# "retry|Sentry": patterns are literal substrings, not regexes — pass alternatives as separate arguments');
     // When each pattern happens, so one call picks each pattern's window.
     expect(output).toContain('# when: "retry scheduled" 10:00:02 → 10:00:02 · "Sentry configured" 10:00:00 → 10:00:00');
     expect(output).toContain('"retry scheduled" 1');
@@ -763,7 +769,8 @@ describe('megolm', () => {
     expect(rowOf(out, 'SESS')).toContain('2: outbound, shared to 1 device');
     expect(rowOf(out, 'SESS')).toContain(`sender ${ALICE_ID} ALICEPHONE (2, by share)`);
     expect(rowOf(out, 'SESS2')).toContain('1: late:late_key×1 (1 unknown)');
-    expect(out).toContain('1: 3 sessions, 2 UTDs (1 reported, 1 unknown)');
+    // Outcome totals too, so nobody adds up rows by hand.
+    expect(out).toContain('1: 3 sessions, 2 UTDs (1 reported, 1 unknown): late:late_key×1 utd:missing_key×1');
     expect(out).toContain('A UTD counts as reported when');
     expect(rowOf(out, 'SESS3')).toContain('1: key_received');
     expect(rowOf(out, 'SESS3')).toContain('(not loaded)');
@@ -815,7 +822,10 @@ describe('megolm', () => {
     expect(rowOf(megolm(bob, '--room', '!room-2222222222'), 'SESS3')).not.toBe('');
     const none = megolm(bob, '--room', '!room-99999999');
     expect(none).toContain('# no session in !room-99999999');
-    expect(none).toContain(`rooms with a UTD: ${ROOM} (2 sessions)`);
+    expect(none).toContain(`rooms with a UTD on the main device: ${ROOM} (2 sessions)`);
+    // An added archive's own UTDs (the sender's other rooms) are not the reporter's rooms.
+    const elsewhere = cryptoArchive('elsewhere.tar.gz', anon(SENDER_DETAILS), ['# [shakeview-anonymized]', utdLine.replaceAll(ROOM, OTHER_ROOM).replace('SESS"', 'SESSX"')].join('\n'));
+    expect(megolm(bob, elsewhere, '--room', '!room-99999999')).not.toContain(OTHER_ROOM);
     expect(() => megolm(bob, '--room', '!room-12')).toThrow(/at least 6 hex/);
   });
 
@@ -850,6 +860,14 @@ describe('megolm', () => {
     const burst = ['# [shakeview-anonymized]', ...['1', '2', '3'].map((n) => utdLine.replace(EV1, `$event-eeeeeeeeeee${n}`).replace('06:55:22.130', `06:55:22.13${n}`))].join('\n');
     const out = megolm(cryptoArchive('burst.tar.gz', anon(RECEIVER_DETAILS), burst), '--session', 'SESS');
     expect(out).toMatch(/06:55:22\.131 1 UTD \$event-eeeee… · MissingMegolmSession ×3 to 06:55:22\.133 \[\d+\]/);
+  });
+
+  it('--raw prints each timeline step\'s verbatim log message, capped by --width', () => {
+    const out = megolm(bob, alice, '--session', 'SESS', '--raw');
+    // As grep prints it: `target: message`.
+    expect(out).toMatch(/ 2 matrix_sdk_crypto::session_manager::group_sessions: Trying to encrypt a room key recipients=\{.*\[\d+\|2\]/);
+    expect(out).not.toContain('share to 1 device · index 0');
+    expect(megolm(bob, alice, '--session', 'SESS', '--raw', '--width', '30')).toMatch(/ 2 matrix_sdk_crypto::session_man… \[\d+\|2\]/);
   });
 
   it('--event on a UTD only an added archive logged judges that archive', () => {

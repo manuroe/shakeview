@@ -95,14 +95,16 @@ Filters:
                                permalink: a raw id never matches. The user's bug report (summary userText)
                                usually has them aliased
   --session <id>               This session in full (megolm); a unique prefix of 6+ characters is enough
-  --room <id>                  Only sessions in this room (megolm); matching nothing lists the rooms with a UTD
+  --raw                        Timeline steps as their verbatim log message, capped by --width, instead of
+                               a one-line description (megolm --event/--session): the lines a report quotes
+  --room <id>                  Only sessions in this room (megolm); matching nothing lists the main device's rooms with a UTD
   --sender <id>                Only sessions this user sent (megolm)
 
 Pagination (all line/tree output is capped, never unbounded):
   --count                      Counts + a time distribution instead of lines (grep, slice). Probe with this
                                before fetching lines: it shows how many matches there are and when they
                                happen, so the window can be picked in one call rather than by walking --limit
-  --width <N>                  Truncate each line's message to N chars (grep, slice; default 200, 0 = no limit)
+  --width <N>                  Truncate each line's message to N chars (grep, slice, megolm --raw; default 200, 0 = no limit)
   --spans                      Keep the "| spans: …" chain on each line (grep, slice). Dropped by default:
                                it is ~49% of an average SDK line, mostly the sliding-sync pos= cursor.
                                Use the "spans" command for span structure; this is for one specific chain
@@ -267,6 +269,7 @@ interface Flags {
   session?: string;
   room?: string;
   sender?: string;
+  raw?: boolean;
 }
 
 const DUR_RE = /^(\d+)(s|m|h|d)$/;
@@ -511,7 +514,7 @@ function lineRef(mergedLineNumber: number, sourceFile: string | undefined, tags:
 function formatLine(line: ParsedLogLine, tags: Map<string, string> | null, width: number, keepSpans: boolean, offsets: ReadonlyMap<string, number>): string {
   const time = line.displayTime ? line.displayTime.slice(0, 12) : '??:??:??.???';
   const text = displayText(line, keepSpans);
-  return `[${lineRef(line.lineNumber, line.sourceFile, tags, offsets)}] ${time} ${line.level.padEnd(5)} ${width > 0 ? trim(text, width) : text}`;
+  return `[${lineRef(line.lineNumber, line.sourceFile, tags, offsets)}] ${time} ${line.level.padEnd(5)} ${capWidth(text, width)}`;
 }
 
 /** Emit display entries with day markers, gap markers and a pagination footer. */
@@ -686,6 +689,8 @@ export function cmdPrecheck(ing: Ingest): { ok: boolean; report: string } {
 // ---------------------------------------------------------------------------
 
 const trim = (s: string, n = 160): string => (s.length > n ? `${s.slice(0, n)}…` : s);
+/** A line's message as --width caps it: 0 = no limit. */
+const capWidth = (s: string, width: number): string => (width > 0 ? trim(s, width) : s);
 
 export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
   const { merged, details, files, removedEntries } = ing;
@@ -984,12 +989,17 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
   const narrowed = range !== null || flags.level !== undefined || flags.file !== undefined;
   const hints: string[] = [];
   for (const [k, n] of counts.entries()) {
-    if (n > 0 || !narrowed) continue;
+    if (n > 0) continue;
+    // Unnarrowed, the selection is the full log: its zero is the full-log count.
     let inLog = 0;
-    for (const l of lines) if (l.rawText.toLowerCase().includes(queries[k])) inLog++;
-    hints.push(inLog > 0
-      ? `# "${patterns[k]}" 0 in range, ${inLog} in full log — widen --last/--since/--from, or drop --level/--file`
-      : `# "${patterns[k]}" 0 in range and 0 in full log — the pattern is never logged`);
+    if (narrowed) for (const l of lines) if (l.rawText.toLowerCase().includes(queries[k])) inLog++;
+    // A regex alternation finds nothing, and "never logged" would send the caller the wrong way.
+    if (inLog === 0 && patterns[k].includes('|')) hints.push(`# "${patterns[k]}": patterns are literal substrings, not regexes — pass alternatives as separate arguments`);
+    else if (narrowed) {
+      hints.push(inLog > 0
+        ? `# "${patterns[k]}" 0 in range, ${inLog} in full log — widen --last/--since/--from, or drop --level/--file`
+        : `# "${patterns[k]}" 0 in range and 0 in full log — the pattern is never logged`);
+    }
   }
   const summary = counts.map((n, k) => `"${patterns[k]}" ${n}`).join(' · ');
   out.push(`# ${summary}${queries.length > 1 ? ` — ${matches.length} lines` : ` line${counts[0] === 1 ? '' : 's'}`}`);
@@ -1353,7 +1363,7 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   const totals = devices.map((d, i) => {
     const mine = sessions.filter(({ s }) => (s.stepsByDevice[d.id]?.length ?? 0) > 0);
     const utds = mine.flatMap(({ s }) => s.utds.filter((u) => u.deviceId === d.id));
-    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')}${analyticsCounts(utds)}`;
+    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')}${analyticsCounts(utds)}${utds.length > 0 ? `: ${outcomeCounts(utds)}` : ''}`;
   });
   out.push(`# ${plural(sessions.length, 'session')}${flags.utd ? ' with a UTD' : ''}, newest first · ${totals.join(' · ')}`);
   out.push('# time room session · sender (archive, how found) · per archive: utd:<reason>×N still failing, late:<how>×N decrypted later, (analytics)');
@@ -1378,11 +1388,22 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   else if (sessions.length === 0 && room) {
     // A room quoted from a report may be mistyped or aliased under another salt: show what is there.
     const byRoom = new Map<string, number>();
-    for (const s of unroomed) if (s.utds.length > 0 && s.roomId) byRoom.set(s.roomId, (byRoom.get(s.roomId) ?? 0) + 1);
+    // The main device's UTDs only: an added archive (the sender's) brings its own rooms' failures.
+    for (const s of unroomed) if (s.roomId && s.utds.some((u) => u.deviceId === devices[0].id)) byRoom.set(s.roomId, (byRoom.get(s.roomId) ?? 0) + 1);
     const rooms = [...byRoom].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([r, n]) => `${r} (${plural(n, 'session')})`);
-    out.push(`# no session in ${room}; rooms with a UTD: ${rooms.join(' · ') || 'none'}`);
+    out.push(`# no session in ${room}; rooms with a UTD on the main device: ${rooms.join(' · ') || 'none'}`);
   } else if (sessions.length === 0) out.push('# no megolm sessions');
   return out.join('\n');
+}
+
+/** UTDs per outcome key: `utd:missing_key×3 late:backup×1`. */
+function outcomeCounts(utds: readonly UtdEvent[]): string {
+  const byKey = new Map<string, number>();
+  for (const u of utds) {
+    const k = u.resolution.state === 'resolved' ? lateOutcomeKey(u.resolution.by) : utdOutcomeKey(u.reason);
+    byKey.set(k, (byKey.get(k) ?? 0) + 1);
+  }
+  return [...byKey].map(([k, n]) => `${k}×${n}`).join(' ');
 }
 
 /** UTDs per analytics value, as /decryption names them: ` (2 reported, 1 unknown)`; empty for none. */
@@ -1403,12 +1424,7 @@ function archiveOutcome(s: MegolmSession, d: CryptoDevice): string {
   }
   const utds = s.utds.filter((u) => u.deviceId === d.id);
   if (utds.length > 0) {
-    const byKey = new Map<string, number>();
-    for (const u of utds) {
-      const k = u.resolution.state === 'resolved' ? lateOutcomeKey(u.resolution.by) : utdOutcomeKey(u.reason);
-      byKey.set(k, (byKey.get(k) ?? 0) + 1);
-    }
-    parts.push(`${[...byKey].map(([k, n]) => `${k}×${n}`).join(' ')}${analyticsCounts(utds)}`);
+    parts.push(`${outcomeCounts(utds)}${analyticsCounts(utds)}`);
   } else if (parts.length === 0 && (s.stepsByDevice[d.id] ?? []).some((x) => x.kind === 'roomkey.received')) {
     parts.push('key_received');
   }
@@ -1422,6 +1438,7 @@ function emitMegolmSession(
 ): void {
   const limit = intFlag(flags.limit, LINE_LIMIT);
   const offset = intFlag(flags.offset, 0);
+  const width = intFlag(flags.width, 200);
   const { sender, receiver } = sessionLanes(session, devices, mainId);
   const j = buildJourney(session, sender, receiver);
   const who = (d: CryptoDevice | undefined) => (d ? `${num.get(d.id)} ${d.identity.userId ?? '?'} ${d.identity.deviceId ?? '?'}` : 'not loaded');
@@ -1485,7 +1502,8 @@ function emitMegolmSession(
     lastDay = pushDayMarker(marker, r[0].ts, lastDay);
     const fold = r.length > 1 ? ` ×${r.length} to ${clockOf(r[r.length - 1].ts)}` : '';
     const mark = isDecisive(r[0]) ? ' ← decisive' : '';
-    return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${describeStep(r[0])}${fold} ${ref(r[0].line)}${mark}`].join('\n');
+    const text = flags.raw ? capWidth(r[0].text, width) : describeStep(r[0]);
+    return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${text}${fold} ${ref(r[0].line)}${mark}`].join('\n');
   }, offset);
 }
 
@@ -1520,6 +1538,7 @@ export function run(argv: string[]): { code: number; output: string } {
       session: { type: 'string' },
       room: { type: 'string' },
       sender: { type: 'string' },
+      raw: { type: 'boolean' },
     },
   });
   const [cmd, path] = positionals;
