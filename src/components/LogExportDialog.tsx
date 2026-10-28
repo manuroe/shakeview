@@ -6,6 +6,7 @@ import { downloadBlob } from '../utils/downloadBlob';
 import type { DisplayItem } from '../utils/logGapManager';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
 import { useLogStore } from '../stores/logStore';
+import { CopyIcon, DownloadIcon } from './icons';
 import styles from './LogExportDialog.module.css';
 
 interface LogExportDialogProps {
@@ -290,10 +291,7 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
             onClick={handleCopy}
             title="Copy exported log to clipboard"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="5" y="4" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" fill="none"/>
-              <path d="M3 11V3a1 1 0 0 1 1-1h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
+            <CopyIcon />
             Copy to clipboard
           </button>
           <button
@@ -301,10 +299,7 @@ export function LogExportDialog({ displayItems, context, onClose }: LogExportDia
             onClick={handleSave}
             title="Download exported log as a .log file"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
+            <DownloadIcon />
             Save to file
           </button>
           {isAnonymized && anonymizationDictionary && (
