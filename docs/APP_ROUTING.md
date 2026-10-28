@@ -14,12 +14,16 @@ This document describes the routing architecture: **URL as single source of trut
 | `/http_requests` | HttpRequestsView | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
 | `/http_requests/sync` | SyncView | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ |
 | `/decryption` | DecryptionView | ✓ | ✓ | - | - | - | - | - |
+| `/anonymize` | AnonymizeView | - | - | - | - | - | - | - |
 
 **Legend**: ✓ = used, - = not used
 
 `/decryption` also reads its list filters `q` (id search), `outcome` (comma-separated outcome
 keys), `analytics` and the selected `session`, and a repeatable `archive` link (see
 [Opening several archives on /decryption](#opening-several-archives-on-decryption)).
+
+`/anonymize` needs no loaded log, so it is exempt from the redirect to `/`. What it holds
+(raw files, mappings, the report) lives in memory for the tab only.
 
 **Notes**:
 - `filter`: Live text filter, synced to store via URL. Same behavior on `/logs` and `/http_requests`.
