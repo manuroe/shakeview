@@ -852,6 +852,14 @@ describe('megolm', () => {
     expect(out).toMatch(/06:55:22\.131 1 UTD \$event-eeeee… · MissingMegolmSession ×3 to 06:55:22\.133 \[\d+\]/);
   });
 
+  it('--raw prints each timeline step\'s verbatim log message, capped by --width', () => {
+    const out = megolm(bob, alice, '--session', 'SESS', '--raw');
+    // As grep prints it: `target: message`.
+    expect(out).toMatch(/ 2 matrix_sdk_crypto::session_manager::group_sessions: Trying to encrypt a room key recipients=\{.*\[\d+\|2\]/);
+    expect(out).not.toContain('share to 1 device · index 0');
+    expect(megolm(bob, alice, '--session', 'SESS', '--raw', '--width', '30')).toMatch(/ 2 matrix_sdk_crypto::session_man… \[\d+\|2\]/);
+  });
+
   it('--event on a UTD only an added archive logged judges that archive', () => {
     const out = megolm(alice, bob, '--event', EV1);
     expect(out).toContain('verdict: Likely this device was left out of the key share');

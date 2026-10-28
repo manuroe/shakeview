@@ -95,6 +95,8 @@ Filters:
                                permalink: a raw id never matches. The user's bug report (summary userText)
                                usually has them aliased
   --session <id>               This session in full (megolm); a unique prefix of 6+ characters is enough
+  --raw                        Timeline steps as their verbatim log message, capped by --width, instead of
+                               a one-line description (megolm --event/--session): the lines a report quotes
   --room <id>                  Only sessions in this room (megolm); matching nothing lists the rooms with a UTD
   --sender <id>                Only sessions this user sent (megolm)
 
@@ -267,6 +269,7 @@ interface Flags {
   session?: string;
   room?: string;
   sender?: string;
+  raw?: boolean;
 }
 
 const DUR_RE = /^(\d+)(s|m|h|d)$/;
@@ -1422,6 +1425,7 @@ function emitMegolmSession(
 ): void {
   const limit = intFlag(flags.limit, LINE_LIMIT);
   const offset = intFlag(flags.offset, 0);
+  const width = intFlag(flags.width, 200);
   const { sender, receiver } = sessionLanes(session, devices, mainId);
   const j = buildJourney(session, sender, receiver);
   const who = (d: CryptoDevice | undefined) => (d ? `${num.get(d.id)} ${d.identity.userId ?? '?'} ${d.identity.deviceId ?? '?'}` : 'not loaded');
@@ -1485,7 +1489,8 @@ function emitMegolmSession(
     lastDay = pushDayMarker(marker, r[0].ts, lastDay);
     const fold = r.length > 1 ? ` ×${r.length} to ${clockOf(r[r.length - 1].ts)}` : '';
     const mark = isDecisive(r[0]) ? ' ← decisive' : '';
-    return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${describeStep(r[0])}${fold} ${ref(r[0].line)}${mark}`].join('\n');
+    const text = flags.raw ? (width > 0 ? trim(r[0].text, width) : r[0].text) : describeStep(r[0]);
+    return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${text}${fold} ${ref(r[0].line)}${mark}`].join('\n');
   }, offset);
 }
 
@@ -1520,6 +1525,7 @@ export function run(argv: string[]): { code: number; output: string } {
       session: { type: 'string' },
       room: { type: 'string' },
       sender: { type: 'string' },
+      raw: { type: 'boolean' },
     },
   });
   const [cmd, path] = positionals;
