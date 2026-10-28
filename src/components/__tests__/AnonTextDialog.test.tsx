@@ -5,6 +5,8 @@ import { KeyboardShortcutContext } from '../KeyboardShortcutContext';
 import type { KeyboardShortcutContextValue } from '../KeyboardShortcutContext';
 import { useLogStore } from '../../stores/logStore';
 import { useAnonSaltStore } from '../../stores/anonSaltStore';
+import { useArchiveStore } from '../../stores/archiveStore';
+import { strToU8 } from 'fflate';
 import {
   applyAnonymization,
   buildAnonymizationDictionary,
@@ -44,6 +46,7 @@ describe('AnonTextDialog', () => {
     }
     vi.restoreAllMocks();
     useLogStore.getState().clearData();
+    useArchiveStore.getState().clearArchive();
   });
 
   it('anonymises pasted text with the stored salt', async () => {
@@ -79,6 +82,24 @@ describe('AnonTextDialog', () => {
     fireEvent.change(inputBox(), { target: { value: alias } });
 
     expect(await screen.findByDisplayValue('@alice:example.org')).toBeInTheDocument();
+  });
+
+  it('unanonymises an identifier seen only in another file of the archive', async () => {
+    useArchiveStore.getState().loadArchive('rs.tar.gz', [
+      { name: 'rs/console.log', data: strToU8('@alice:example.org joined') },
+      { name: 'rs/details.json', data: strToU8('{"user":"@bob:example.org"}') },
+    ]);
+    useLogStore.setState({
+      rawLogLines: [createParsedLogLine({ lineNumber: 0, rawText: '@alice:example.org joined' })],
+      loadedEntryNames: ['rs/console.log'],
+    });
+    const alias = await aliasOf('@bob:example.org');
+
+    render(<AnonTextDialog onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unanonymise' }));
+    fireEvent.change(inputBox(), { target: { value: alias } });
+
+    expect(await screen.findByDisplayValue('@bob:example.org')).toBeInTheDocument();
   });
 
   it('disables unanonymising when no log is loaded', () => {

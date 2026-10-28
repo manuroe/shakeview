@@ -10,6 +10,9 @@ import {
 } from '../utils/anonymizeUtils';
 import { useLogStore } from '../stores/logStore';
 import { useAnonSaltStore } from '../stores/anonSaltStore';
+import { useArchiveStore } from '../stores/archiveStore';
+import { loadedArchive } from '../stores/cryptoStore';
+import { buildArchiveDictionary } from '../utils/anonymizeArchive';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useKeyboardShortcutContextOptional } from './KeyboardShortcutContext';
 import styles from './LogExportDialog.module.css';
@@ -53,29 +56,38 @@ export function AnonTextDialog({ onClose }: AnonTextDialogProps) {
   const rawLogLines = useLogStore((s) => s.rawLogLines);
   const isAnonymized = useLogStore((s) => s.isAnonymized);
   const appliedDict = useLogStore((s) => s.anonymizationDictionary);
+  const loadedEntryNames = useLogStore((s) => s.loadedEntryNames);
+  const archiveName = useArchiveStore((s) => s.archiveName);
+  const archiveEntries = useArchiveStore((s) => s.archiveEntries);
 
-  // The reverse map can only come from the loaded log: either the mapping applied
+  // A text can cite identifiers from any file of the archive, not just the loaded
+  // log, so reverse with the whole archive's mapping when there is one: on the
+  // archive listing (nothing loaded yet), or when the loaded log came from it.
+  const fromArchive = archiveEntries.length > 0
+    && (rawLogLines.length === 0 || loadedArchive(archiveName, archiveEntries, loadedEntryNames) !== null);
+
+  // Otherwise the reverse map can only come from the loaded log: either the mapping applied
   // in this session, or one rebuilt from the raw lines — and rebuilding is only
   // valid while those lines still hold the *original* identifiers (a log loaded
   // already-anonymised has none, so hashing them again would yield nonsense).
-  const canUnanonymise = appliedDict !== null || (rawLogLines.length > 0 && !isAnonymized);
+  const canUnanonymise = fromArchive || appliedDict !== null || (rawLogLines.length > 0 && !isAnonymized);
 
-  // The log mapping costs a hash per unique identifier in the whole log, so build
-  // it once per (log, salt) — on the first switch to unanonymising, not per keystroke.
+  // The mapping costs a hash per unique identifier in the whole log or archive, so
+  // build it once per (source, salt) — on the first switch to unanonymising, not per keystroke.
   const [logDict, setLogDict] = useState<AnonymizationDictionary | null>(null);
   useEffect(() => {
     if (direction !== 'unanonymise' || !canUnanonymise) return;
-    if (appliedDict) {
+    if (appliedDict && !fromArchive) {
       setLogDict(appliedDict);
       return;
     }
     let cancelled = false;
     setLogDict(null); // drop a mapping built with a stale salt while the new one builds
-    void buildAnonymizationDictionary(rawLogLines, salt)
+    void (fromArchive ? buildArchiveDictionary(archiveEntries, salt) : buildAnonymizationDictionary(rawLogLines, salt))
       .then((d) => { if (!cancelled) setLogDict(d); })
       .catch(() => { if (!cancelled) setError('Could not build the mapping from this log.'); });
     return () => { cancelled = true; };
-  }, [direction, canUnanonymise, appliedDict, rawLogLines, salt]);
+  }, [direction, canUnanonymise, appliedDict, rawLogLines, salt, fromArchive, archiveEntries]);
 
   const debouncedInput = useDebouncedValue(input, 300);
 
