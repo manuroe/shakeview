@@ -12,14 +12,13 @@ import { mergeLogParserResults } from '../mergeLogParserResults';
 import { parseDetailsJson } from '../detailsJson';
 import { decodeTextBytes, readBlob, validateGzipFile, validateTextFile } from '../fileValidator';
 import { parseLogFile } from '../logParser';
-import { assertArchiveSizeOk, parseTarGzArchive } from '../tarGzArchive';
+import { assertArchiveSizeOk, parseTarGzArchive, TAR_GZ_NAME } from '../tarGzArchive';
 import { getMinMaxTimestamps } from '../timeUtils';
 import { byTs } from './buildCryptoModel';
 import { deviceIdentity } from './identity';
 import { extractSteps } from './steps';
 import type { CryptoDevice, CryptoStep, DeviceCoverage } from './types';
 
-const ARCHIVE_NAME = /\.(tar\.gz|tgz)$/i;
 const basename = (name: string): string => name.split('/').pop() ?? name;
 const yieldToUi = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -73,7 +72,7 @@ export async function deviceFromEntries(archiveName: string, entries: readonly A
  * @example (await deviceFromFile('bob.log', bytes)).entries // [{ name: 'bob.log', data: bytes }]
  */
 export function deviceFromFile(name: string, bytes: Uint8Array): Promise<CryptoDevice> {
-  const entries = ARCHIVE_NAME.test(name) ? parseTarGzArchive(bytes) : [{ name, data: bytes }];
+  const entries = TAR_GZ_NAME.test(name) ? parseTarGzArchive(bytes) : [{ name, data: bytes }];
   return deviceFromEntries(name, entries);
 }
 
@@ -91,8 +90,8 @@ export interface DroppedDevice {
  * @example droppedDevices([alice.tar.gz, a.log, b.log]) // [{ name: 'alice.tar.gz', files: [alice] }, { name: 'a.log, b.log', files: [a, b] }]
  */
 export function droppedDevices(files: readonly File[]): DroppedDevice[] {
-  const groups = files.filter((f) => ARCHIVE_NAME.test(f.name)).map((f) => [f]);
-  const logs = files.filter((f) => !ARCHIVE_NAME.test(f.name));
+  const groups = files.filter((f) => TAR_GZ_NAME.test(f.name)).map((f) => [f]);
+  const logs = files.filter((f) => !TAR_GZ_NAME.test(f.name));
   if (logs.length > 0) groups.push(logs);
   return groups.map((g) => ({ name: g.map((f) => f.name).join(', '), files: g }));
 }
@@ -106,7 +105,7 @@ export function droppedDevices(files: readonly File[]): DroppedDevice[] {
  */
 export async function deviceFromDroppedFiles({ name, files }: DroppedDevice): Promise<CryptoDevice> {
   for (const file of files) {
-    if (ARCHIVE_NAME.test(file.name)) {
+    if (TAR_GZ_NAME.test(file.name)) {
       assertArchiveSizeOk(file.size);
     } else {
       const v = file.name.toLowerCase().endsWith('.gz') ? await validateGzipFile(file, decompressSync) : await validateTextFile(file);

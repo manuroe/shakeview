@@ -1,0 +1,423 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100vh;
+    padding: 16px 24px;
+    box-sizing: border-box;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header h1 {
+    font-size: var(--font-size-2xl);
+    margin: 0;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.muted {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.dropZone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--radius-xl);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--transition-slow) ease;
+}
+
+.dropZone:hover,
+.dragOver {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.dropIcon {
+    width: 24px;
+    height: 24px;
+    color: var(--text-placeholder);
+}
+
+.fileInput {
+    display: none;
+}
+
+.jobsPanel {
+    width: max-content;
+    max-width: 70vw;
+}
+
+.jobs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 4px 12px;
+    list-style: none;
+}
+
+.forget {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.job {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+}
+
+.jobName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.done {
+    display: inline-flex;
+    color: var(--color-success);
+}
+
+.error {
+    color: var(--color-error-text);
+}
+
+.panes {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+}
+
+.pane {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+.paneDragOver .report {
+    border: 2px dashed var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.dropHint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--color-primary);
+    pointer-events: none;
+}
+
+.paneHeader {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+}
+
+.paneHeader button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.paneTitle {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.report {
+    flex: 1;
+    overflow: auto;
+    padding: 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    resize: none;
+    margin: 0;
+}
+
+.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-placeholder);
+    font-family: var(--font-system);
+}
+
+.warning {
+    font-size: var(--font-size-xs);
+    color: var(--color-warning-text);
+}
+
+.rendered {
+    padding: 16px 24px;
+    font-family: var(--font-system);
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* GitHub's markdown rhythm, put back after foundation.css resets every margin and padding. */
+.rendered > :first-child {
+    margin-top: 0;
+}
+
+.rendered p,
+.rendered ul,
+.rendered ol,
+.rendered blockquote,
+.rendered pre,
+.rendered table {
+    margin: 0 0 16px;
+}
+
+.rendered h1,
+.rendered h2,
+.rendered h3,
+.rendered h4 {
+    margin: 24px 0 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.rendered h1,
+.rendered h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.rendered h1 {
+    font-size: 2em;
+}
+
+.rendered h2 {
+    font-size: 1.5em;
+}
+
+.rendered h3 {
+    font-size: 1.25em;
+}
+
+.rendered ul,
+.rendered ol {
+    padding-left: 2em;
+}
+
+.rendered ul {
+    list-style: disc;
+}
+
+.rendered ol {
+    list-style: decimal;
+}
+
+.rendered li + li {
+    margin-top: 0.25em;
+}
+
+.rendered li > ul,
+.rendered li > ol {
+    margin: 0.25em 0 0;
+}
+
+.rendered a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.rendered a:hover {
+    text-decoration: underline;
+}
+
+.rendered blockquote {
+    padding: 0 1em;
+    border-left: 0.25em solid var(--border-medium);
+    color: var(--text-secondary);
+}
+
+.rendered blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+.rendered code {
+    font-family: var(--font-mono);
+    font-size: 85%;
+    padding: 0.2em 0.4em;
+    background: var(--bg-code);
+    border-radius: var(--radius-md);
+}
+
+.rendered pre {
+    padding: 16px;
+    background: var(--bg-code);
+    border-radius: var(--radius-md);
+    overflow: auto;
+    line-height: 1.45;
+}
+
+.rendered pre code {
+    padding: 0;
+    font-size: 85%;
+    background: none;
+}
+
+.rendered hr {
+    height: 0.25em;
+    margin: 24px 0;
+    border: 0;
+    background: var(--border-default);
+}
+
+.rendered table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow: auto;
+    border-collapse: collapse;
+}
+
+.rendered th,
+.rendered td {
+    padding: 6px 13px;
+    border: 1px solid var(--border-default);
+}
+
+.rendered th {
+    font-weight: 600;
+}
+
+.rendered tr:nth-child(2n) {
+    background: var(--bg-secondary);
+}
+
+.notice {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(440px, calc(100vw - 48px));
+    padding: 12px 12px 14px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-modal);
+}
+
+.noticeRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.noticeTitle {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.noticePct {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.noticeBar {
+    height: 6px;
+    margin-right: 4px;
+    background: var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.noticeFill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+    transition: width 200ms ease-out;
+}
+
+.linkButton {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--color-error-text);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.textButton {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--color-primary);
+    cursor: pointer;
+}
+
+.textButton:hover {
+    text-decoration: underline;
+}
+
+.originalZone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+    text-align: center;
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--transition-slow) ease;
+}
+
+.originalZone:hover,
+.paneDragOver .originalZone {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}

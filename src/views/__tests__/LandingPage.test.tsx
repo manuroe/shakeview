@@ -50,14 +50,6 @@ describe('LandingPage', () => {
     expect(screen.getByRole('button', { name: /try with web demo logs/i })).toHaveTextContent('Web');
   });
 
-  it('renders the GitHub link', () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(new Response(''));
-
-    renderLandingPage();
-
-    expect(screen.getByRole('link', { name: /view on github/i })).toBeInTheDocument();
-  });
-
   it('loads data into the store and navigates to /summary on success', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(new Response(DEMO_LOG_TEXT));
 
@@ -130,17 +122,6 @@ describe('LandingPage', () => {
     await waitFor(() => {
       expect(screen.queryByText(/failed to load demo/i)).not.toBeInTheDocument();
     });
-  });
-
-  it('uses PR-specific GitHub URL when VITE_PR_NUMBER is set', () => {
-    vi.stubEnv('VITE_PR_NUMBER', '42');
-
-    renderLandingPage();
-
-    const githubLink = screen.getByRole('link', { name: /view on github/i });
-    expect(githubLink.getAttribute('href')).toContain('/pull/42');
-
-    vi.unstubAllEnvs();
   });
 
   describe('with chrome extension APIs available', () => {

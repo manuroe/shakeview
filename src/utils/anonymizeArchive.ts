@@ -1,7 +1,10 @@
 import { decompressSync, gzipSync, strToU8 } from 'fflate';
 import type { AnonymizationDictionary } from '../types/log.types';
-import { buildAnonymizationDictionaryFromTexts, buildCompiledAnonymizer } from './anonymizeUtils';
+import { ANONYMIZED_LOG_MARKER, buildAnonymizationDictionaryFromTexts, buildCompiledAnonymizer } from './anonymizeUtils';
+import { deriveAnonymizedFilename } from './anonymizedLogFile';
+import { FileError } from './errorHandling';
 import { decodeTextBytes, isValidGzipHeader, isValidTextContent } from './fileValidator';
+import { parseTarGzArchive, TAR_GZ_NAME } from './tarGzArchive';
 import { buildTar, canEncodeUstarName, type TarFile } from './tarWriter';
 
 /**
@@ -142,6 +145,24 @@ export async function buildAnonymisedArchiveGz(
   salt: string,
   onProgress?: ArchiveProgress,
 ): Promise<Uint8Array> {
+  return (await anonymiseArchiveEntries(entries, salt, onProgress)).gz;
+}
+
+/**
+ * `buildAnonymisedArchiveGz`, also returning the mapping it applied. The
+ * anonymise page keeps that mapping to reverse a report written about the archive.
+ *
+ * @example
+ * ```ts
+ * const { gz, dict } = await anonymiseArchiveEntries(entries, salt);
+ * dict.reverse['@user-0123456789ab:domain-01234567.org']; // '@alice:example.org'
+ * ```
+ */
+export async function anonymiseArchiveEntries(
+  entries: readonly { name: string; data: Uint8Array }[],
+  salt: string,
+  onProgress?: ArchiveProgress,
+): Promise<{ gz: Uint8Array; dict: AnonymizationDictionary }> {
   const total = entries.length;
   const maybeYield = makeYielder();
 
@@ -179,5 +200,45 @@ export async function buildAnonymisedArchiveGz(
   // Phase 3: pack + compress (single blocking step → indeterminate).
   onProgress?.('Compressing', 0, 0);
   await maybeYield();
-  return gzipSync(buildTar(outFiles));
+  return { gz: gzipSync(buildTar(outFiles)), dict };
+}
+
+/** Result of anonymising one dropped file, ready to download. */
+export interface AnonymisedFile {
+  readonly name: string;
+  readonly data: Uint8Array | string;
+  readonly mime: string;
+  readonly dict: AnonymizationDictionary;
+  /** True for a `.tar.gz` archive: the only kind a report's deep links point into. */
+  readonly isArchive: boolean;
+}
+
+/**
+ * Anonymise one file as dropped on the anonymise page. A `.tar.gz`/`.tgz` is
+ * repacked whole (`<base>-anonym.tar.gz`); anything else is one log, written as
+ * plain text with the anonymised marker (`<name>-anonym.log`), like "Save
+ * anonymised" on a loaded log.
+ *
+ * @throws {FileError} when a single file is not text (binary, or a corrupt `.gz`).
+ * @example
+ * ```ts
+ * const out = await anonymiseDroppedFile('rageshake.tar.gz', bytes, salt);
+ * out.name; // 'rageshake-anonym.tar.gz'
+ * ```
+ */
+export async function anonymiseDroppedFile(
+  name: string,
+  bytes: Uint8Array,
+  salt: string,
+  onProgress?: ArchiveProgress,
+): Promise<AnonymisedFile> {
+  if (TAR_GZ_NAME.test(name)) {
+    const { gz, dict } = await anonymiseArchiveEntries(parseTarGzArchive(bytes), salt, onProgress);
+    return { name: deriveAnonymizedArchiveName(name), data: gz, mime: 'application/gzip', dict, isArchive: true };
+  }
+  const text = decodeEntryText({ name, data: bytes });
+  if (text === null) throw new FileError(`${name} is not a text log, so it cannot be anonymised.`);
+  const dict = await buildAnonymizationDictionaryFromTexts([text], salt);
+  const data = `${ANONYMIZED_LOG_MARKER}\n${buildCompiledAnonymizer(dict)(text)}`;
+  return { name: deriveAnonymizedFilename(name), data, mime: 'text/plain', dict, isArchive: false };
 }

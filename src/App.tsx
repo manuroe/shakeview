@@ -29,6 +29,7 @@ import { useExtensionFile } from './hooks/useExtensionFile';
 import { useTabLog, TAB_LOG_PARAM } from './hooks/useTabLog';
 import { useArchiveUrl, ARCHIVE_URL_PARAM } from './hooks/useArchiveUrl';
 import { DecryptionView } from './views/DecryptionView';
+import { AnonymizeView } from './views/AnonymizeView';
 import { AnonymizingProgressModal } from './components/AnonymizingProgressModal';
 import uploadStyles from './components/FileUpload.module.css';
 
@@ -109,7 +110,7 @@ function AppContent() {
     // populate the store in its own effect and the redirect would race it.
     const tabLogPending = searchParams.get(TAB_LOG_PARAM) !== null;
     const listingPending = searchParams.get(LISTING_URL_PARAM) !== null;
-    if (!hasData && !hasArchive && !hasListing && !tabLogPending && !listingPending && !archivePending && location.pathname !== '/' && !isRedirecting.current) {
+    if (!hasData && !hasArchive && !hasListing && !tabLogPending && !listingPending && !archivePending && location.pathname !== '/' && location.pathname !== '/anonymize' && !isRedirecting.current) {
       isRedirecting.current = true;
       void navigate('/', { replace: true });
     }
@@ -142,6 +143,7 @@ function AppContent() {
         <Route path="/http_requests" element={<HttpRequestsView />} />
         <Route path="/http_requests/sync" element={<SyncView />} />
         <Route path="/decryption" element={<DecryptionView />} />
+        <Route path="/anonymize" element={<AnonymizeView />} />
       </Routes>
       <ShortcutHelpOverlay />
       <ChordToast />

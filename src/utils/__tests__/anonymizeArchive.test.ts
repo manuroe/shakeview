@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { decompressSync, gzipSync, strToU8, strFromU8 } from 'fflate';
 import { parseTar } from '../tarParser';
-import { buildAnonymisedArchiveGz, buildArchiveDictionary, deriveAnonymizedArchiveName } from '../anonymizeArchive';
+import { anonymiseDroppedFile, buildAnonymisedArchiveGz, buildArchiveDictionary, deriveAnonymizedArchiveName } from '../anonymizeArchive';
+import { buildTar } from '../tarWriter';
 
 const SALT = 'test-salt';
 const USER_RE = /@user-[0-9a-f]{12}:domain-[0-9a-f]{8}\.org/;
@@ -168,5 +169,31 @@ describe('buildArchiveDictionary', () => {
     expect(dict.forward['@alice:matrix.org'].split(':')[1]).toBe(
       dict.forward['@bob:matrix.org'].split(':')[1],
     );
+  });
+});
+
+describe('anonymiseDroppedFile', () => {
+  it('repacks an archive and returns the mapping that reverses it', async () => {
+    const bytes = gzipSync(buildTar([{ name: 'logs/console.log', data: strToU8('@alice:matrix.org joined') }]));
+    const out = await anonymiseDroppedFile('rs.tar.gz', bytes, SALT);
+
+    expect(out.name).toBe('rs-anonym.tar.gz');
+    expect(out.isArchive).toBe(true);
+    const text = strFromU8(parseTar(decompressSync(out.data as Uint8Array))[0].data);
+    const alias = text.match(USER_RE)![0];
+    expect(out.dict.reverse[alias]).toBe('@alice:matrix.org');
+  });
+
+  it('writes a single log as marked plain text', async () => {
+    const out = await anonymiseDroppedFile('console.log.gz', gzipSync(strToU8('@alice:matrix.org joined\n')), SALT);
+
+    expect(out.name).toBe('console-anonym.log');
+    expect(out.isArchive).toBe(false);
+    expect(out.data).toMatch(/^# \[shakeview-anonymized\]\n@user-[0-9a-f]{12}:domain-[0-9a-f]{8}\.org joined\n$/);
+  });
+
+  it('refuses a binary single file', async () => {
+    await expect(anonymiseDroppedFile('shot.png', new Uint8Array([0x89, 0x50, 0, 0, 255]), SALT))
+      .rejects.toThrow(/not a text log/);
   });
 });

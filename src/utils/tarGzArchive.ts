@@ -22,6 +22,9 @@ import type { ArchiveEntry } from '../stores/archiveStore';
  */
 export const MAX_TAR_GZ_SIZE = 500 * 1024 * 1024; // 500 MB
 
+/** File names this module unpacks: `.tar.gz` and its `.tgz` short form. */
+export const TAR_GZ_NAME = /\.(tar\.gz|tgz)$/i;
+
 /**
  * @throws {FileError} when a compressed archive of `byteLength` is over the limit.
  *
