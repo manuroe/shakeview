@@ -177,49 +177,143 @@
 }
 
 .rendered {
+    padding: 16px 24px;
     font-family: var(--font-system);
     font-size: var(--font-size-base);
+    line-height: 1.5;
     white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* GitHub's markdown rhythm, put back after foundation.css resets every margin and padding. */
+.rendered > :first-child {
+    margin-top: 0;
+}
+
+.rendered p,
+.rendered ul,
+.rendered ol,
+.rendered blockquote,
+.rendered pre,
+.rendered table {
+    margin: 0 0 16px;
 }
 
 .rendered h1,
 .rendered h2,
+.rendered h3,
+.rendered h4 {
+    margin: 24px 0 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.rendered h1,
+.rendered h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.rendered h1 {
+    font-size: 2em;
+}
+
+.rendered h2 {
+    font-size: 1.5em;
+}
+
 .rendered h3 {
-    margin: 16px 0 8px;
+    font-size: 1.25em;
+}
+
+.rendered ul,
+.rendered ol {
+    padding-left: 2em;
+}
+
+.rendered ul {
+    list-style: disc;
+}
+
+.rendered ol {
+    list-style: decimal;
+}
+
+.rendered li + li {
+    margin-top: 0.25em;
+}
+
+.rendered li > ul,
+.rendered li > ol {
+    margin: 0.25em 0 0;
+}
+
+.rendered a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.rendered a:hover {
+    text-decoration: underline;
 }
 
 .rendered blockquote {
-    margin: 8px 0;
-    padding-left: 12px;
-    border-left: 3px solid var(--border-medium);
+    padding: 0 1em;
+    border-left: 0.25em solid var(--border-medium);
     color: var(--text-secondary);
+}
+
+.rendered blockquote > :last-child {
+    margin-bottom: 0;
 }
 
 .rendered code {
     font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
+    font-size: 85%;
+    padding: 0.2em 0.4em;
     background: var(--bg-code);
-    border-radius: var(--radius-sm);
-    padding: 0 3px;
+    border-radius: var(--radius-md);
 }
 
 .rendered pre {
-    padding: 8px;
+    padding: 16px;
     background: var(--bg-code);
     border-radius: var(--radius-md);
     overflow: auto;
+    line-height: 1.45;
 }
 
 .rendered pre code {
     padding: 0;
+    font-size: 85%;
+    background: none;
+}
+
+.rendered hr {
+    height: 0.25em;
+    margin: 24px 0;
+    border: 0;
+    background: var(--border-default);
 }
 
 .rendered table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow: auto;
     border-collapse: collapse;
 }
 
 .rendered th,
 .rendered td {
-    padding: 4px 8px;
+    padding: 6px 13px;
     border: 1px solid var(--border-default);
+}
+
+.rendered th {
+    font-weight: 600;
+}
+
+.rendered tr:nth-child(2n) {
+    background: var(--bg-secondary);
 }

@@ -129,4 +129,11 @@ describe('AnonymizeView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.getByText('summary')).toBeInTheDocument();
   });
+
+  it('renders a single newline as a line break, like GitHub comments', () => {
+    useAnonymizeSessionStore.setState({ report: 'first\nsecond' });
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+
+    expect(screen.getByLabelText('De-anonymised').querySelector('p')?.innerHTML).toBe('first<br>\nsecond');
+  });
 });

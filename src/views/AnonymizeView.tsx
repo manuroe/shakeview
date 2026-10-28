@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Markdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { saveJobOutput, useAnonymizeSessionStore, type AnonymizeJob } from '../stores/anonymizeSessionStore';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -162,7 +163,8 @@ function TextPane({ title, source, markdown = source, saveName, onEdit, placehol
       {source && !showSource && (
         <div className={`${styles.report} ${styles.rendered}`} aria-label={title}>
           <Markdown
-            remarkPlugins={[remarkGfm]}
+            // remarkBreaks: a newline is a line break, as in GitHub comments.
+            remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{ a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}
           >
             {markdown}
