@@ -104,7 +104,7 @@ Pagination (all line/tree output is capped, never unbounded):
   --count                      Counts + a time distribution instead of lines (grep, slice). Probe with this
                                before fetching lines: it shows how many matches there are and when they
                                happen, so the window can be picked in one call rather than by walking --limit
-  --width <N>                  Truncate each line's message to N chars (grep, slice; default 200, 0 = no limit)
+  --width <N>                  Truncate each line's message to N chars (grep, slice, megolm --raw; default 200, 0 = no limit)
   --spans                      Keep the "| spans: …" chain on each line (grep, slice). Dropped by default:
                                it is ~49% of an average SDK line, mostly the sliding-sync pos= cursor.
                                Use the "spans" command for span structure; this is for one specific chain
@@ -514,7 +514,7 @@ function lineRef(mergedLineNumber: number, sourceFile: string | undefined, tags:
 function formatLine(line: ParsedLogLine, tags: Map<string, string> | null, width: number, keepSpans: boolean, offsets: ReadonlyMap<string, number>): string {
   const time = line.displayTime ? line.displayTime.slice(0, 12) : '??:??:??.???';
   const text = displayText(line, keepSpans);
-  return `[${lineRef(line.lineNumber, line.sourceFile, tags, offsets)}] ${time} ${line.level.padEnd(5)} ${width > 0 ? trim(text, width) : text}`;
+  return `[${lineRef(line.lineNumber, line.sourceFile, tags, offsets)}] ${time} ${line.level.padEnd(5)} ${capWidth(text, width)}`;
 }
 
 /** Emit display entries with day markers, gap markers and a pagination footer. */
@@ -689,6 +689,8 @@ export function cmdPrecheck(ing: Ingest): { ok: boolean; report: string } {
 // ---------------------------------------------------------------------------
 
 const trim = (s: string, n = 160): string => (s.length > n ? `${s.slice(0, n)}…` : s);
+/** A line's message as --width caps it: 0 = no limit. */
+const capWidth = (s: string, width: number): string => (width > 0 ? trim(s, width) : s);
 
 export function cmdSummary(ing: Ingest, flags: Flags = {}): string {
   const { merged, details, files, removedEntries } = ing;
@@ -1500,7 +1502,7 @@ function emitMegolmSession(
     lastDay = pushDayMarker(marker, r[0].ts, lastDay);
     const fold = r.length > 1 ? ` ×${r.length} to ${clockOf(r[r.length - 1].ts)}` : '';
     const mark = isDecisive(r[0]) ? ' ← decisive' : '';
-    const text = flags.raw ? (width > 0 ? trim(r[0].text, width) : r[0].text) : describeStep(r[0]);
+    const text = flags.raw ? capWidth(r[0].text, width) : describeStep(r[0]);
     return [...marker, `${clockOf(r[0].ts)} ${num.get(r[0].line.archive)} ${text}${fold} ${ref(r[0].line)}${mark}`].join('\n');
   }, offset);
 }
