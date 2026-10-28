@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FileUpload } from '../components/FileUpload';
 import { parseLogFile } from '../utils/logParser';
 import { useLogStore } from '../stores/logStore';
@@ -9,6 +9,7 @@ import { wrapError } from '../utils/errorHandling';
 import type { AppError } from '../utils/errorHandling';
 import ErrorDisplay from '../components/ErrorDisplay';
 import uploadStyles from '../components/FileUpload.module.css';
+import buttonStyles from '../components/Button.module.css';
 import { EXTENSION_FILE_URL_PARAM, EXTENSION_FILE_NAME_PARAM } from '../hooks/useExtensionFile';
 
 export function LandingPage() {
@@ -54,11 +55,6 @@ export function LandingPage() {
     );
   }
 
-  const prNumber = import.meta.env.VITE_PR_NUMBER;
-  const githubUrl = prNumber
-    ? `https://github.com/manuroe/shakeview/pull/${prNumber}`
-    : 'https://github.com/manuroe/shakeview';
-
   const handleLoadDemo = async (fileName: 'demo.log' | 'demo-web.log') => {
     setDemoError(null);
     setDemoLoading(true);
@@ -82,7 +78,7 @@ export function LandingPage() {
         className={uploadStyles.dropZoneError}
       />
       <div className={uploadStyles.dropZoneFooter}>
-        Try with demo logs:{' '}
+        Try a demo:{' '}
         <button type="button" onClick={() => { void handleLoadDemo('demo.log'); }} disabled={demoLoading} aria-label="Try with mobile demo logs">
           Mobile
         </button>
@@ -90,10 +86,9 @@ export function LandingPage() {
         <button type="button" onClick={() => { void handleLoadDemo('demo-web.log'); }} disabled={demoLoading} aria-label="Try with web demo logs">
           Web
         </button>
-        {' · '}
-        <a href={githubUrl} target="_blank" rel="noopener noreferrer">
-          View on GitHub
-        </a>
+      </div>
+      <div className={uploadStyles.cornerActions}>
+        <Link to="/anonymize" className={buttonStyles.pillButton}>Anonymise</Link>
       </div>
     </>
   );

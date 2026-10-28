@@ -61,6 +61,20 @@
     z-index: calc(var(--z-dropdown) + 1);
 }
 
+.cornerActions {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: calc(var(--z-dropdown) + 1);
+}
+
+.cornerActions a {
+    text-decoration: none;
+}
+
 .dropZoneFooter a,
 .dropZoneFooter button {
     color: var(--color-primary);

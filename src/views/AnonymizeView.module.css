@@ -1,0 +1,225 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100vh;
+    padding: 16px 24px;
+    box-sizing: border-box;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header h1 {
+    font-size: var(--font-size-2xl);
+    margin: 0;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.muted {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.dropZone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--radius-xl);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--transition-slow) ease;
+}
+
+.dropZone:hover,
+.dragOver {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.dropIcon {
+    width: 24px;
+    height: 24px;
+    color: var(--text-placeholder);
+}
+
+.fileInput {
+    display: none;
+}
+
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.jobsPanel {
+    width: max-content;
+    max-width: 70vw;
+}
+
+.jobs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 4px 12px;
+    list-style: none;
+}
+
+.forget {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.job {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+}
+
+.jobName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.done {
+    display: inline-flex;
+    color: var(--color-success);
+}
+
+.error {
+    color: var(--color-error-text);
+}
+
+.panes {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+}
+
+.pane {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.paneHeader {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+}
+
+.paneHeader button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.paneTitle {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.report {
+    flex: 1;
+    overflow: auto;
+    padding: 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    resize: none;
+    margin: 0;
+}
+
+.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-placeholder);
+    font-family: var(--font-system);
+}
+
+.warning {
+    font-size: var(--font-size-xs);
+    color: var(--color-warning-text);
+}
+
+.rendered {
+    font-family: var(--font-system);
+    font-size: var(--font-size-base);
+    white-space: normal;
+}
+
+.rendered h1,
+.rendered h2,
+.rendered h3 {
+    margin: 16px 0 8px;
+}
+
+.rendered blockquote {
+    margin: 8px 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--border-medium);
+    color: var(--text-secondary);
+}
+
+.rendered code {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    background: var(--bg-code);
+    border-radius: var(--radius-sm);
+    padding: 0 3px;
+}
+
+.rendered pre {
+    padding: 8px;
+    background: var(--bg-code);
+    border-radius: var(--radius-md);
+    overflow: auto;
+}
+
+.rendered pre code {
+    padding: 0;
+}
+
+.rendered table {
+    border-collapse: collapse;
+}
+
+.rendered th,
+.rendered td {
+    padding: 4px 8px;
+    border: 1px solid var(--border-default);
+}

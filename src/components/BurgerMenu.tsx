@@ -317,6 +317,12 @@ export function BurgerMenu() {
                 >
                   Anonymise text…
                 </button>
+                <button
+                  className={styles.burgerItem}
+                  onClick={() => { setIsOpen(false); setAnonOpen(false); void navigate('/anonymize'); }}
+                >
+                  Anonymise files / de-anonymise report…
+                </button>
                 <div className={styles.burgerDivider} />
                 <div className={styles.submenuSalt}>
                   <label className={styles.saltLabel} htmlFor="anon-salt-input">Salt</label>
