@@ -61,15 +61,6 @@
     display: none;
 }
 
-.toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-}
-
 .jobsPanel {
     width: max-content;
     max-width: 70vw;
@@ -126,6 +117,23 @@
     gap: 6px;
     flex: 1;
     min-width: 0;
+    position: relative;
+}
+
+.paneDragOver .report {
+    border: 2px dashed var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.dropHint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--color-primary);
+    pointer-events: none;
 }
 
 .paneHeader {
@@ -316,4 +324,100 @@
 
 .rendered tr:nth-child(2n) {
     background: var(--bg-secondary);
+}
+
+.notice {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(440px, calc(100vw - 48px));
+    padding: 12px 12px 14px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-modal);
+}
+
+.noticeRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.noticeTitle {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.noticePct {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.noticeBar {
+    height: 6px;
+    margin-right: 4px;
+    background: var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.noticeFill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-md);
+    transition: width 200ms ease-out;
+}
+
+.linkButton {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--color-error-text);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.textButton {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--color-primary);
+    cursor: pointer;
+}
+
+.textButton:hover {
+    text-decoration: underline;
+}
+
+.originalZone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+    text-align: center;
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--transition-slow) ease;
+}
+
+.originalZone:hover,
+.paneDragOver .originalZone {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
 }

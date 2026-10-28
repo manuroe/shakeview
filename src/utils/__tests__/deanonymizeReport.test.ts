@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildAnonymizationDictionaryFromTexts, applyAnonymization } from '../anonymizeUtils';
-import { repointViewerLinks, unanonymizeReport, type DeanonymizeSource } from '../deanonymizeReport';
+import { countUnresolvedAliases, repointViewerLinks, unanonymizeReport, type DeanonymizeSource } from '../deanonymizeReport';
 
 const SALT = 'test-salt';
 const APP = 'https://manuroe.github.io/shakeview/';
@@ -45,5 +45,13 @@ describe('repointViewerLinks', () => {
   it('leaves links into other archives alone', () => {
     const link = '[x](http://127.0.0.1:7357/#/logs?archive=/cases/c/shakes/unknown-anonym.tar.gz&line=3)';
     expect(repointViewerLinks(link, sources, APP)).toBe(link);
+  });
+});
+
+describe('countUnresolvedAliases', () => {
+  it('counts each alias left once, encoded or not, and ignores real identifiers', () => {
+    const alias = '@user-0123456789ab:domain-01234567.org';
+    expect(countUnresolvedAliases(`${alias} met ${alias} and @alice:example.org in %21room-0123456789ab%3Adomain-01234567.org`)).toBe(2);
+    expect(countUnresolvedAliases('@alice:example.org')).toBe(0);
   });
 });

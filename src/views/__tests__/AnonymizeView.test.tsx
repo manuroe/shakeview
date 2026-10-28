@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, afterAll, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AnonymizeView } from '../AnonymizeView';
-import { useAnonymizeSessionStore } from '../../stores/anonymizeSessionStore';
+import { useAnonymizeSessionStore, type AnonymizeJob } from '../../stores/anonymizeSessionStore';
 import { applyAnonymization, buildAnonymizationDictionaryFromTexts } from '../../utils/anonymizeUtils';
 import * as download from '../../utils/downloadBlob';
 
@@ -25,7 +25,7 @@ describe('AnonymizeView', () => {
     const alias = applyAnonymization('@alice:matrix.org', dict);
     useAnonymizeSessionStore.setState({
       jobs: [{
-        id: 0, sourceName: 'rs.tar.gz', status: 'done', message: '', rawUrl: 'blob:http://localhost/1',
+        id: 0, sourceName: 'rs.tar.gz', status: 'done', message: '', progress: 1, rawUrl: 'blob:http://localhost/1', save: true,
         output: { name: 'rs-anonym.tar.gz', data: new Uint8Array(), mime: 'application/gzip', dict, isArchive: true },
       }],
       report: `# Case\n\n${alias} left.\n\n- [12:00](http://127.0.0.1:7357/#/logs?archive=/c/rs-anonym.tar.gz&line=4)\n`,
@@ -81,20 +81,60 @@ describe('AnonymizeView', () => {
     const file = new File(['x'], 'rs.tar.gz');
     const dataTransfer = { files: [file], types: ['Files'] };
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Auto-save' }));
-    expect(useAnonymizeSessionStore.getState().autoSave).toBe(false);
     fireEvent.dragOver(zone, { dataTransfer });
     expect(zone.className).toMatch(/dragOver/);
     fireEvent.dragLeave(zone);
     expect(zone.className).not.toMatch(/dragOver/);
     fireEvent.drop(zone, { dataTransfer });
-    expect(anonymiseFiles).toHaveBeenLastCalledWith([file]);
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([file], true);
 
     fireEvent.click(zone);
     fireEvent.keyDown(zone, { key: 'Enter' });
     expect(click).toHaveBeenCalledTimes(2);
     fireEvent.change(input, { target: { files: [file] } });
     expect(anonymiseFiles).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads a text file dropped on the rageshake zone as the report', async () => {
+    const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
+    useAnonymizeSessionStore.setState({ anonymiseFiles });
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    const zone = screen.getByRole('button', { name: 'Choose rageshakes to anonymise' });
+    const archive = new File(['x'], 'rs.tar.gz');
+    const txt = Object.assign(new File(['# Report'], 'report.txt'), { text: () => Promise.resolve('# Report') });
+
+    fireEvent.drop(zone, { dataTransfer: { files: [archive, txt], types: ['Files'] } });
+
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], true);
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().report).toBe('# Report'));
+  });
+
+  it('takes the original on the de-anonymised pane for its mapping only, dropped or chosen', () => {
+    const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
+    useAnonymizeSessionStore.setState({ anonymiseFiles });
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    const zone = screen.getByRole('button', { name: 'Choose the original rageshake' });
+    const file = new File(['x'], 'rs.tar.gz');
+    const dataTransfer = { files: [file], types: ['Files'] };
+
+    fireEvent.dragOver(zone, { dataTransfer });
+    expect(zone.parentElement?.className).toMatch(/paneDragOver/);
+    fireEvent.drop(zone, { dataTransfer });
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([file], false);
+
+    const chooser = document.querySelectorAll('input[type="file"]')[2] as HTMLInputElement;
+    const click = vi.spyOn(chooser, 'click').mockImplementation(() => {});
+    fireEvent.click(zone);
+    fireEvent.keyDown(zone, { key: 'Enter' });
+    expect(click).toHaveBeenCalledTimes(2);
+    // With text but no original yet, a hint under the pane offers the same, as does the header, always.
+    act(() => useAnonymizeSessionStore.setState({ report: 'x' }));
+    fireEvent.click(screen.getByRole('button', { name: 'choose it' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add original rageshake' }));
+    expect(click).toHaveBeenCalledTimes(4);
+    fireEvent.change(chooser, { target: { files: [file] } });
+    expect(anonymiseFiles).toHaveBeenCalledTimes(2);
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([file], false);
   });
 
   it('loads a markdown file dropped on the anonymised pane and swallows stray file drops', async () => {
@@ -135,5 +175,109 @@ describe('AnonymizeView', () => {
     render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
 
     expect(screen.getByLabelText('De-anonymised').querySelector('p')?.innerHTML).toBe('first<br>\nsecond');
+  });
+
+  it('keeps editing when pasting into existing text, and shows the drop target while dragging a file', () => {
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    const input = screen.getByRole('textbox', { name: 'Anonymised' });
+    fireEvent.change(input, { target: { value: 'typed' } });
+    fireEvent.paste(input);
+    fireEvent.change(input, { target: { value: 'typed and pasted' } });
+    // Still the textarea, holding the edit: a paste only flips to rendered when it fills an empty pane.
+    expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveValue('typed and pasted');
+
+    fireEvent.dragOver(input, { dataTransfer: { types: ['Files'], files: [] } });
+    expect(screen.getByText('Drop to load')).toBeInTheDocument();
+  });
+
+  it('keeps typing in the textarea after a paste that inserted nothing', () => {
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    const input = screen.getByRole('textbox', { name: 'Anonymised' });
+    fireEvent.paste(input); // e.g. an image: no change follows
+    fireEvent.keyDown(input, { key: 'a' });
+    fireEvent.change(input, { target: { value: 'a' } });
+
+    expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveValue('a');
+  });
+
+  it('keeps the zone once originals are loaded, counting them, until there is text', () => {
+    const job: AnonymizeJob = {
+      id: 1, sourceName: 'rs.tar.gz', status: 'done', message: '', progress: 1, rawUrl: null, save: false,
+      output: { name: 'rs-anonym.tar.gz', data: 'x', mime: 'text/plain', dict: { forward: {}, reverse: {} }, isArchive: true },
+    };
+    useAnonymizeSessionStore.setState({ jobs: [job] });
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+
+    expect(screen.getByRole('button', { name: 'Add another original rageshake' })).toHaveTextContent('1 rageshake loaded');
+    act(() => useAnonymizeSessionStore.setState({ report: '# Text' }));
+    expect(screen.queryByRole('button', { name: 'Add another original rageshake' })).toBeNull();
+  });
+
+  it('routes a dropped file by type, whichever pane it lands on', async () => {
+    const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
+    useAnonymizeSessionStore.setState({ anonymiseFiles });
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    const archive = new File(['x'], 'rs.tar.gz');
+    // jsdom's File lacks text(), which every browser has.
+    const md = Object.assign(new File(['# From the right'], 'r.md'), { text: () => Promise.resolve('# From the right') });
+
+    // An archive on the anonymised pane is an original, not text to read.
+    fireEvent.drop(screen.getByRole('textbox', { name: 'Anonymised' }), { dataTransfer: { files: [archive], types: ['Files'] } });
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], false);
+    expect(useAnonymizeSessionStore.getState().report).toBe('');
+
+    // Markdown on the de-anonymised pane is the text to reverse, not a log.
+    fireEvent.drop(screen.getByRole('button', { name: 'Choose the original rageshake' }), { dataTransfer: { files: [md], types: ['Files'] } });
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().report).toBe('# From the right'));
+    expect(anonymiseFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('says how many IDs no loaded rageshake knows, instead of leaving the text silently unchanged', () => {
+    const job: AnonymizeJob = {
+      id: 1, sourceName: 'other.tar.gz', status: 'done', message: '', progress: 1, rawUrl: null, save: false,
+      output: { name: 'other-anonym.tar.gz', data: 'x', mime: 'text/plain', dict: { forward: {}, reverse: {} }, isArchive: true },
+    };
+    useAnonymizeSessionStore.setState({ jobs: [job], report: '@user-0123456789ab:domain-01234567.org left' });
+    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+
+    expect(screen.getByText(/1 ID not found in the loaded rageshakes/)).toBeInTheDocument();
+  });
+
+  describe('progress notice', () => {
+    const done = (id: number, name: string): AnonymizeJob => ({
+      id, sourceName: name, status: 'done', message: '', progress: 1, rawUrl: null, save: true,
+      output: { name: `${name}-anonym.log`, data: 'x', mime: 'text/plain', dict: { forward: {}, reverse: {} }, isArchive: false },
+    });
+    const failed: AnonymizeJob = { id: 9, sourceName: 'bad.png', status: 'error', message: 'not a text log', progress: 1, output: null, rawUrl: null, save: true };
+    const working: AnonymizeJob = { ...failed, status: 'working', message: 'Reading', progress: 0.5 };
+
+    it('shows the drop\'s progress, asks nothing, and cannot be closed while working', () => {
+      useAnonymizeSessionStore.setState({ jobs: [done(1, 'a'), working], batch: { jobIds: [1, 9], dismissed: false } });
+      render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+
+      // One file done, one halfway: 75% of the drop.
+      expect(screen.getByRole('status')).toHaveTextContent('Anonymising 2 rageshakes75%');
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '75');
+      expect(screen.getByRole('status').querySelectorAll('button')).toHaveLength(0);
+    });
+
+    it('closes by itself once done', () => {
+      useAnonymizeSessionStore.setState({ jobs: [done(1, 'a'), done(2, 'b')], batch: { jobIds: [1, 2], dismissed: false } });
+      render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(useAnonymizeSessionStore.getState().batch?.dismissed).toBe(true);
+    });
+
+    it('stays when something failed, opens the list from the failure count, and can then be closed', () => {
+      useAnonymizeSessionStore.setState({ jobs: [done(1, 'a'), failed], batch: { jobIds: [1, 9], dismissed: false } });
+      render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+
+      expect(screen.getByRole('status')).toHaveTextContent('1 of 2 anonymised1 failed');
+      fireEvent.click(screen.getByRole('button', { name: '1 failed' }));
+      expect(screen.getByText('not a text log')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(screen.queryByRole('status')).toBeNull();
+    });
   });
 });

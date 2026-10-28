@@ -1,5 +1,5 @@
 import type { AnonymizationDictionary } from '../types/log.types';
-import { applyUnanonymization } from './anonymizeUtils';
+import { applyUnanonymization, decodeIdentifier, isIdentifierAlias, MATRIX_IDENTIFIER_RE } from './anonymizeUtils';
 
 /** What the anonymise page knows about one file it anonymised. */
 export interface DeanonymizeSource {
@@ -65,4 +65,26 @@ export function repointViewerLinks(text: string, sources: readonly DeanonymizeSo
     params.set('archive', rawUrl);
     return `${appBase}#${route.slice(0, q)}?${params.toString()}`;
   });
+}
+
+/**
+ * Distinct aliases still in `text` after reversing: identifiers no loaded
+ * mapping knows. Non-zero means the rageshake loaded is not the one the text
+ * was written about, or it was anonymised with another salt (another browser
+ * or install) — a mismatch that would otherwise leave the text silently
+ * unchanged.
+ *
+ * @example
+ * ```ts
+ * countUnresolvedAliases('@user-0123456789ab:domain-01234567.org and @alice:example.org'); // 1
+ * ```
+ */
+export function countUnresolvedAliases(text: string): number {
+  // Same scan as the CLI's precheck. Fresh regex instance so its lastIndex is ours.
+  const seen = new Set<string>();
+  for (const [id] of text.matchAll(new RegExp(MATRIX_IDENTIFIER_RE.source, 'g'))) {
+    const decoded = decodeIdentifier(id);
+    if (isIdentifierAlias(decoded)) seen.add(decoded);
+  }
+  return seen.size;
 }

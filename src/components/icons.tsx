@@ -62,3 +62,8 @@ export function TrashIcon(props: IconProps) {
 export function BackIcon(props: IconProps) {
   return <svg aria-hidden="true" {...base(props)}><path d="M13 8H3M7 4L3 8l4 4" {...stroke}/></svg>;
 }
+
+/** Cross: close. */
+export function CloseIcon(props: IconProps) {
+  return <svg aria-hidden="true" {...base(props)}><path d="M4 4l8 8M12 4l-8 8" {...stroke}/></svg>;
+}
