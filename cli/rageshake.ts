@@ -97,7 +97,7 @@ Filters:
   --session <id>               This session in full (megolm); a unique prefix of 6+ characters is enough
   --raw                        Timeline steps as their verbatim log message, capped by --width, instead of
                                a one-line description (megolm --event/--session): the lines a report quotes
-  --room <id>                  Only sessions in this room (megolm); matching nothing lists the rooms with a UTD
+  --room <id>                  Only sessions in this room (megolm); matching nothing lists the main device's rooms with a UTD
   --sender <id>                Only sessions this user sent (megolm)
 
 Pagination (all line/tree output is capped, never unbounded):
@@ -994,6 +994,10 @@ export function cmdGrep(ing: Ingest, patterns: readonly string[], flags: Flags):
       ? `# "${patterns[k]}" 0 in range, ${inLog} in full log — widen --last/--since/--from, or drop --level/--file`
       : `# "${patterns[k]}" 0 in range and 0 in full log — the pattern is never logged`);
   }
+  // A regex alternation finds nothing, and "never logged" would send the caller the wrong way.
+  for (const [k, n] of counts.entries()) {
+    if (n === 0 && patterns[k].includes('|')) hints.push(`# "${patterns[k]}": patterns are literal substrings, not regexes — pass alternatives as separate arguments`);
+  }
   const summary = counts.map((n, k) => `"${patterns[k]}" ${n}`).join(' · ');
   out.push(`# ${summary}${queries.length > 1 ? ` — ${matches.length} lines` : ` line${counts[0] === 1 ? '' : 's'}`}`);
   out.push(...hints);
@@ -1381,9 +1385,10 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   else if (sessions.length === 0 && room) {
     // A room quoted from a report may be mistyped or aliased under another salt: show what is there.
     const byRoom = new Map<string, number>();
-    for (const s of unroomed) if (s.utds.length > 0 && s.roomId) byRoom.set(s.roomId, (byRoom.get(s.roomId) ?? 0) + 1);
+    // The main device's UTDs only: an added archive (the sender's) brings its own rooms' failures.
+    for (const s of unroomed) if (s.roomId && s.utds.some((u) => u.deviceId === devices[0].id)) byRoom.set(s.roomId, (byRoom.get(s.roomId) ?? 0) + 1);
     const rooms = [...byRoom].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([r, n]) => `${r} (${plural(n, 'session')})`);
-    out.push(`# no session in ${room}; rooms with a UTD: ${rooms.join(' · ') || 'none'}`);
+    out.push(`# no session in ${room}; rooms with a UTD on the main device: ${rooms.join(' · ') || 'none'}`);
   } else if (sessions.length === 0) out.push('# no megolm sessions');
   return out.join('\n');
 }

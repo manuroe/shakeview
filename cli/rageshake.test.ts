@@ -635,6 +635,8 @@ describe('rageshake CLI', () => {
     writeFileSync(file, buildArchive(ANON_LOG));
     const { code, output } = run(['grep', file, 'retry scheduled', 'Sentry configured', '--count']);
     expect(code).toBe(0);
+    // A regex alternation matches nothing: say patterns are literal rather than "never logged".
+    expect(run(['grep', file, 'retry|Sentry']).output).toContain('# "retry|Sentry": patterns are literal substrings, not regexes — pass alternatives as separate arguments');
     // When each pattern happens, so one call picks each pattern's window.
     expect(output).toContain('# when: "retry scheduled" 10:00:02 → 10:00:02 · "Sentry configured" 10:00:00 → 10:00:00');
     expect(output).toContain('"retry scheduled" 1');
@@ -815,7 +817,10 @@ describe('megolm', () => {
     expect(rowOf(megolm(bob, '--room', '!room-2222222222'), 'SESS3')).not.toBe('');
     const none = megolm(bob, '--room', '!room-99999999');
     expect(none).toContain('# no session in !room-99999999');
-    expect(none).toContain(`rooms with a UTD: ${ROOM} (2 sessions)`);
+    expect(none).toContain(`rooms with a UTD on the main device: ${ROOM} (2 sessions)`);
+    // An added archive's own UTDs (the sender's other rooms) are not the reporter's rooms.
+    const elsewhere = cryptoArchive('elsewhere.tar.gz', anon(SENDER_DETAILS), ['# [shakeview-anonymized]', utdLine.replaceAll(ROOM, OTHER_ROOM).replace('SESS"', 'SESSX"')].join('\n'));
+    expect(megolm(bob, elsewhere, '--room', '!room-99999999')).not.toContain(OTHER_ROOM);
     expect(() => megolm(bob, '--room', '!room-12')).toThrow(/at least 6 hex/);
   });
 
