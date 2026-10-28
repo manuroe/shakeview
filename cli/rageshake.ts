@@ -1360,7 +1360,7 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   const totals = devices.map((d, i) => {
     const mine = sessions.filter(({ s }) => (s.stepsByDevice[d.id]?.length ?? 0) > 0);
     const utds = mine.flatMap(({ s }) => s.utds.filter((u) => u.deviceId === d.id));
-    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')}${analyticsCounts(utds)}`;
+    return `${i + 1}: ${plural(mine.length, 'session')}, ${plural(utds.length, 'UTD')}${analyticsCounts(utds)}${utds.length > 0 ? `: ${outcomeCounts(utds)}` : ''}`;
   });
   out.push(`# ${plural(sessions.length, 'session')}${flags.utd ? ' with a UTD' : ''}, newest first · ${totals.join(' · ')}`);
   out.push('# time room session · sender (archive, how found) · per archive: utd:<reason>×N still failing, late:<how>×N decrypted later, (analytics)');
@@ -1393,6 +1393,16 @@ export function cmdMegolm(archives: readonly MegolmArchive[], flags: Flags = {})
   return out.join('\n');
 }
 
+/** UTDs per outcome key: `utd:missing_key×3 late:backup×1`. */
+function outcomeCounts(utds: readonly UtdEvent[]): string {
+  const byKey = new Map<string, number>();
+  for (const u of utds) {
+    const k = u.resolution.state === 'resolved' ? lateOutcomeKey(u.resolution.by) : utdOutcomeKey(u.reason);
+    byKey.set(k, (byKey.get(k) ?? 0) + 1);
+  }
+  return [...byKey].map(([k, n]) => `${k}×${n}`).join(' ');
+}
+
 /** UTDs per analytics value, as /decryption names them: ` (2 reported, 1 unknown)`; empty for none. */
 function analyticsCounts(utds: readonly UtdEvent[]): string {
   const parts = ANALYTICS_CATEGORIES.flatMap((c) => {
@@ -1411,12 +1421,7 @@ function archiveOutcome(s: MegolmSession, d: CryptoDevice): string {
   }
   const utds = s.utds.filter((u) => u.deviceId === d.id);
   if (utds.length > 0) {
-    const byKey = new Map<string, number>();
-    for (const u of utds) {
-      const k = u.resolution.state === 'resolved' ? lateOutcomeKey(u.resolution.by) : utdOutcomeKey(u.reason);
-      byKey.set(k, (byKey.get(k) ?? 0) + 1);
-    }
-    parts.push(`${[...byKey].map(([k, n]) => `${k}×${n}`).join(' ')}${analyticsCounts(utds)}`);
+    parts.push(`${outcomeCounts(utds)}${analyticsCounts(utds)}`);
   } else if (parts.length === 0 && (s.stepsByDevice[d.id] ?? []).some((x) => x.kind === 'roomkey.received')) {
     parts.push('key_received');
   }

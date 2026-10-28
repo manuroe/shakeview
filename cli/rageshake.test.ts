@@ -765,7 +765,8 @@ describe('megolm', () => {
     expect(rowOf(out, 'SESS')).toContain('2: outbound, shared to 1 device');
     expect(rowOf(out, 'SESS')).toContain(`sender ${ALICE_ID} ALICEPHONE (2, by share)`);
     expect(rowOf(out, 'SESS2')).toContain('1: late:late_key×1 (1 unknown)');
-    expect(out).toContain('1: 3 sessions, 2 UTDs (1 reported, 1 unknown)');
+    // Outcome totals too, so nobody adds up rows by hand.
+    expect(out).toContain('1: 3 sessions, 2 UTDs (1 reported, 1 unknown): late:late_key×1 utd:missing_key×1');
     expect(out).toContain('A UTD counts as reported when');
     expect(rowOf(out, 'SESS3')).toContain('1: key_received');
     expect(rowOf(out, 'SESS3')).toContain('(not loaded)');
