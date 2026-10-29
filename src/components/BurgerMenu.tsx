@@ -17,6 +17,7 @@ import { useClickOutside } from '../hooks/useClickOutside';
 import { LogSelectionDialog } from './LogSelectionDialog';
 import { AnonMappingDialog } from './AnonMappingDialog';
 import { AnonTextDialog } from './AnonTextDialog';
+import { SaltField } from './SaltField';
 import { SaveProgressModal } from './SaveProgressModal';
 import styles from './BurgerMenu.module.css';
 
@@ -42,7 +43,7 @@ export function BurgerMenu() {
   const archiveEntryCount = archiveEntries.length;
   const listingEntryCount = listingEntries.length;
   const { theme, setTheme } = useThemeStore();
-  const { salt, setSalt, resetSalt } = useAnonSaltStore();
+  const salt = useAnonSaltStore((s) => s.salt);
   const shortcutCtx = useKeyboardShortcutContextOptional();
   const [showLogSelection, setShowLogSelection] = useState(false);
   const [showMapping, setShowMapping] = useState(false);
@@ -324,27 +325,7 @@ export function BurgerMenu() {
                   Anonymise files / de-anonymise report…
                 </button>
                 <div className={styles.burgerDivider} />
-                <div className={styles.submenuSalt}>
-                  <label className={styles.saltLabel} htmlFor="anon-salt-input">Salt</label>
-                  <input
-                    id="anon-salt-input"
-                    type="text"
-                    className={styles.saltInput}
-                    value={salt}
-                    onChange={(e) => setSalt(e.target.value)}
-                    placeholder="salt"
-                    aria-label="Anonymisation salt"
-                    spellCheck={false}
-                    autoComplete="off"
-                  />
-                  <button className={styles.saltReset} onClick={resetSalt}>
-                    Regenerate
-                  </button>
-                  <p className={styles.saltWarning}>
-                    Use the same salt across installs to get matching aliases. Empty = reproducible
-                    but guessable.
-                  </p>
-                </div>
+                <SaltField />
               </div>
             )}
           </div>
