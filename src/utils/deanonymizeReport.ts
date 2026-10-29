@@ -1,5 +1,14 @@
 import type { AnonymizationDictionary } from '../types/log.types';
-import { applyUnanonymization, decodeIdentifier, isIdentifierAlias, MATRIX_IDENTIFIER_RE } from './anonymizeUtils';
+import {
+  applyAnonymization,
+  applyUnanonymization,
+  buildAnonymizationDictionaryFromTexts,
+  decodeIdentifier,
+  isDomainAlias,
+  isIdentifierAlias,
+  MATRIX_IDENTIFIER_RE,
+  URL_HOST_RE,
+} from './anonymizeUtils';
 
 /** What the anonymise page knows about one file it anonymised. */
 export interface DeanonymizeSource {
@@ -85,6 +94,61 @@ export function countUnresolvedAliases(text: string): number {
   for (const [id] of text.matchAll(new RegExp(MATRIX_IDENTIFIER_RE.source, 'g'))) {
     const decoded = decodeIdentifier(id);
     if (isIdentifierAlias(decoded)) seen.add(decoded);
+  }
+  return seen.size;
+}
+
+/**
+ * Anonymise text written with real identifiers, with the salt alone: aliases are
+ * a pure function of (identifier, salt), so they match the anonymised rageshakes.
+ * The loaded mappings apply too. Aliases already in the text stay as they are:
+ * hashing one again would give an alias no log holds.
+ *
+ * Returns the text's own mapping as well, so it can be read back later.
+ *
+ * @example
+ * ```ts
+ * (await anonymizeText('@alice:example.org left', salt, [])).text; // '@user-…:domain-….org left'
+ * ```
+ */
+export async function anonymizeText(
+  text: string,
+  salt: string,
+  sources: readonly DeanonymizeSource[],
+): Promise<{ text: string; dict: AnonymizationDictionary }> {
+  const built = await buildAnonymizationDictionaryFromTexts([text], salt);
+  const isAlias = (id: string) => isIdentifierAlias(decodeIdentifier(id)) || isDomainAlias(id.replace(/:\d{1,5}$/, ''));
+  const forward: Record<string, string> = {};
+  const reverse: Record<string, string> = {};
+  for (const [id, alias] of Object.entries(built.forward)) {
+    if (isAlias(id)) continue;
+    forward[id] = alias;
+    reverse[alias] = id;
+  }
+  const merged: Record<string, string> = {};
+  // A raw log holding an alias (an anonymised ID pasted into the app) maps it too: skip those as well.
+  for (const s of sources) for (const [id, alias] of Object.entries(s.dict.forward)) if (!isAlias(id)) merged[id] = alias;
+  Object.assign(merged, forward);
+  return { text: applyAnonymization(text, { forward: merged, reverse: {} }), dict: { forward, reverse } };
+}
+
+/**
+ * Real identifiers left in `text`: Matrix IDs and URL hosts that are not
+ * aliases. The CLI's precheck scan, so a text that passes here passes there.
+ *
+ * @example
+ * ```ts
+ * countRealIdentifiers('@alice:example.org on https://matrix.example.org/x'); // 2
+ * ```
+ */
+export function countRealIdentifiers(text: string): number {
+  const seen = new Set<string>();
+  for (const [id] of text.matchAll(new RegExp(MATRIX_IDENTIFIER_RE.source, 'g'))) {
+    const decoded = decodeIdentifier(id);
+    if (!isIdentifierAlias(decoded)) seen.add(decoded);
+  }
+  for (const m of text.matchAll(new RegExp(URL_HOST_RE.source, 'g'))) {
+    if (!isDomainAlias(m[1])) seen.add(m[1]);
   }
   return seen.size;
 }
