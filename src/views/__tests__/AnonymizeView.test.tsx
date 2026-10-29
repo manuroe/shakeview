@@ -1,10 +1,33 @@
 import { describe, it, expect, afterEach, afterAll, vi } from 'vitest';
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AnonymizeView } from '../AnonymizeView';
 import { useAnonymizeSessionStore, type AnonymizeJob } from '../../stores/anonymizeSessionStore';
+import { useAnonSaltStore } from '../../stores/anonSaltStore';
+import type { AnonymizationDictionary } from '../../types/log.types';
+import type { MatrixProfile } from '../../types/listing';
 import { applyAnonymization, buildAnonymizationDictionaryFromTexts } from '../../utils/anonymizeUtils';
 import * as download from '../../utils/downloadBlob';
+import * as deanonymize from '../../utils/deanonymizeReport';
+
+// No homeserver in tests: each test says which profiles exist.
+const profiles = vi.hoisted(() => new Map<string, MatrixProfile>());
+vi.mock('../../hooks/useMatrixProfile', () => ({
+  useMatrixProfile: (userId: string | undefined) => (userId ? profiles.get(userId) ?? null : null),
+}));
+
+const EMPTY: AnonymizationDictionary = { forward: {}, reverse: {} };
+
+const job = (patch: Partial<AnonymizeJob> & { userId?: string; deviceId?: string; dict?: AnonymizationDictionary } = {}): AnonymizeJob => {
+  const { userId, deviceId, dict = EMPTY, ...rest } = patch;
+  return {
+    id: 1, sourceName: 'rs.tar.gz', status: 'done', message: '', progress: 1, rawUrl: null, salt: 'salt', save: false, file: new File(['x'], 'rs.tar.gz'),
+    output: { name: 'rs-anonym.tar.gz', data: 'x', mime: 'text/plain', dict, isArchive: true, identity: { userId, deviceId } },
+    ...rest,
+  };
+};
+
+const page = () => render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
 
 describe('AnonymizeView', () => {
   // jsdom has no revokeObjectURL; Forget all calls it for the held raw archive.
@@ -12,56 +35,123 @@ describe('AnonymizeView', () => {
   const originalRevoke = URL.revokeObjectURL;
   URL.revokeObjectURL = revoke;
   const initialState = useAnonymizeSessionStore.getState();
+  const initialSalt = useAnonSaltStore.getState().salt;
   afterEach(() => {
     vi.restoreAllMocks();
+    profiles.clear();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- removing the stubbed JSDOM property
     delete (navigator as any).clipboard;
     useAnonymizeSessionStore.setState(initialState, true);
+    // Back to the first salt. A salt change re-anonymises after a debounce: run that here, not in the next test.
+    vi.useFakeTimers();
+    act(() => {
+      useAnonSaltStore.setState({ salt: initialSalt });
+      vi.runAllTimers();
+    });
+    vi.useRealTimers();
   });
   afterAll(() => { URL.revokeObjectURL = originalRevoke; });
 
-  it('renders the report de-anonymised, links repointed at the raw archive, with a raw view', async () => {
+  it('reads anonymised text back with real IDs, links repointed at the raw archive, and forgets all but the anonymised text', async () => {
     const dict = await buildAnonymizationDictionaryFromTexts(['@alice:matrix.org'], 'salt');
     const alias = applyAnonymization('@alice:matrix.org', dict);
+    const text = `# Case\n\n${alias} left.\n\n- [12:00](http://127.0.0.1:7357/#/logs?archive=/c/rs-anonym.tar.gz&line=4)\n`;
     useAnonymizeSessionStore.setState({
-      jobs: [{
-        id: 0, sourceName: 'rs.tar.gz', status: 'done', message: '', progress: 1, rawUrl: 'blob:http://localhost/1', save: true,
-        output: { name: 'rs-anonym.tar.gz', data: new Uint8Array(), mime: 'application/gzip', dict, isArchive: true },
-      }],
-      report: `# Case\n\n${alias} left.\n\n- [12:00](http://127.0.0.1:7357/#/logs?archive=/c/rs-anonym.tar.gz&line=4)\n`,
+      jobs: [job({ dict, rawUrl: 'blob:http://localhost/1', output: { name: 'rs-anonym.tar.gz', data: new Uint8Array(), mime: 'application/gzip', dict, isArchive: true, identity: {} } })],
+      text,
     });
 
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    page();
 
-    expect(screen.getByRole('heading', { name: 'Case' })).toBeInTheDocument();
     expect(screen.getByText('@alice:matrix.org left.')).toBeInTheDocument();
-    const href = screen.getByRole('link', { name: '12:00' }).getAttribute('href')!;
+    const href = screen.getAllByRole('link', { name: '12:00' })[0].getAttribute('href')!;
     expect(new URLSearchParams(href.slice(href.indexOf('?') + 1)).get('archive')).toBe('blob:http://localhost/1');
 
     const save = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {});
-    fireEvent.click(screen.getByRole('button', { name: 'Save de-anonymised' }));
-    expect(save).toHaveBeenLastCalledWith(expect.stringContaining('@alice:matrix.org left.'), 'deanonymised.md', 'text/markdown');
+    fireEvent.click(screen.getByRole('button', { name: 'Save real ids' }));
+    expect(save).toHaveBeenLastCalledWith(expect.stringContaining('@alice:matrix.org left.'), 'real.md', 'text/markdown');
     fireEvent.click(screen.getByRole('button', { name: '1 rageshake ▾' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save rs-anonym.tar.gz' }));
     expect(save).toHaveBeenLastCalledWith(expect.any(Uint8Array), 'rs-anonym.tar.gz', 'application/gzip');
     fireEvent.click(screen.getByRole('button', { name: /Forget all/ }));
-    expect(useAnonymizeSessionStore.getState().jobs).toEqual([]);
+    expect(useAnonymizeSessionStore.getState()).toMatchObject({ jobs: [], text, driver: 'anonymised' });
     expect(revoke).toHaveBeenCalledWith('blob:http://localhost/1');
-    act(() => useAnonymizeSessionStore.setState({ report: '# Case' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show de-anonymised markdown source' }));
-    expect(screen.getByLabelText('De-anonymised').textContent).toContain('# Case');
+    fireEvent.click(screen.getByRole('button', { name: 'Show real ids markdown source' }));
+    expect(screen.getByRole('textbox', { name: 'Real IDs' })).toHaveValue(text);
   });
 
-  it('renders pasted anonymised text, keeps it editable, and copies its source', async () => {
+  it('anonymises text typed with real IDs, and reads it back once the anonymised side is edited', async () => {
+    page();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Real IDs' }), { target: { value: '@alice:matrix.org left' } });
+    await vi.waitFor(() => expect(screen.getByText(/^@user-[0-9a-f]{12}:domain-[0-9a-f]{8}\.org left$/)).toBeInTheDocument());
+    expect(screen.queryByText(/real ID/)).toBeNull(); // all anonymised: nothing to warn about
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show anonymised markdown source' }));
+    const right = screen.getByRole('textbox', { name: 'Anonymised' }) as HTMLTextAreaElement;
+    const edited = `${right.value}, then came back`;
+    fireEvent.change(right, { target: { value: edited } });
+
+    expect(useAnonymizeSessionStore.getState().driver).toBe('anonymised');
+    expect(screen.getByRole('textbox', { name: 'Real IDs' })).toHaveValue('@alice:matrix.org left, then came back');
+
+    // Typing on the left again: until it is anonymised, the right keeps its text, not the anonymisation before the edit.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Real IDs' }), { target: { value: '@alice:matrix.org left, then came back!' } });
+    expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveValue(edited);
+  });
+
+  it('anonymises typed text again neither on a progress tick nor on each keystroke of the salt', async () => {
+    useAnonymizeSessionStore.setState({ jobs: [job()] });
+    page();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Real IDs' }), { target: { value: '@alice:matrix.org left' } });
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().textDict.forward).toHaveProperty(['@alice:matrix.org']));
+    const spy = vi.spyOn(deanonymize, 'anonymizeText');
+
+    act(() => {
+      // A re-run's progress: a new job, the same output.
+      useAnonymizeSessionStore.setState((s) => ({ jobs: s.jobs.map((j) => ({ ...j, status: 'working', progress: 0.5 })) }));
+      for (const salt of ['n', 'ne', 'new']) useAnonSaltStore.setState({ salt });
+    });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 400)); // past the debounce
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith('@alice:matrix.org left', 'new', expect.anything());
+  });
+
+  it('forgets the mapping of text typed with real IDs, keeping its anonymisation as typed last', async () => {
+    useAnonymizeSessionStore.setState({ jobs: [job()] });
+    page();
+    const left = screen.getByRole('textbox', { name: 'Real IDs' });
+    fireEvent.change(left, { target: { value: '@alice:matrix.org left' } });
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().textDict.forward).toHaveProperty(['@alice:matrix.org']));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Real IDs' }), { target: { value: '@alice:matrix.org left, @bob:matrix.org stayed' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '1 rageshake ▾' }));
+    fireEvent.click(screen.getByRole('button', { name: /Forget all/ }));
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().driver).toBe('anonymised'));
+    expect(useAnonymizeSessionStore.getState().text).toMatch(/^@user-\S+ left, @user-\S+ stayed$/);
+    await new Promise((r) => setTimeout(r, 400)); // past the debounce of the text typed
+
+    expect(useAnonymizeSessionStore.getState().textDict).toEqual({ forward: {}, reverse: {} });
+  });
+
+  it('warns when the anonymised side holds real IDs', () => {
+    useAnonymizeSessionStore.setState({ text: '@alice:matrix.org on https://matrix.example.org/x' });
+    page();
+
+    expect(screen.getByText('2 real IDs left: not safe to share.')).toBeInTheDocument();
+  });
+
+  it('renders pasted text on both sides, keeps it editable, and copies its source', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    page();
 
     const input = screen.getByRole('textbox', { name: 'Anonymised' });
     fireEvent.paste(input);
     fireEvent.change(input, { target: { value: '# Notes' } });
-    // Rendered on both sides now: the left after the paste, the right always.
     expect(screen.getAllByRole('heading', { name: 'Notes' })).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: 'Show anonymised markdown source' }));
@@ -71,11 +161,11 @@ describe('AnonymizeView', () => {
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('# Notes'));
   });
 
-  it('anonymises files dropped, picked, or chosen from the keyboard', () => {
+  it('anonymises and saves files dropped, picked, or chosen from the keyboard above the anonymised side', () => {
     const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
     useAnonymizeSessionStore.setState({ anonymiseFiles });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
-    const zone = screen.getByRole('button', { name: 'Choose rageshakes to anonymise' });
+    page();
+    const zone = screen.getByRole('button', { name: 'Load and download anonymised' });
     const input = zone.querySelector('input[type="file"]') as HTMLInputElement;
     const click = vi.spyOn(input, 'click').mockImplementation(() => {});
     const file = new File(['x'], 'rs.tar.gz');
@@ -92,59 +182,40 @@ describe('AnonymizeView', () => {
     fireEvent.keyDown(zone, { key: 'Enter' });
     expect(click).toHaveBeenCalledTimes(2);
     fireEvent.change(input, { target: { files: [file] } });
-    expect(anonymiseFiles).toHaveBeenCalledTimes(2);
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([file], true);
   });
 
-  it('loads a text file dropped on the rageshake zone as the report', async () => {
+  it('takes originals above the real side for their mapping only, and loads text dropped there as real text', async () => {
     const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
     useAnonymizeSessionStore.setState({ anonymiseFiles });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
-    const zone = screen.getByRole('button', { name: 'Choose rageshakes to anonymise' });
+    page();
+    const zone = screen.getByRole('button', { name: 'Load rageshakes' });
     const archive = new File(['x'], 'rs.tar.gz');
+    // jsdom's File lacks text(), which every browser has.
     const txt = Object.assign(new File(['# Report'], 'report.txt'), { text: () => Promise.resolve('# Report') });
 
     fireEvent.drop(zone, { dataTransfer: { files: [archive, txt], types: ['Files'] } });
 
-    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], true);
-    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().report).toBe('# Report'));
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], false);
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState()).toMatchObject({ text: '# Report', driver: 'real' }));
   });
 
-  it('takes the original on the de-anonymised pane for its mapping only, dropped or chosen', () => {
+  it('routes a file dropped on a pane: a rageshake to the zone above it, text into the pane', async () => {
     const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
     useAnonymizeSessionStore.setState({ anonymiseFiles });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
-    const zone = screen.getByRole('button', { name: 'Choose the original rageshake' });
-    const file = new File(['x'], 'rs.tar.gz');
-    const dataTransfer = { files: [file], types: ['Files'] };
-
-    fireEvent.dragOver(zone, { dataTransfer });
-    expect(zone.parentElement?.className).toMatch(/paneDragOver/);
-    fireEvent.drop(zone, { dataTransfer });
-    expect(anonymiseFiles).toHaveBeenLastCalledWith([file], false);
-
-    const chooser = document.querySelectorAll('input[type="file"]')[2] as HTMLInputElement;
-    const click = vi.spyOn(chooser, 'click').mockImplementation(() => {});
-    fireEvent.click(zone);
-    fireEvent.keyDown(zone, { key: 'Enter' });
-    expect(click).toHaveBeenCalledTimes(2);
-    // With text but no original yet, a hint under the pane offers the same, as does the header, always.
-    act(() => useAnonymizeSessionStore.setState({ report: 'x' }));
-    fireEvent.click(screen.getByRole('button', { name: 'choose it' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add original rageshake' }));
-    expect(click).toHaveBeenCalledTimes(4);
-    fireEvent.change(chooser, { target: { files: [file] } });
-    expect(anonymiseFiles).toHaveBeenCalledTimes(2);
-    expect(anonymiseFiles).toHaveBeenLastCalledWith([file], false);
-  });
-
-  it('loads a markdown file dropped on the anonymised pane and swallows stray file drops', async () => {
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
-    // jsdom's File lacks text(), which every browser has.
+    page();
+    const archive = new File(['x'], 'rs.tar.gz');
     const md = Object.assign(new File(['# Dropped'], 'r.md'), { text: () => Promise.resolve('# Dropped') });
 
-    fireEvent.drop(screen.getByRole('textbox', { name: 'Anonymised' }), { dataTransfer: { files: [md], types: ['Files'] } });
+    fireEvent.drop(screen.getByRole('textbox', { name: 'Real IDs' }), { dataTransfer: { files: [archive], types: ['Files'] } });
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], false);
+    fireEvent.drop(screen.getByRole('textbox', { name: 'Anonymised' }), { dataTransfer: { files: [archive], types: ['Files'] } });
+    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], true);
+    expect(useAnonymizeSessionStore.getState().text).toBe('');
 
-    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().report).toBe('# Dropped'));
+    fireEvent.drop(screen.getByRole('textbox', { name: 'Anonymised' }), { dataTransfer: { files: [md], types: ['Files'] } });
+    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState()).toMatchObject({ text: '# Dropped', driver: 'anonymised' }));
+
     const stray = fireEvent.dragOver(screen.getByRole('heading', { name: 'Anonymise' }), { dataTransfer: { files: [md], types: ['Files'] } });
     expect(stray).toBe(false); // default prevented: the browser does not navigate to the file
   });
@@ -171,14 +242,36 @@ describe('AnonymizeView', () => {
   });
 
   it('renders a single newline as a line break, like GitHub comments', () => {
-    useAnonymizeSessionStore.setState({ report: 'first\nsecond' });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    useAnonymizeSessionStore.setState({ text: '# Notes\nfirst\nsecond' });
+    page();
 
-    expect(screen.getByLabelText('De-anonymised').querySelector('p')?.innerHTML).toBe('first<br>\nsecond');
+    expect(screen.getByLabelText('Real IDs').querySelector('p')?.innerHTML).toBe('first<br>\nsecond');
+  });
+
+  it('keeps pasted raw logs in the textarea: only markdown renders', () => {
+    page();
+    const input = screen.getByRole('textbox', { name: 'Real IDs' });
+    fireEvent.paste(input);
+    fireEvent.change(input, { target: { value: '2026-10-29 12:00:00 D/Sync: started\n2026-10-29 12:00:01 E/Sync: failed' } });
+
+    expect(screen.getByRole('textbox', { name: 'Real IDs' })).toHaveValue('2026-10-29 12:00:00 D/Sync: started\n2026-10-29 12:00:01 E/Sync: failed');
+    expect(screen.getByRole('button', { name: 'Show real ids markdown source' })).toBeDisabled();
+  });
+
+  it('edits rendered markdown on a click, but not on a link click', () => {
+    useAnonymizeSessionStore.setState({ text: '# Notes\nsee [log](https://example.org)' });
+    page();
+
+    const anonymised = within(screen.getByLabelText('Anonymised'));
+    fireEvent.click(anonymised.getByRole('link', { name: 'log' }));
+    expect(screen.queryByRole('textbox', { name: 'Anonymised' })).toBeNull();
+
+    fireEvent.click(anonymised.getByRole('heading', { name: 'Notes' }));
+    expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveFocus();
   });
 
   it('keeps editing when pasting into existing text, and shows the drop target while dragging a file', () => {
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    page();
     const input = screen.getByRole('textbox', { name: 'Anonymised' });
     fireEvent.change(input, { target: { value: 'typed' } });
     fireEvent.paste(input);
@@ -191,7 +284,7 @@ describe('AnonymizeView', () => {
   });
 
   it('keeps typing in the textarea after a paste that inserted nothing', () => {
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    page();
     const input = screen.getByRole('textbox', { name: 'Anonymised' });
     fireEvent.paste(input); // e.g. an image: no change follows
     fireEvent.keyDown(input, { key: 'a' });
@@ -200,84 +293,60 @@ describe('AnonymizeView', () => {
     expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveValue('a');
   });
 
-  it('keeps the zone once originals are loaded, counting them, until there is text', () => {
-    const job: AnonymizeJob = {
-      id: 1, sourceName: 'rs.tar.gz', status: 'done', message: '', progress: 1, rawUrl: null, save: false,
-      output: { name: 'rs-anonym.tar.gz', data: 'x', mime: 'text/plain', dict: { forward: {}, reverse: {} }, isArchive: true },
-    };
-    useAnonymizeSessionStore.setState({ jobs: [job] });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+  it('asks for the original when nothing is loaded, then blames the salt for aliases no rageshake knows', () => {
+    useAnonymizeSessionStore.setState({ text: '@user-0123456789ab:domain-01234567.org left' });
+    page();
+    expect(screen.getByText('To reveal real IDs, load the original rageshake above.')).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Add another original rageshake' })).toHaveTextContent('1 rageshake loaded');
-    act(() => useAnonymizeSessionStore.setState({ report: '# Text' }));
-    expect(screen.queryByRole('button', { name: 'Add another original rageshake' })).toBeNull();
+    act(() => useAnonymizeSessionStore.setState({ jobs: [job()] }));
+    expect(screen.getByText(/1 alias not found in the loaded rageshakes/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'wrong salt?' }));
+    expect(screen.getByRole('textbox', { name: 'Anonymisation salt' })).toHaveValue(useAnonSaltStore.getState().salt);
   });
 
-  it('routes a dropped file by type, whichever pane it lands on', async () => {
-    const anonymiseFiles = vi.fn().mockResolvedValue(undefined);
-    useAnonymizeSessionStore.setState({ anonymiseFiles });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
-    const archive = new File(['x'], 'rs.tar.gz');
-    // jsdom's File lacks text(), which every browser has.
-    const md = Object.assign(new File(['# From the right'], 'r.md'), { text: () => Promise.resolve('# From the right') });
+  it('opens the salt from the key button', () => {
+    page();
+    expect(screen.queryByRole('textbox', { name: 'Anonymisation salt' })).toBeNull();
 
-    // An archive on the anonymised pane is an original, not text to read.
-    fireEvent.drop(screen.getByRole('textbox', { name: 'Anonymised' }), { dataTransfer: { files: [archive], types: ['Files'] } });
-    expect(anonymiseFiles).toHaveBeenLastCalledWith([archive], false);
-    expect(useAnonymizeSessionStore.getState().report).toBe('');
-
-    // Markdown on the de-anonymised pane is the text to reverse, not a log.
-    fireEvent.drop(screen.getByRole('button', { name: 'Choose the original rageshake' }), { dataTransfer: { files: [md], types: ['Files'] } });
-    await vi.waitFor(() => expect(useAnonymizeSessionStore.getState().report).toBe('# From the right'));
-    expect(anonymiseFiles).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Salt' }));
+    expect(screen.getByRole('textbox', { name: 'Anonymisation salt' })).toBeInTheDocument();
   });
 
-  it('says how many IDs no loaded rageshake knows, instead of leaving the text silently unchanged', () => {
-    const job: AnonymizeJob = {
-      id: 1, sourceName: 'other.tar.gz', status: 'done', message: '', progress: 1, rawUrl: null, save: false,
-      output: { name: 'other-anonym.tar.gz', data: 'x', mime: 'text/plain', dict: { forward: {}, reverse: {} }, isArchive: true },
-    };
-    useAnonymizeSessionStore.setState({ jobs: [job], report: '@user-0123456789ab:domain-01234567.org left' });
-    render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+  describe('identity', () => {
+    it('shows one user like the summary page, counting their devices', () => {
+      profiles.set('@alice:matrix.org', { displayName: 'Alice', avatarHttpUrl: null });
+      useAnonymizeSessionStore.setState({ jobs: [job({ userId: '@alice:matrix.org', deviceId: 'PHONE' })] });
+      const { container } = page();
 
-    expect(screen.getByText(/1 ID not found in the loaded rageshakes/)).toBeInTheDocument();
-  });
+      expect(screen.getByText('Alice')).toBeInTheDocument();
+      expect(screen.getByText('@alice:matrix.org · PHONE')).toBeInTheDocument();
 
-  describe('progress notice', () => {
-    const done = (id: number, name: string): AnonymizeJob => ({
-      id, sourceName: name, status: 'done', message: '', progress: 1, rawUrl: null, save: true,
-      output: { name: `${name}-anonym.log`, data: 'x', mime: 'text/plain', dict: { forward: {}, reverse: {} }, isArchive: false },
-    });
-    const failed: AnonymizeJob = { id: 9, sourceName: 'bad.png', status: 'error', message: 'not a text log', progress: 1, output: null, rawUrl: null, save: true };
-    const working: AnonymizeJob = { ...failed, status: 'working', message: 'Reading', progress: 0.5 };
-
-    it('shows the drop\'s progress, asks nothing, and cannot be closed while working', () => {
-      useAnonymizeSessionStore.setState({ jobs: [done(1, 'a'), working], batch: { jobIds: [1, 9], dismissed: false } });
-      render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
-
-      // One file done, one halfway: 75% of the drop.
-      expect(screen.getByRole('status')).toHaveTextContent('Anonymising 2 rageshakes75%');
-      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '75');
-      expect(screen.getByRole('status').querySelectorAll('button')).toHaveLength(0);
+      act(() => useAnonymizeSessionStore.setState({
+        jobs: [job({ userId: '@alice:matrix.org', deviceId: 'PHONE' }), job({ id: 2, userId: '@alice:matrix.org', deviceId: 'DESKTOP' })],
+      }));
+      expect(screen.getByText('@alice:matrix.org · 2 devices')).toBeInTheDocument();
+      expect(container.querySelector('[title="@alice:matrix.org · PHONE · DESKTOP"]')).not.toBeNull();
     });
 
-    it('closes by itself once done', () => {
-      useAnonymizeSessionStore.setState({ jobs: [done(1, 'a'), done(2, 'b')], batch: { jobIds: [1, 2], dismissed: false } });
-      render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    it('stacks several users, naming two, counting more', () => {
+      profiles.set('@alice:matrix.org', { displayName: 'Alice', avatarHttpUrl: 'https://matrix.org/alice.png' });
+      useAnonymizeSessionStore.setState({ jobs: [job({ userId: '@alice:matrix.org' }), job({ id: 2, userId: '@bob:example.com' })] });
+      const { container } = page();
+      expect(screen.getByText('Alice, @bob:example.com')).toBeInTheDocument();
+      // Only Alice has a face: Bob gets none, not a placeholder.
+      expect([...container.querySelectorAll('header img')].map((i) => i.getAttribute('src'))).toEqual(['https://matrix.org/alice.png']);
 
-      expect(screen.queryByRole('status')).toBeNull();
-      expect(useAnonymizeSessionStore.getState().batch?.dismissed).toBe(true);
+      act(() => useAnonymizeSessionStore.setState({
+        jobs: ['@a:x.org', '@b:x.org', '@c:x.org', '@d:x.org'].map((userId, id) => job({ id, userId })),
+      }));
+      expect(screen.getByText('4 users')).toBeInTheDocument();
     });
 
-    it('stays when something failed, opens the list from the failure count, and can then be closed', () => {
-      useAnonymizeSessionStore.setState({ jobs: [done(1, 'a'), failed], batch: { jobIds: [1, 9], dismissed: false } });
-      render(<MemoryRouter><AnonymizeView /></MemoryRouter>);
+    it('shows nobody until a rageshake names its user', () => {
+      useAnonymizeSessionStore.setState({ jobs: [job()] });
+      const { container } = page();
 
-      expect(screen.getByRole('status')).toHaveTextContent('1 of 2 anonymised1 failed');
-      fireEvent.click(screen.getByRole('button', { name: '1 failed' }));
-      expect(screen.getByText('not a text log')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-      expect(screen.queryByRole('status')).toBeNull();
+      expect(container.querySelector('header')).toHaveTextContent(/^Anonymise1 rageshake ▾$/);
     });
   });
 });

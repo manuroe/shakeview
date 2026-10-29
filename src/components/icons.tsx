@@ -67,3 +67,8 @@ export function BackIcon(props: IconProps) {
 export function CloseIcon(props: IconProps) {
   return <svg aria-hidden="true" {...base(props)}><path d="M4 4l8 8M12 4l-8 8" {...stroke}/></svg>;
 }
+
+/** Key: the anonymisation salt. */
+export function KeyIcon(props: IconProps) {
+  return <svg aria-hidden="true" {...base(props)}><circle cx="5" cy="11" r="2.75" {...stroke}/><path d="M7 9l6-6M11 5l1.5 1.5M9.5 6.5L11 8" {...stroke}/></svg>;
+}

@@ -45,7 +45,7 @@ export function utcText(us: number, part: keyof typeof UTC_PARTS): string {
  *
  * @example plural(2, 'device') // '2 devices'
  */
-export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+export const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
 /**
  * A long id (event, request, to-device message) cut to its start; the full line is in the log panel.

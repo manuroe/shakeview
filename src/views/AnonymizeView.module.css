@@ -20,11 +20,65 @@
     margin: 0;
 }
 
-.headerActions {
+.headerCenter {
+    display: flex;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
+}
+
+/* The summary page's identity block. */
+.identity {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-left: auto;
+    gap: 8px;
+    min-width: 0;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.avatarSmall {
+    width: 18px;
+    height: 18px;
+}
+
+.avatarStack {
+    display: flex;
+}
+
+.avatarStack > * + * {
+    margin-left: -8px;
+}
+
+.avatarStack > * {
+    box-shadow: 0 0 0 2px var(--bg-secondary);
+}
+
+.identityText {
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.displayName {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ids {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    word-break: break-all;
+}
+
+.saltPanel {
+    width: 320px;
 }
 
 .muted {
@@ -37,7 +91,7 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 20px;
+    padding: 14px;
     border: 2px dashed var(--border-medium);
     border-radius: var(--radius-xl);
     background: var(--bg-primary);
@@ -111,6 +165,18 @@
     min-height: 0;
 }
 
+.column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.paneFooter {
+    min-height: 1.5em;
+}
+
 .pane {
     display: flex;
     flex-direction: column;
@@ -118,6 +184,11 @@
     flex: 1;
     min-width: 0;
     position: relative;
+}
+
+.paneNote {
+    font-weight: normal;
+    color: var(--text-tertiary);
 }
 
 .paneDragOver .report {
@@ -171,14 +242,6 @@
     margin: 0;
 }
 
-.empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-placeholder);
-    font-family: var(--font-system);
-}
-
 .warning {
     font-size: var(--font-size-xs);
     color: var(--color-warning-text);
@@ -191,6 +254,7 @@
     line-height: 1.5;
     white-space: normal;
     overflow-wrap: break-word;
+    cursor: text; /* a click edits */
 }
 
 /* GitHub's markdown rhythm, put back after foundation.css resets every margin and padding. */
@@ -326,67 +390,6 @@
     background: var(--bg-secondary);
 }
 
-.notice {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: min(440px, calc(100vw - 48px));
-    padding: 12px 12px 14px 16px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    z-index: var(--z-modal);
-}
-
-.noticeRow {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.noticeTitle {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.noticePct {
-    font-variant-numeric: tabular-nums;
-    color: var(--text-secondary);
-}
-
-.noticeBar {
-    height: 6px;
-    margin-right: 4px;
-    background: var(--border-default);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-}
-
-.noticeFill {
-    height: 100%;
-    background: var(--color-primary);
-    border-radius: var(--radius-md);
-    transition: width 200ms ease-out;
-}
-
-.linkButton {
-    padding: 0;
-    border: none;
-    background: none;
-    font: inherit;
-    color: var(--color-error-text);
-    text-decoration: underline;
-    cursor: pointer;
-}
-
 .textButton {
     padding: 0;
     border: none;
@@ -400,24 +403,3 @@
     text-decoration: underline;
 }
 
-.originalZone {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 16px;
-    text-align: center;
-    border: 2px dashed var(--border-medium);
-    border-radius: var(--radius-md);
-    background: var(--bg-primary);
-    cursor: pointer;
-    transition: all var(--transition-slow) ease;
-}
-
-.originalZone:hover,
-.paneDragOver .originalZone {
-    border-color: var(--color-primary);
-    background: var(--color-primary-light);
-}
