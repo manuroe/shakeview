@@ -23,7 +23,7 @@ keys), `analytics` and the selected `session`, and a repeatable `archive` link (
 [Opening several archives on /decryption](#opening-several-archives-on-decryption)).
 
 `/anonymize` needs no loaded log, so it is exempt from the redirect to `/`. What it holds
-(raw files, mappings, the report) lives in memory for the tab only.
+(raw files, mappings, the text) lives in memory for the tab only.
 
 **Notes**:
 - `filter`: Live text filter, synced to store via URL. Same behavior on `/logs` and `/http_requests`.

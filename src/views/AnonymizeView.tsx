@@ -1,74 +1,150 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import Markdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { saveJobOutput, useAnonymizeSessionStore, type AnonymizeBatch, type AnonymizeJob } from '../stores/anonymizeSessionStore';
+import { saveJobOutput, useAnonymizeSessionStore, type AnonymizeJob, type TextSide } from '../stores/anonymizeSessionStore';
+import { useAnonSaltStore } from '../stores/anonSaltStore';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { countUnresolvedAliases, repointViewerLinks, unanonymizeReport, type DeanonymizeSource } from '../utils/deanonymizeReport';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useMatrixProfile } from '../hooks/useMatrixProfile';
+import {
+  anonymizeText,
+  countRealIdentifiers,
+  countUnresolvedAliases,
+  repointViewerLinks,
+  unanonymizeReport,
+  type DeanonymizeSource,
+} from '../utils/deanonymizeReport';
 import { downloadBlob } from '../utils/downloadBlob';
-import { BackIcon, CheckIcon, CloseIcon, CodeIcon, CopyIcon, DownloadIcon, TrashIcon, UploadIcon } from '../components/icons';
+import { plural } from '../utils/crypto/format';
+import { BackIcon, CheckIcon, CodeIcon, CopyIcon, DownloadIcon, KeyIcon, TrashIcon, UploadIcon } from '../components/icons';
+import { SaltField } from '../components/SaltField';
 import buttonStyles from '../components/Button.module.css';
 import dropdownStyles from '../components/Dropdown.module.css';
 import styles from './AnonymizeView.module.css';
 
 const COPIED_DURATION_MS = 1500;
+const MAX_AVATARS = 3;
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** A user's face from their homeserver; nothing without one, like the summary page. */
+function Avatar({ userId, small = false }: { readonly userId: string; readonly small?: boolean }) {
+  const url = useMatrixProfile(userId)?.avatarHttpUrl;
+  return url
+    ? <img src={url} alt="" className={`${styles.avatar} ${small ? styles.avatarSmall : ''}`} onError={(e) => { e.currentTarget.hidden = true; }} />
+    : null;
+}
+
+/** A user's display name, else their ID. */
+function UserName({ userId }: { readonly userId: string }) {
+  return <>{useMatrixProfile(userId)?.displayName ?? userId}</>;
+}
+
+/**
+ * Whose rageshakes are loaded, like the summary page's header: one user shows
+ * their face, name and IDs; several show a stack of faces, naming two users and
+ * counting more, each user and device listed in the tooltip.
+ */
+function Identity({ jobs }: { readonly jobs: readonly AnonymizeJob[] }) {
+  const devicesByUser = new Map<string, Set<string>>();
+  for (const j of jobs) {
+    const { userId, deviceId } = j.output?.identity ?? {};
+    if (!userId) continue;
+    const devices = devicesByUser.get(userId) ?? new Set<string>();
+    if (deviceId) devices.add(deviceId);
+    devicesByUser.set(userId, devices);
+  }
+  const users = [...devicesByUser.keys()];
+  const profile = useMatrixProfile(users.length === 1 ? users[0] : undefined);
+  if (users.length === 0) return null;
+
+  const tooltip = [...devicesByUser].map(([u, d]) => [u, ...d].join(' · ')).join('\n');
+  if (users.length === 1) {
+    const [userId] = users;
+    const devices = [...devicesByUser.get(userId)!];
+    return (
+      <div className={styles.identity} title={tooltip}>
+        <Avatar userId={userId} />
+        <div className={styles.identityText}>
+          {profile?.displayName && <div className={styles.displayName}>{profile.displayName}</div>}
+          <div className={styles.ids}>
+            {[userId, devices.length > 1 ? plural(devices.length, 'device') : devices[0]].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.identity} title={tooltip}>
+      <div className={styles.avatarStack}>
+        {users.slice(0, MAX_AVATARS).map((u) => <Avatar key={u} userId={u} />)}
+      </div>
+      <div className={styles.displayName}>
+        {users.length === 2
+          ? <><UserName userId={users[0]} />, <UserName userId={users[1]} /></>
+          : plural(users.length, 'user')}
+      </div>
+    </div>
+  );
+}
 
 interface RageshakesDropdownProps {
   readonly jobs: readonly AnonymizeJob[];
-  readonly batch: AnonymizeBatch | null;
-  readonly isOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
+  readonly onForget: () => void;
 }
 
-/** Header dropdown listing the dropped rageshakes: progress, a save button each, and Forget all. */
-function RageshakesDropdown({ jobs, batch, isOpen, onOpenChange }: RageshakesDropdownProps) {
-  const forgetAll = useAnonymizeSessionStore((s) => s.forgetAll);
+/** Header dropdown listing the dropped rageshakes: whose, progress, a save button each, and Forget all. */
+function RageshakesDropdown({ jobs, onForget }: RageshakesDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(ref, () => onOpenChange(false), isOpen);
+  useClickOutside(ref, () => setIsOpen(false), isOpen);
 
-  const inBatch = jobs.filter((j) => batch?.jobIds.includes(j.id));
-  const finished = inBatch.filter((j) => j.status !== 'working').length;
+  const working = jobs.filter((j) => j.status === 'working');
   const failed = jobs.filter((j) => j.status === 'error').length;
-  const label = jobs.some((j) => j.status === 'working')
-    ? `Anonymising ${Math.min(finished + 1, inBatch.length)}/${inBatch.length}…`
+  const pct = Math.round((100 * working.reduce((sum, j) => sum + j.progress, 0)) / Math.max(working.length, 1));
+  const label = working.length > 0
+    ? `Anonymising ${plural(working.length, 'rageshake')}… ${pct}%`
     : `${plural(jobs.length, 'rageshake')}${failed > 0 ? ` · ${failed} failed` : ''}`;
 
   return (
     <div className={dropdownStyles.container} ref={ref}>
-      <button type="button" className={dropdownStyles.button} onClick={() => onOpenChange(!isOpen)} aria-expanded={isOpen}>
+      <button type="button" className={dropdownStyles.button} onClick={() => setIsOpen(!isOpen)} aria-expanded={isOpen}>
         {label} ▾
       </button>
       {isOpen && (
         <div className={`${dropdownStyles.dropdown} ${styles.jobsPanel}`}>
           <ul className={styles.jobs}>
-            {jobs.map((j) => (
-              <li key={j.id} className={styles.job}>
-                <span className={styles.jobName} title={j.sourceName}>{j.output?.name ?? j.sourceName}</span>
-                {j.status === 'working' && <span className={styles.muted}>{j.message}</span>}
-                {j.status === 'error' && <span className={styles.error}>{j.message}</span>}
-                {j.output && (
-                  <>
-                    <span className={styles.done} title="Anonymised"><CheckIcon /></span>
-                    <button
-                      type="button"
-                      className={buttonStyles.iconButton}
-                      onClick={() => saveJobOutput(j)}
-                      title={`Save ${j.output.name}`}
-                      aria-label={`Save ${j.output.name}`}
-                    >
-                      <DownloadIcon />
-                    </button>
-                  </>
-                )}
-              </li>
-            ))}
+            {jobs.map((j) => {
+              const { userId } = j.output?.identity ?? {};
+              return (
+                <li key={j.id} className={styles.job}>
+                  {userId && <Avatar userId={userId} small />}
+                  <span className={styles.jobName} title={j.sourceName}>{j.output?.name ?? j.sourceName}</span>
+                  {userId && <span className={styles.muted}>{userId}</span>}
+                  {j.status === 'working' && <span className={styles.muted}>{j.message}</span>}
+                  {j.status === 'error' && <span className={styles.error}>{j.message}</span>}
+                  {j.status === 'done' && j.output && (
+                    <>
+                      <span className={styles.done} title="Anonymised"><CheckIcon /></span>
+                      <button
+                        type="button"
+                        className={buttonStyles.iconButton}
+                        onClick={() => saveJobOutput(j)}
+                        title={`Save ${j.output.name}`}
+                        aria-label={`Save ${j.output.name}`}
+                      >
+                        <DownloadIcon />
+                      </button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           <div className={dropdownStyles.divider} />
-          <button type="button" className={`${dropdownStyles.option} ${styles.forget}`} onClick={() => { onOpenChange(false); forgetAll(); }}>
+          <button type="button" className={`${dropdownStyles.option} ${styles.forget}`} onClick={() => { setIsOpen(false); onForget(); }}>
             <TrashIcon /> Forget all
           </button>
         </div>
@@ -77,94 +153,57 @@ function RageshakesDropdown({ jobs, batch, isOpen, onOpenChange }: RageshakesDro
   );
 }
 
-/**
- * Bottom progress notice from the moment files are dropped. It asks nothing:
- * where a file was dropped already said whether to save it. It cannot be
- * closed while working — closing would stop nothing — and closes by itself
- * once done, unless something failed. No "Saved" message: the browser's own
- * download UI (or save dialog) is the confirmation, and the page cannot know
- * whether the user went through with it.
- */
-function BatchNotice({ onShowList }: { readonly onShowList: () => void }) {
-  const jobs = useAnonymizeSessionStore((s) => s.jobs);
-  const batch = useAnonymizeSessionStore((s) => s.batch);
-  const dismissBatch = useAnonymizeSessionStore((s) => s.dismissBatch);
-
-  const inBatch = batch && !batch.dismissed ? jobs.filter((j) => batch.jobIds.includes(j.id)) : [];
-  const finished = inBatch.filter((j) => j.status !== 'working').length;
-  const working = finished < inBatch.length;
-  const ok = inBatch.filter((j) => j.output).length;
-  const failed = finished - ok;
-  const settled = inBatch.length > 0 && !working && failed === 0;
-
-  useEffect(() => {
-    if (settled) dismissBatch();
-  }, [settled, dismissBatch]);
-
-  if (inBatch.length === 0 || settled) return null;
-  const pct = Math.round((100 * inBatch.reduce((sum, j) => sum + j.progress, 0)) / inBatch.length);
-  const headline = working
-    ? `Anonymising ${inBatch.length === 1 ? inBatch[0].sourceName : plural(inBatch.length, 'rageshake')}`
-    : `${ok} of ${inBatch.length} anonymised`;
+/** Key button opening the app-wide salt. */
+function SaltButton({ isOpen, onOpenChange }: { readonly isOpen: boolean; readonly onOpenChange: (open: boolean) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, () => onOpenChange(false), isOpen);
   return (
-    <div className={styles.notice} role="status">
-      <div className={styles.noticeRow}>
-        <strong className={styles.noticeTitle} title={headline}>{headline}</strong>
-        {working
-          ? <span className={styles.noticePct}>{pct}%</span>
-          : (
-            <button type="button" className={buttonStyles.iconButton} onClick={dismissBatch} title="Dismiss" aria-label="Dismiss">
-              <CloseIcon />
-            </button>
-          )}
-      </div>
-      {working && (
-        <div className={styles.noticeBar} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Anonymising">
-          <div className={styles.noticeFill} style={{ width: `${pct}%` }} />
-        </div>
-      )}
-      {failed > 0 && (
-        <div className={styles.noticeRow}>
-          <button type="button" className={styles.linkButton} onClick={onShowList}>{failed} failed</button>
-        </div>
-      )}
+    <div className={dropdownStyles.container} ref={ref}>
+      <button
+        type="button"
+        className={`${buttonStyles.iconButton} ${isOpen ? buttonStyles.pillButtonActive : ''}`}
+        onClick={() => onOpenChange(!isOpen)}
+        aria-expanded={isOpen}
+        title="Salt"
+        aria-label="Salt"
+      >
+        <KeyIcon />
+      </button>
+      {isOpen && <div className={`${dropdownStyles.dropdown} ${styles.saltPanel}`}><SaltField /></div>}
     </div>
   );
 }
 
 interface TextPaneProps {
   readonly title: string;
+  /** Said after the title, e.g. who may see the text. */
+  readonly note: string;
   /** Markdown source: what the source view shows, Copy copies and Save saves. */
   readonly source: string;
   /** What the rendered view shows, when it differs from `source` (e.g. links repointed for this tab only). */
   readonly markdown?: string;
   readonly saveName: string;
-  /** Makes the pane an input: the source view becomes an editable textarea, and a file dropped on the pane loads into it. */
-  readonly onEdit?: (text: string) => void;
-  /**
-   * Every file dropped on the pane goes here first, to be routed by type; a file
-   * returned is loaded as the pane's own text (inputs only).
-   */
-  readonly onFiles?: (files: File[]) => File | undefined;
-  /** Shown over the pane while a file is dragged onto it. */
-  readonly dropHint?: string;
-  /** Empty-state text, or the textarea placeholder for an input. */
-  readonly placeholder?: string;
-  /** Replaces a read-only pane's whole empty state (its own box included), e.g. with a drop zone. */
-  readonly empty?: ReactNode;
+  /** An edit of the source view, or a file loaded into the pane. */
+  readonly onEdit: (text: string) => void;
+  /** Every file dropped on the pane goes here first, to be routed by type; a file returned is loaded as the pane's text. */
+  readonly onFiles: (files: File[]) => File | undefined;
+  readonly placeholder: string;
   /** Extra header button, before the source/copy/save actions. */
   readonly headerAction?: ReactNode;
   readonly footer?: ReactNode;
 }
 
-/** One side of the page: markdown rendered by default, with source, Copy and Save actions. */
-function TextPane({
-  title, source, markdown = source, saveName, onEdit, onFiles, dropHint = 'Drop to load', placeholder, empty, headerAction, footer,
-}: TextPaneProps) {
-  // An input starts on its textarea and only flips to rendered when content is
-  // loaded whole (a paste into the empty pane, a dropped or opened file), never
-  // while editing.
-  const [showSource, setShowSource] = useState(onEdit !== undefined);
+// ponytail: syntax sniff (heading, list, quote, fence, table, link, bold); a log line
+// that happens to start with "- " renders, a markdown parser pass if that bites.
+const MARKDOWN_RE = /^(?:#{1,6}\s|\s*(?:[-*+]|\d+\.)\s|>\s|```|\|.*\|)|\[[^\]\n]+\]\([^)\s]+\)|\*\*[^*\n]+\*\*/m;
+
+/** One side of the page: markdown rendered once it holds text, with source, Copy and Save actions. */
+function TextPane({ title, note, source, markdown = source, saveName, onEdit, onFiles, placeholder, headerAction, footer }: TextPaneProps) {
+  // Rendered once text arrives whole (a paste into the empty pane, a dropped or
+  // opened file, the other pane's text); the source view while typing in it.
+  const [showSource, setShowSource] = useState(false);
+  // Raw logs are no markdown: rendering them only mangles them.
+  const isMarkdown = MARKDOWN_RE.test(source);
   const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -192,19 +231,13 @@ function TextPane({
     void file.text().then(onEdit);
   };
 
-  const takesFiles = onEdit !== undefined || onFiles !== undefined;
-
   const handleDrop = (e: DragEvent) => {
     setDragOver(false);
     const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0 || !takesFiles) return; // plain text drag: let the textarea insert it
+    if (files.length === 0) return; // plain text drag: let the textarea insert it
     e.preventDefault();
-    const own = onFiles ? onFiles(files) : files[0];
-    if (own && onEdit) loadFile(own);
-  };
-
-  const handleDragOver = (e: DragEvent) => {
-    if (takesFiles && e.dataTransfer.types.includes('Files')) setDragOver(true);
+    const own = onFiles(files);
+    if (own) loadFile(own);
   };
 
   const handleDragLeave = (e: DragEvent) => {
@@ -217,41 +250,37 @@ function TextPane({
     <div
       className={`${styles.pane} ${dragOver ? styles.paneDragOver : ''}`}
       onDrop={handleDrop}
-      onDragOver={handleDragOver}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) setDragOver(true); }}
       onDragLeave={handleDragLeave}
     >
       <div className={styles.paneHeader}>
-        <span className={styles.paneTitle}>{title}</span>
-        {onEdit && (
-          <>
-            <button
-              type="button"
-              className={buttonStyles.iconButton}
-              onClick={() => fileRef.current?.click()}
-              title="Open file"
-              aria-label={`Open ${lower} file`}
-            >
-              <UploadIcon width={16} height={16} />
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".md,.markdown,.txt,text/*"
-              className={styles.fileInput}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) loadFile(file);
-                e.target.value = ''; // so opening the same file again fires onChange
-              }}
-            />
-          </>
-        )}
+        <span className={styles.paneTitle}>{title} <span className={styles.paneNote}>· {note}</span></span>
+        <button
+          type="button"
+          className={buttonStyles.iconButton}
+          onClick={() => fileRef.current?.click()}
+          title="Open file"
+          aria-label={`Open ${lower} file`}
+        >
+          <UploadIcon width={16} height={16} />
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".md,.markdown,.txt,text/*"
+          className={styles.fileInput}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) loadFile(file);
+            e.target.value = ''; // so opening the same file again fires onChange
+          }}
+        />
         {headerAction}
         <button
           type="button"
           className={`${buttonStyles.iconButton} ${showSource ? buttonStyles.pillButtonActive : ''}`}
           onClick={() => setShowSource((v) => !v)}
-          disabled={!source}
+          disabled={!isMarkdown}
           aria-pressed={showSource}
           title="Show markdown source"
           aria-label={`Show ${lower} markdown source`}
@@ -279,16 +308,14 @@ function TextPane({
           <DownloadIcon />
         </button>
       </div>
-      {onEdit && (showSource || !source) && (
+      {(showSource || !isMarkdown) ? (
         <textarea
           className={styles.report}
           value={source}
           onChange={(e) => {
             onEdit(e.target.value);
-            if (pastedIntoEmpty.current) {
-              pastedIntoEmpty.current = false;
-              setShowSource(false);
-            }
+            setShowSource(!pastedIntoEmpty.current);
+            pastedIntoEmpty.current = false;
           }}
           onPaste={() => { pastedIntoEmpty.current = !source; }}
           // A paste that inserted nothing (an image) leaves the flag set: typing clears it.
@@ -296,12 +323,19 @@ function TextPane({
           placeholder={placeholder}
           aria-label={title}
           spellCheck={false}
+          // Mounted by a click on the rendered view (or the source button): straight to typing.
+          autoFocus={showSource}
         />
-      )}
-      {!onEdit && !source && (empty ?? <div className={`${styles.report} ${styles.empty}`}>{placeholder}</div>)}
-      {!onEdit && source && showSource && <pre className={styles.report} aria-label={title}>{source}</pre>}
-      {source && !showSource && (
-        <div className={`${styles.report} ${styles.rendered}`} aria-label={title}>
+      ) : (
+        <div
+          className={`${styles.report} ${styles.rendered}`}
+          aria-label={title}
+          title="Click to edit"
+          // A click edits; following a link or selecting text to copy does not.
+          onClick={(e) => {
+            if (!(e.target as Element).closest('a') && !window.getSelection()?.toString()) setShowSource(true);
+          }}
+        >
           <Markdown
             // remarkBreaks: a newline is a line break, as in GitHub comments.
             remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -311,101 +345,147 @@ function TextPane({
           </Markdown>
         </div>
       )}
-      {/* A custom empty state is its own drop zone, already saying what a drop does. */}
-      {dragOver && (onEdit || source || !empty) && <div className={styles.dropHint}>{dropHint}</div>}
-      {footer}
+      {dragOver && <div className={styles.dropHint}>Drop to load</div>}
+      {footer && <div className={styles.paneFooter}>{footer}</div>}
     </div>
   );
 }
 
-/** Rageshakes are archives and logs; any other dropped file is report text. */
+/** Rageshakes are archives and logs; any other dropped file is text. */
 const isRageshake = (f: File) => /\.(?:tgz|gz|log)$/i.test(f.name);
 
-/**
- * Anonymise rageshakes before sharing them, and read a markdown report written
- * about them back with the real identifiers.
- *
- * Where a rageshake is dropped says why, so the page never has to ask:
- * - the top zone anonymises it to share, saving each result when ready;
- * - the right pane takes the original only for its mapping, never saving.
- * Bottom: paste or drop anonymised markdown on the left — the right pane
- * renders it reversed with every mapping held, and its deep links open the
- * real log. Everything stays in this tab (see `useAnonymizeSessionStore`).
- */
-export function AnonymizeView() {
-  const jobs = useAnonymizeSessionStore((s) => s.jobs);
-  const report = useAnonymizeSessionStore((s) => s.report);
-  const batch = useAnonymizeSessionStore((s) => s.batch);
+interface DropZoneProps {
+  readonly label: string;
+  readonly hint: string;
+  /** Download each anonymised result, or keep only its mapping. */
+  readonly save: boolean;
+  /** A dropped file that is not a rageshake: text for the pane below. */
+  readonly onText: (file: File) => void;
+}
+
+/** Drop or pick original rageshakes; text files dropped here go to the pane below. */
+function DropZone({ label, hint, save, onText }: DropZoneProps) {
   const anonymiseFiles = useAnonymizeSessionStore((s) => s.anonymiseFiles);
-  const setReport = useAnonymizeSessionStore((s) => s.setReport);
   const inputRef = useRef<HTMLInputElement>(null);
-  const originalRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
   const [dragOver, setDragOver] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
 
-  const sources = useMemo(
-    () => jobs.flatMap((j): DeanonymizeSource[] =>
-      j.output ? [{ anonymizedName: j.output.name, dict: j.output.dict, rawUrl: j.rawUrl }] : []),
-    [jobs],
-  );
-  const appBase = `${window.location.origin}${window.location.pathname}`;
-  const plain = useMemo(() => unanonymizeReport(report, sources), [report, sources]);
-  const rendered = useMemo(() => repointViewerLinks(plain, sources, appBase), [plain, sources, appBase]);
-
-  const handleFilesDrop = (e: DragEvent) => {
+  const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const files = Array.from(e.dataTransfer.files);
     const rageshakes = files.filter(isRageshake);
-    if (rageshakes.length > 0) void anonymiseFiles(rageshakes, true);
+    if (rageshakes.length > 0) void anonymiseFiles(rageshakes, save);
     const text = files.find((f) => !isRageshake(f));
-    if (text) void text.text().then(setReport);
+    if (text) onText(text);
   };
-  const loadOriginals = (files: File[]) => { void anonymiseFiles(files, false); };
-  const unresolved = useMemo(() => countUnresolvedAliases(plain), [plain]);
 
-  /**
-   * A file dropped on either pane goes where its type belongs, whichever pane it
-   * landed on: rageshakes (archives, logs) are loaded as originals, anything else
-   * is text for the anonymised side — returned for the caller to load. Reading an
-   * archive as text, or a markdown file as a log, would only produce junk.
-   */
-  const routeFiles = (files: File[]): File | undefined => {
-    const originals = files.filter(isRageshake);
-    if (originals.length > 0) loadOriginals(originals);
-    return files.find((f) => !isRageshake(f));
-  };
-  const chooseOriginal = () => originalRef.current?.click();
-  const originalZone = (
+  return (
     <div
-      className={styles.originalZone}
+      className={`${styles.dropZone} ${dragOver ? styles.dragOver : ''}`}
       role="button"
       tabIndex={0}
-      aria-label={sources.length === 0 ? 'Choose the original rageshake' : 'Add another original rageshake'}
-      onClick={chooseOriginal}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') chooseOriginal(); }}
+      aria-label={label}
+      onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
     >
       <UploadIcon className={styles.dropIcon} />
-      {sources.length === 0
-        ? (
-          <>
-            <strong>Drop the original rageshake</strong>
-            <span className={styles.muted}>or click to choose · reveals real IDs, not saved again</span>
-          </>
-        )
-        : (
-          <>
-            <strong>{plural(sources.length, 'rageshake')} loaded</strong>
-            <span className={styles.muted}>drop or click to add another · then add text on the left</span>
-          </>
-        )}
+      <strong>{label}</strong>
+      <span className={styles.muted}>{hint}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept=".tar.gz,.tgz,.gz,.log"
+        className={styles.fileInput}
+        onChange={(e) => {
+          void anonymiseFiles(Array.from(e.target.files ?? []), save);
+          e.target.value = ''; // so picking the same file again fires onChange
+        }}
+      />
     </div>
   );
+}
+
+/**
+ * Anonymise rageshakes and text, and read anonymised text back with the real
+ * identifiers.
+ *
+ * Left: real identifiers. Right: anonymised. Both are editable; the one edited
+ * last drives, the other is derived from it — anonymised with the salt alone, or
+ * reversed with the mappings of the rageshakes loaded and of the text typed.
+ *
+ * Where a rageshake is dropped says why, so the page never has to ask: above the
+ * left pane to reveal real IDs (mapping only), above the right one to anonymise
+ * it to share (each result saved when ready). Everything stays in this tab (see
+ * `useAnonymizeSessionStore`).
+ */
+export function AnonymizeView() {
+  const jobs = useAnonymizeSessionStore((s) => s.jobs);
+  const text = useAnonymizeSessionStore((s) => s.text);
+  const driver = useAnonymizeSessionStore((s) => s.driver);
+  const textDict = useAnonymizeSessionStore((s) => s.textDict);
+  const anonymiseFiles = useAnonymizeSessionStore((s) => s.anonymiseFiles);
+  const setText = useAnonymizeSessionStore((s) => s.setText);
+  const addTextDict = useAnonymizeSessionStore((s) => s.addTextDict);
+  const forgetAll = useAnonymizeSessionStore((s) => s.forgetAll);
+  const salt = useAnonSaltStore((s) => s.salt);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [saltOpen, setSaltOpen] = useState(false);
+
+  // Not from jobs, a new array on every progress tick: the sources change only when a file finishes.
+  const outputs = useAnonymizeSessionStore(useShallow((s) => s.jobs.map((j) => j.output)));
+  const rawUrls = useAnonymizeSessionStore(useShallow((s) => s.jobs.map((j) => j.rawUrl)));
+  const jobSources = useMemo(
+    () => outputs.flatMap((o, i): DeanonymizeSource[] =>
+      o ? [{ anonymizedName: o.name, dict: o.dict, rawUrl: rawUrls[i] }] : []),
+    [outputs, rawUrls],
+  );
+  const sources = useMemo(() => [...jobSources, { anonymizedName: '', dict: textDict, rawUrl: null }], [jobSources, textDict]);
+
+  // Real side drives: anonymise it (async: hashing), once typing settles.
+  const [anonymised, setAnonymised] = useState('');
+  const realText = useDebouncedValue(driver === 'real' ? text : null);
+  // Not once per keystroke in the salt field.
+  const realSalt = useDebouncedValue(salt);
+  useEffect(() => {
+    // Debounced, realText outlives a switch of driver (Forget all among them): adding
+    // its mapping then would bring back real IDs just forgotten.
+    if (realText === null || driver !== 'real') return undefined;
+    let cancelled = false;
+    void anonymizeText(realText, realSalt, jobSources).then((out) => {
+      if (cancelled) return;
+      setAnonymised(out.text);
+      addTextDict(out.dict);
+    });
+    return () => { cancelled = true; };
+  }, [realText, driver, realSalt, jobSources, addTextDict]);
+
+  const real = useMemo(() => (driver === 'real' ? text : unanonymizeReport(text, sources)), [driver, text, sources]);
+  const right = driver === 'anonymised' ? text : anonymised;
+  const appBase = `${window.location.origin}${window.location.pathname}`;
+  const rendered = useMemo(() => repointViewerLinks(real, sources, appBase), [real, sources, appBase]);
+  const unresolved = useMemo(() => (driver === 'anonymised' ? countUnresolvedAliases(real) : 0), [driver, real]);
+  const realIds = useMemo(() => countRealIdentifiers(right), [right]);
+
+  /** A rageshake dropped on a pane goes to the zone above it; any other file is the pane's text. */
+  const routeFiles = (save: boolean) => (files: File[]): File | undefined => {
+    const rageshakes = files.filter(isRageshake);
+    if (rageshakes.length > 0) void anonymiseFiles(rageshakes, save);
+    return files.find((f) => !isRageshake(f));
+  };
+  const edit = (side: TextSide) => (value: string) => {
+    // The right pane keeps its text until the left is anonymised, not a stale earlier anonymisation.
+    if (side === 'real' && driver !== 'real') setAnonymised(right);
+    setText(side, value);
+  };
+  const loadText = (side: TextSide) => (file: File) => { void file.text().then(edit(side)); };
 
   // A file dropped beside the targets would make the browser navigate to it,
-  // losing everything this tab holds. Text drags are left alone for the textarea.
+  // losing everything this tab holds. Text drags are left alone for the textareas.
   const swallowFileDrop = (e: DragEvent) => {
     if (e.dataTransfer.types.includes('Files')) e.preventDefault();
   };
@@ -424,102 +504,64 @@ export function AnonymizeView() {
           <BackIcon />
         </button>
         <h1>Anonymise</h1>
-        <span className={styles.muted}>Stays in this tab. Reload to forget.</span>
-        <div className={styles.headerActions}>
-          {jobs.length > 0 && <RageshakesDropdown jobs={jobs} batch={batch} isOpen={listOpen} onOpenChange={setListOpen} />}
-        </div>
+        <div className={styles.headerCenter}><Identity jobs={jobs} /></div>
+        {jobs.length > 0 && <RageshakesDropdown jobs={jobs} onForget={() => {
+          // The right pane lags typing on the left: keep the anonymisation of the text as it is now.
+          // Failing that, the anonymisation shown: forgetting must not fail.
+          if (driver === 'real') void anonymizeText(text, salt, jobSources).then((out) => forgetAll(out.text), () => forgetAll(right));
+          else forgetAll(text);
+        }} />}
       </header>
 
-      <div
-        className={`${styles.dropZone} ${dragOver ? styles.dragOver : ''}`}
-        role="button"
-        tabIndex={0}
-        aria-label="Choose rageshakes to anonymise"
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleFilesDrop}
-      >
-        <UploadIcon className={styles.dropIcon} />
-        <strong>Drop rageshakes to anonymise</strong>
-        <span className={styles.muted}>or click to choose · each is saved when ready</span>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".tar.gz,.tgz,.gz,.log"
-          className={styles.fileInput}
-          onChange={(e) => {
-            void anonymiseFiles(Array.from(e.target.files ?? []), true);
-            e.target.value = ''; // so picking the same file again fires onChange
-          }}
-        />
-      </div>
-
       <div className={styles.panes}>
-        <TextPane
-          title="Anonymised"
-          source={report}
-          saveName="anonymised.md"
-          onEdit={setReport}
-          onFiles={routeFiles}
-          placeholder="Paste or drop anonymised text or markdown"
-        />
-        <TextPane
-          title="De-anonymised"
-          source={plain}
-          markdown={rendered}
-          saveName="deanonymised.md"
-          onFiles={(files) => {
-            const text = routeFiles(files);
-            if (text) void text.text().then(setReport);
-            return undefined;
-          }}
-          dropHint="Drop the original to reveal real IDs"
-          empty={originalZone}
-          headerAction={(
-            <button
-              type="button"
-              className={buttonStyles.iconButton}
-              onClick={chooseOriginal}
-              title="Add original rageshake"
-              aria-label="Add original rageshake"
-            >
-              <UploadIcon width={16} height={16} />
-            </button>
-          )}
-          footer={(
-            <>
-              {plain !== report && <span className={styles.warning}>Shows real IDs. Don&apos;t share publicly.</span>}
-              {report && sources.length === 0 && (
-                <span className={styles.muted}>
-                  To reveal real IDs, drop the original rageshake on this pane, or{' '}
-                  <button type="button" className={styles.textButton} onClick={chooseOriginal}>choose it</button>.
-                </span>
-              )}
-              {/* Otherwise a mismatch would leave the text silently unchanged. */}
-              {sources.length > 0 && unresolved > 0 && (
-                <span className={styles.muted}>
-                  {plural(unresolved, 'ID')} not found in the loaded rageshakes: anonymised in another browser, or not the original?
-                </span>
-              )}
-            </>
-          )}
-        />
-        <input
-          ref={originalRef}
-          type="file"
-          multiple
-          accept=".tar.gz,.tgz,.gz,.log"
-          className={styles.fileInput}
-          onChange={(e) => {
-            loadOriginals(Array.from(e.target.files ?? []));
-            e.target.value = ''; // so picking the same file again fires onChange
-          }}
-        />
+        <div className={styles.column}>
+          <DropZone
+            label="Load rageshakes"
+            hint="drop or click · nothing is downloaded"
+            save={false}
+            onText={loadText('real')}
+          />
+          <TextPane
+            title="Real IDs"
+            note="private"
+            source={real}
+            markdown={rendered}
+            saveName="real.md"
+            onEdit={edit('real')}
+            onFiles={routeFiles(false)}
+            placeholder="Type, paste or drop text with real IDs, or anonymised text on the right to read it here"
+            footer={driver === 'anonymised' && text && (
+              jobSources.length === 0 && unresolved > 0
+                ? <span className={styles.muted}>To reveal real IDs, load the original rageshake above.</span>
+                : unresolved > 0 && (
+                  <span className={styles.muted}>
+                    {plural(unresolved, 'alias', 'aliases')} not found in the loaded rageshakes:{' '}
+                    <button type="button" className={styles.textButton} onClick={() => setSaltOpen(true)}>wrong salt?</button>
+                  </span>
+                )
+            )}
+          />
+        </div>
+        <div className={styles.column}>
+          <DropZone
+            label="Load and download anonymised"
+            hint="drop or click · an anonymised copy of each is downloaded"
+            save
+            onText={loadText('anonymised')}
+          />
+          <TextPane
+            title="Anonymised"
+            note="shareable"
+            source={right}
+            saveName="anonymised.md"
+            onEdit={edit('anonymised')}
+            onFiles={routeFiles(true)}
+            placeholder="Type, paste or drop anonymised text, or text with real IDs on the left to anonymise it here"
+            headerAction={<SaltButton isOpen={saltOpen} onOpenChange={setSaltOpen} />}
+            footer={realIds > 0 && <span className={styles.warning}>{plural(realIds, 'real ID')} left: not safe to share.</span>}
+          />
+        </div>
       </div>
-      <BatchNotice onShowList={() => setListOpen(true)} />
     </div>
   );
 }

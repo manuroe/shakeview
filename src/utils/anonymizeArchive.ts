@@ -1,7 +1,11 @@
 import { decompressSync, gzipSync, strToU8 } from 'fflate';
+import type { ListingDetails } from '../types/listing';
 import type { AnonymizationDictionary } from '../types/log.types';
 import { ANONYMIZED_LOG_MARKER, buildAnonymizationDictionaryFromTexts, buildCompiledAnonymizer } from './anonymizeUtils';
 import { deriveAnonymizedFilename } from './anonymizedLogFile';
+import { deviceIdentity } from './crypto/identity';
+import { detailsFromEntries } from './crypto/loadDevice';
+import type { DeviceIdentity } from './crypto/types';
 import { FileError } from './errorHandling';
 import { decodeTextBytes, isValidGzipHeader, isValidTextContent } from './fileValidator';
 import { parseTarGzArchive, TAR_GZ_NAME } from './tarGzArchive';
@@ -211,6 +215,20 @@ export interface AnonymisedFile {
   readonly dict: AnonymizationDictionary;
   /** True for a `.tar.gz` archive: the only kind a report's deep links point into. */
   readonly isArchive: boolean;
+  /** Whose rageshake it is, read from the original. */
+  readonly identity: DeviceIdentity;
+}
+
+/** Element Web login lines, the only ones `deviceIdentity` reads: no copy of every line of an archive. */
+// Anchored: unanchored, `.*` retries from every column, quadratic on a long line.
+const loginLines = (text: string | null): string[] => text?.match(/^.*setLoggedIn: .*$/gm) ?? [];
+
+/** Whose rageshake: `details.json` first, else the last Element Web login line of its logs. */
+function identityOf(details: ListingDetails | null, lines: () => readonly string[]): DeviceIdentity {
+  if (details?.userId && details.deviceId) return deviceIdentity(details, []);
+  // ponytail: lines lead with an ISO timestamp, so a string sort is chronological
+  // across log files (archive order is not), like `deviceFromEntries`' timestamp sort.
+  return deviceIdentity(details, [...lines()].sort().map((message) => ({ message })));
 }
 
 /**
@@ -233,12 +251,14 @@ export async function anonymiseDroppedFile(
   onProgress?: ArchiveProgress,
 ): Promise<AnonymisedFile> {
   if (TAR_GZ_NAME.test(name)) {
-    const { gz, dict } = await anonymiseArchiveEntries(parseTarGzArchive(bytes), salt, onProgress);
-    return { name: deriveAnonymizedArchiveName(name), data: gz, mime: 'application/gzip', dict, isArchive: true };
+    const entries = parseTarGzArchive(bytes);
+    const { gz, dict } = await anonymiseArchiveEntries(entries, salt, onProgress);
+    const identity = identityOf(detailsFromEntries(entries), () => entries.flatMap((e) => loginLines(decodeEntryText(e))));
+    return { name: deriveAnonymizedArchiveName(name), data: gz, mime: 'application/gzip', dict, isArchive: true, identity };
   }
   const text = decodeEntryText({ name, data: bytes });
   if (text === null) throw new FileError(`${name} is not a text log, so it cannot be anonymised.`);
   const dict = await buildAnonymizationDictionaryFromTexts([text], salt);
   const data = `${ANONYMIZED_LOG_MARKER}\n${buildCompiledAnonymizer(dict)(text)}`;
-  return { name: deriveAnonymizedFilename(name), data, mime: 'text/plain', dict, isArchive: false };
+  return { name: deriveAnonymizedFilename(name), data, mime: 'text/plain', dict, isArchive: false, identity: identityOf(null, () => loginLines(text)) };
 }

@@ -1,10 +1,12 @@
 import { create } from 'zustand';
+import type { AnonymizationDictionary } from '../types/log.types';
 import { anonymiseDroppedFile, type AnonymisedFile } from '../utils/anonymizeArchive';
+import { buildAnonymizationDictionaryFromTexts } from '../utils/anonymizeUtils';
 import { downloadBlob } from '../utils/downloadBlob';
 import { assertArchiveSizeOk } from '../utils/tarGzArchive';
 import { useAnonSaltStore } from './anonSaltStore';
 
-/** One file dropped on the anonymise page, from queued to downloaded. */
+/** One file dropped on the anonymise page, from queued to anonymised. */
 export interface AnonymizeJob {
   readonly id: number;
   readonly sourceName: string;
@@ -15,38 +17,46 @@ export interface AnonymizeJob {
   readonly progress: number;
   /** The anonymised file and its mapping, once done — kept so it can be saved (again) from the list. */
   readonly output: AnonymisedFile | null;
+  /** Salt the file was last anonymised with: a salt change anonymises it again. */
+  readonly salt: string | null;
+  /** Dropped to download: a salt change downloads the new anonymisation too. */
+  readonly save: boolean;
+  /** The file as dropped, so a salt change can anonymise it again. */
+  readonly file: File;
   /** `blob:` URL of the raw archive, so a report link can open the real log; null for single logs. */
   readonly rawUrl: string | null;
-  /**
-   * Download the anonymised file once done. Set by where it was dropped: true on
-   * the anonymise zone, false for an original dropped only for its mapping.
-   */
-  readonly save: boolean;
 }
 
-/**
- * The files of the drops the progress notice reports on. A drop while the
- * notice is still up joins it, so one notice covers everything in flight.
- */
-export interface AnonymizeBatch {
-  readonly jobIds: readonly number[];
-  readonly dismissed: boolean;
-}
+/** Which pane holds the text typed or loaded; the other pane is derived from it. */
+export type TextSide = 'real' | 'anonymised';
+
+const emptyDict = (): AnonymizationDictionary => ({ forward: {}, reverse: {} });
 
 interface AnonymizeSessionStore {
   jobs: readonly AnonymizeJob[];
-  batch: AnonymizeBatch | null;
-  /** Report text pasted or dropped on the page, kept across in-app navigation. */
-  report: string;
+  /** Text typed, pasted or dropped on the page, kept across in-app navigation. */
+  text: string;
+  /** The pane `text` belongs to. */
+  driver: TextSide;
+  /**
+   * Mapping of the identifiers typed on the real side, so they read back once
+   * the anonymised side drives. Holds real identifiers: memory only.
+   */
+  textDict: AnonymizationDictionary;
   /**
    * Anonymise each file in turn, keeping its mapping. With `save`, each result
    * downloads as soon as it is ready; without, only the mapping is wanted.
    */
   anonymiseFiles: (files: readonly File[], save: boolean) => Promise<void>;
-  setReport: (report: string) => void;
-  dismissBatch: () => void;
-  /** Drop every raw file and mapping held for this tab. The text pasted is kept: it holds no real identifier. */
-  forgetAll: () => void;
+  setText: (driver: TextSide, text: string) => void;
+  addTextDict: (dict: AnonymizationDictionary) => void;
+  /** Anonymise every finished file again, and rebuild the text mapping, with the current salt. */
+  applySalt: () => Promise<void>;
+  /**
+   * Drop every raw file and mapping held for this tab. Only `anonymisedText` is
+   * kept, on the anonymised side: it holds no real identifier.
+   */
+  forgetAll: (anonymisedText: string) => void;
 }
 
 /**
@@ -75,6 +85,10 @@ export function saveJobOutput(job: AnonymizeJob): void {
 }
 
 let nextId = 0;
+// One file at a time across drops and salt changes: one archive's bytes in
+// memory at a time, downloads in drop order, and each run reads the salt current
+// when it starts.
+let queue: Promise<void> = Promise.resolve();
 
 /**
  * State of the anonymise page: what it anonymised and the mappings to reverse it.
@@ -89,69 +103,109 @@ export const useAnonymizeSessionStore = create<AnonymizeSessionStore>()((set, ge
   const update = (id: number, patch: Partial<AnonymizeJob>) =>
     set((s) => ({ jobs: s.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j)) }));
 
+  const run = async (id: number) => {
+    const job = get().jobs.find((j) => j.id === id);
+    // Forget all, meanwhile: nothing left to show or save it.
+    if (!job) return;
+    const forgotten = () => !get().jobs.some((j) => j.id === id);
+    const salt = useAnonSaltStore.getState().salt;
+    const { file, save } = job;
+    update(id, { status: 'working', message: 'Reading', progress: 0 });
+    try {
+      // Before reading, like the start page's drop zone: an oversized file never enters memory.
+      assertArchiveSizeOk(file.size);
+      const out = await anonymiseDroppedFile(
+        file.name,
+        new Uint8Array(await file.arrayBuffer()),
+        salt,
+        (phase, current, total) => update(id, {
+          message: total > 0 ? `${phase} ${current}/${total}` : phase,
+          progress: phaseProgress(phase, current, total),
+        }),
+      );
+      if (forgotten()) return;
+      if (save) downloadBlob(out.data, out.name, out.mime);
+      // A File is a Blob: the URL references it, no copy of the bytes.
+      const rawUrl = job.rawUrl ?? (out.isArchive ? URL.createObjectURL(file) : null);
+      // Dropping the same file again replaces the earlier result. Only a finished
+      // one: a same-name job still working replaces this one in turn when done.
+      const replaced = (j: AnonymizeJob) => j.id !== id && j.sourceName === file.name && j.status !== 'working';
+      for (const old of get().jobs) if (replaced(old) && old.rawUrl) URL.revokeObjectURL(old.rawUrl);
+      set((s) => ({
+        jobs: s.jobs
+          .filter((j) => !replaced(j))
+          .map((j) => (j.id === id ? { ...j, status: 'done', message: '', progress: 1, output: out, salt, rawUrl } : j)),
+      }));
+    } catch (e) {
+      // An earlier salt's output would map aliases this salt never makes. Its salt
+      // stays, so the next salt change tries again.
+      update(id, { status: 'error', progress: 1, output: null, message: e instanceof Error ? e.message : 'Could not anonymise this file.' });
+    }
+  };
+
+  const enqueue = (ids: readonly number[]) => {
+    for (const id of ids) queue = queue.then(() => run(id));
+    return queue;
+  };
+
   return {
     jobs: [],
-    batch: null,
-    report: '',
+    text: '',
+    driver: 'anonymised',
+    textDict: emptyDict(),
 
-    anonymiseFiles: async (files, save) => {
-      const salt = useAnonSaltStore.getState().salt;
-      // Queue the whole drop first, so progress can say "2/3".
-      // A drop joins the notice still showing.
-      const open = get().batch?.dismissed === false ? get().batch : null;
+    anonymiseFiles: (files, save) => {
       const queued: AnonymizeJob[] = files.map((file) => ({
-        id: nextId++, sourceName: file.name, status: 'working', message: 'Waiting', progress: 0, output: null, rawUrl: null, save,
+        id: nextId++, sourceName: file.name, status: 'working', message: 'Waiting', progress: 0, output: null, salt: null, save, file, rawUrl: null,
       }));
-      set((s) => ({
-        jobs: [...s.jobs, ...queued],
-        batch: { jobIds: [...(open?.jobIds ?? []), ...queued.map((j) => j.id)], dismissed: false },
-      }));
-      // Sequential: one archive's bytes in memory at a time, and the
-      // downloads arrive in drop order.
-      for (const [i, file] of files.entries()) {
-        const { id } = queued[i];
-        // Forget all, meanwhile: nothing left to show or save it.
-        const forgotten = () => !get().jobs.some((j) => j.id === id);
-        if (forgotten()) continue;
-        update(id, { message: 'Reading' });
-        try {
-          // Before reading, like the start page's drop zone: an oversized file never enters memory.
-          assertArchiveSizeOk(file.size);
-          const out = await anonymiseDroppedFile(
-            file.name,
-            new Uint8Array(await file.arrayBuffer()),
-            salt,
-            (phase, current, total) => update(id, {
-              message: total > 0 ? `${phase} ${current}/${total}` : phase,
-              progress: phaseProgress(phase, current, total),
-            }),
-          );
-          if (forgotten()) continue;
-          if (save) downloadBlob(out.data, out.name, out.mime);
-          // A File is a Blob: the URL references it, no copy of the bytes.
-          const rawUrl = out.isArchive ? URL.createObjectURL(file) : null;
-          // Dropping the same file again replaces the earlier result. Only a finished
-          // one: a same-name job still working replaces this one in turn when done.
-          const replaced = (j: AnonymizeJob) => j.id !== id && j.sourceName === file.name && j.status !== 'working';
-          for (const old of get().jobs) if (replaced(old) && old.rawUrl) URL.revokeObjectURL(old.rawUrl);
-          set((s) => ({
-            jobs: s.jobs
-              .filter((j) => !replaced(j))
-              .map((j) => (j.id === id ? { ...j, status: 'done', message: '', progress: 1, output: out, rawUrl } : j)),
-          }));
-        } catch (e) {
-          update(id, { status: 'error', progress: 1, message: e instanceof Error ? e.message : 'Could not anonymise this file.' });
-        }
-      }
+      set((s) => ({ jobs: [...s.jobs, ...queued] }));
+      return enqueue(queued.map((j) => j.id));
     },
 
-    setReport: (report) => set({ report }),
+    setText: (driver, text) => set({ driver, text }),
 
-    dismissBatch: () => set((s) => ({ batch: s.batch && { ...s.batch, dismissed: true } })),
+    addTextDict: (dict) => {
+      // Nothing new, nothing set: a new textDict would drop a salt change's rebuild (see applySalt).
+      const { forward } = get().textDict;
+      if (Object.entries(dict.forward).every(([id, alias]) => forward[id] === alias)) return;
+      set((s) => ({
+        textDict: { forward: { ...s.textDict.forward, ...dict.forward }, reverse: { ...s.textDict.reverse, ...dict.reverse } },
+      }));
+    },
 
-    forgetAll: () => {
+    applySalt: async () => {
+      const { salt } = useAnonSaltStore.getState();
+      // Behind the files in flight: one still working now finishes with the old salt, so is stale then.
+      const files = queue.then(async () => {
+        // A re-run that failed is tried again; a first failure has no salt: the file is bad.
+        const current = useAnonSaltStore.getState().salt;
+        const stale = get().jobs.filter((j) => j.salt !== null && (j.status === 'error' || (j.status === 'done' && j.salt !== current)));
+        for (const j of stale) update(j.id, { status: 'working', message: 'Waiting', progress: 0 });
+        for (const j of stale) await run(j.id);
+      });
+      queue = files;
+      const before = get().textDict;
+      // URL hosts are keyed bare: back in a URL, so the scan finds them again.
+      const ids = Object.keys(before.forward).map((id) => (/^[@#!$%]/.test(id) ? id : `https://${id}/`));
+      if (ids.length > 0) {
+        const dict = await buildAnonymizationDictionaryFromTexts([ids.join('\n')], salt);
+        // Not after a newer salt, nor after Forget all: it would bring the forgotten IDs back.
+        if (useAnonSaltStore.getState().salt === salt && get().textDict === before) set({ textDict: dict });
+      }
+      await files;
+    },
+
+    forgetAll: (anonymisedText) => {
       for (const j of get().jobs) if (j.rawUrl) URL.revokeObjectURL(j.rawUrl);
-      set({ jobs: [], batch: null });
+      set({ jobs: [], text: anonymisedText, driver: 'anonymised', textDict: emptyDict() });
     },
   };
+});
+
+// The salt field writes on every keystroke: re-anonymise once typing settles.
+let saltTimer: ReturnType<typeof setTimeout> | undefined;
+useAnonSaltStore.subscribe((s, prev) => {
+  if (s.salt === prev.salt) return;
+  clearTimeout(saltTimer);
+  saltTimer = setTimeout(() => { void useAnonymizeSessionStore.getState().applySalt(); }, 500);
 });

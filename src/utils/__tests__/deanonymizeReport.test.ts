@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildAnonymizationDictionaryFromTexts, applyAnonymization } from '../anonymizeUtils';
-import { countUnresolvedAliases, repointViewerLinks, unanonymizeReport, type DeanonymizeSource } from '../deanonymizeReport';
+import {
+  anonymizeText, countRealIdentifiers, countUnresolvedAliases, repointViewerLinks, unanonymizeReport, type DeanonymizeSource,
+} from '../deanonymizeReport';
 
 const SALT = 'test-salt';
 const APP = 'https://manuroe.github.io/shakeview/';
@@ -53,5 +55,40 @@ describe('countUnresolvedAliases', () => {
     const alias = '@user-0123456789ab:domain-01234567.org';
     expect(countUnresolvedAliases(`${alias} met ${alias} and @alice:example.org in %21room-0123456789ab%3Adomain-01234567.org`)).toBe(2);
     expect(countUnresolvedAliases('@alice:example.org')).toBe(0);
+  });
+});
+
+describe('anonymizeText', () => {
+  it('anonymises with the salt alone, as the rageshake would, and returns the mapping to read it back', async () => {
+    const text = '@alice:matrix.org left !abc:matrix.org';
+    const out = await anonymizeText(text, SALT, []);
+
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(out.text).toBe(applyAnonymization(text, dict));
+    expect(unanonymizeReport(out.text, [{ anonymizedName: '', dict: out.dict, rawUrl: null }])).toBe(text);
+  });
+
+  it('leaves aliases already in the text as they are', async () => {
+    const alias = '@user-0123456789ab:domain-01234567.org';
+    const out = await anonymizeText(`${alias} and @alice:matrix.org`, SALT, []);
+
+    expect(out.text.startsWith(`${alias} and @user-`)).toBe(true);
+    expect(Object.keys(out.dict.forward)).not.toContain(alias);
+    expect(countRealIdentifiers(out.text)).toBe(0);
+  });
+
+  it('leaves aliases as they are even when a loaded rageshake logged them', async () => {
+    const alias = '@user-0123456789ab:domain-01234567.org';
+    const dict = await buildAnonymizationDictionaryFromTexts([alias], SALT);
+    const out = await anonymizeText(alias, SALT, [{ anonymizedName: 'x', dict, rawUrl: null }]);
+
+    expect(out.text).toBe(alias);
+  });
+});
+
+describe('countRealIdentifiers', () => {
+  it('counts Matrix IDs and URL hosts that are not aliases, once each', () => {
+    expect(countRealIdentifiers('@alice:example.org, @alice:example.org on https://matrix.example.org/x')).toBe(2);
+    expect(countRealIdentifiers('@user-0123456789ab:domain-01234567.org on https://domain-01234567.org/x')).toBe(0);
   });
 });

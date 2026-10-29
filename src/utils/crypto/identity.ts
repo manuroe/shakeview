@@ -1,5 +1,4 @@
 import type { ListingDetails } from '../../types/listing';
-import type { ParsedLogLine } from '../../types/log.types';
 import type { DeviceIdentity } from './types';
 
 const LOGGED_IN_RE = /setLoggedIn: mxid: (\S+) deviceId: (\S+)/;
@@ -13,7 +12,7 @@ const CURVE_RE = /curve25519:([A-Za-z0-9+/=]+)/;
  *
  * @example deviceIdentity(null, lines) // { userId: '@bob:d', deviceId: 'VYTOIDPHBO', curveKey: undefined }
  */
-export function deviceIdentity(details: ListingDetails | null, lines: readonly ParsedLogLine[]): DeviceIdentity {
+export function deviceIdentity(details: ListingDetails | null, lines: readonly { readonly message: string }[]): DeviceIdentity {
   let userId = details?.userId ?? undefined;
   let deviceId = details?.deviceId ?? undefined;
   const curveKey = details?.deviceKeys ? CURVE_RE.exec(details.deviceKeys)?.[1] : undefined;
