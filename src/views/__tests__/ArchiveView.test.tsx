@@ -412,7 +412,8 @@ describe('ArchiveView', () => {
       ]);
       renderArchiveView();
       expect(screen.getByText('Device ID')).toBeInTheDocument();
-      expect(screen.getByText('ABCDEF12')).toBeInTheDocument();
+      // In the user header and the details card.
+      expect(screen.getAllByText('ABCDEF12')).toHaveLength(2);
     });
 
     it('renders app id from base_bundle_identifier', () => {
@@ -487,7 +488,7 @@ describe('ArchiveView', () => {
       renderArchiveView();
 
       await waitFor(() => {
-        expect(screen.getByText('Alice')).toBeInTheDocument();
+        expect(screen.getAllByText('Alice')).toHaveLength(2);
       });
     });
 

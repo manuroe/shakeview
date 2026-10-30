@@ -35,8 +35,10 @@ import { openMergedEntries } from '../utils/openMergedLogs';
 import { userInitial } from '../utils/matrixProfile';
 import { useMatrixProfile } from '../hooks/useMatrixProfile';
 import { formatBytes } from '../utils/sizeUtils';
+import { roomCount } from '../utils/roomCount';
 import { isNumericStatus } from '../utils/statusCodeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
+import { UserHeader } from '../components/UserHeader';
 import tableStyles from '../components/Table.module.css';
 import styles from './ArchiveView.module.css';
 
@@ -141,6 +143,12 @@ export function ArchiveView() {
 
   /** Matrix profile fetched from the user's homeserver; `null` while loading or without a userId. */
   const matrixProfile = useMatrixProfile(parsedDetails?.userId);
+
+  /** Rooms over every file, for the user header; `null` until all are summarized, not re-merged per summary. */
+  const rooms = useMemo(() => {
+    if (!sortedEntries.every((e) => !isAnalyzableEntry(e.name) || archiveSummaries.has(e.name))) return null;
+    return roomCount([...archiveSummaries.values()].map((s) => s.rooms));
+  }, [sortedEntries, archiveSummaries]);
 
   /**
    * Object URLs for PNG entries, created once and revoked on unmount.
@@ -322,6 +330,9 @@ export function ArchiveView() {
           <BurgerMenu />
           <h1 className="header-title">{archiveName}</h1>
         </div>
+        <UserHeader
+          userId={parsedDetails?.userId} deviceId={parsedDetails?.deviceId} deviceKeys={parsedDetails?.deviceKeys} rooms={rooms}
+        />
         <div className="header-right">
           {selected.size > 0 && (
             <>
