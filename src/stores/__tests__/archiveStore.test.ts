@@ -27,7 +27,7 @@ function makeSummary(totalLines = 10): ArchiveSummary {
     statusCodes: {},
     utdCount: 0,
     utdReasons: {},
-    cryptoSteps: [],
+    cryptoSteps: [], rooms: { seenIds: [], lists: {} },
   };
 }
 
