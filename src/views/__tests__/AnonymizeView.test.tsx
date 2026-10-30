@@ -26,7 +26,7 @@ const job = (patch: Partial<AnonymizeJob> & { userId?: string; deviceId?: string
   const { userId, deviceId, dict = EMPTY, ...rest } = patch;
   return {
     id: 1, sourceName: 'rs.tar.gz', status: 'done', message: '', progress: 1, rawUrl: null, salt: 'salt', save: false, file: new File(['x'], 'rs.tar.gz'),
-    output: { name: 'rs-anonym.tar.gz', data: 'x', mime: 'text/plain', dict, isArchive: true, identity: { userId, deviceId } },
+    output: { name: 'rs-anonym.tar.gz', data: 'x', mime: 'text/plain', dict, isArchive: true, identity: { userId, deviceId }, rooms: { seenIds: [], lists: {} } },
     ...rest,
   };
 };
@@ -65,7 +65,7 @@ describe('AnonymizeView', () => {
     const alias = applyAnonymization('@alice:matrix.org', dict);
     const text = `# Case\n\n${alias} left.\n\n- [12:00](http://127.0.0.1:7357/#/logs?archive=/c/rs-anonym.tar.gz&line=4)\n`;
     useAnonymizeSessionStore.setState({
-      jobs: [job({ dict, rawUrl: 'blob:http://localhost/1', output: { name: 'rs-anonym.tar.gz', data: new Uint8Array(), mime: 'application/gzip', dict, isArchive: true, identity: {} } })],
+      jobs: [job({ dict, rawUrl: 'blob:http://localhost/1', output: { name: 'rs-anonym.tar.gz', data: new Uint8Array(), mime: 'application/gzip', dict, isArchive: true, identity: {}, rooms: { seenIds: [], lists: {} } } })],
       text,
     });
 
@@ -343,6 +343,19 @@ describe('AnonymizeView', () => {
         jobs: [job({ userId: '@alice:matrix.org', deviceId: 'PHONE' }), job({ id: 2, userId: '@alice:matrix.org', deviceId: 'DESKTOP' })],
       }));
       expect(screen.getByText('2 devices')).toBeInTheDocument();
+    });
+
+    it('counts the user\'s rooms over their rageshakes, like the summary page', () => {
+      const rooms = (seenIds: string[], count: number) => ({ seenIds, lists: { AllRooms: { count, ts: count } } });
+      useAnonymizeSessionStore.setState({
+        jobs: [
+          job({ output: { ...job({ userId: '@alice:matrix.org' }).output!, rooms: rooms(['!a:x.org', '!b:x.org'], 40) } }),
+          job({ id: 2, output: { ...job({ userId: '@alice:matrix.org' }).output!, rooms: rooms(['!b:x.org'], 41) } }),
+        ],
+      });
+      page();
+      expect(screen.getByText('41 rooms')).toBeInTheDocument();
+      expect(screen.getByText('2 in logs')).toBeInTheDocument();
     });
 
     it('stacks several users, naming two, counting more', () => {

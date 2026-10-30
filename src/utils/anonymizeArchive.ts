@@ -7,6 +7,8 @@ import { deviceIdentity } from './crypto/identity';
 import { detailsFromEntries } from './crypto/loadDevice';
 import type { DeviceIdentity } from './crypto/types';
 import { FileError } from './errorHandling';
+import { parseLogFile } from './logParser';
+import { roomsInLog, type RoomsInLog } from './roomCount';
 import { decodeTextBytes, isValidGzipHeader, isValidTextContent } from './fileValidator';
 import { parseTarGzArchive, TAR_GZ_NAME } from './tarGzArchive';
 import { buildTar, canEncodeUstarName, type TarFile } from './tarWriter';
@@ -166,7 +168,7 @@ export async function anonymiseArchiveEntries(
   entries: readonly { name: string; data: Uint8Array }[],
   salt: string,
   onProgress?: ArchiveProgress,
-): Promise<{ gz: Uint8Array; dict: AnonymizationDictionary }> {
+): Promise<{ gz: Uint8Array; dict: AnonymizationDictionary; texts: readonly string[] }> {
   const total = entries.length;
   const maybeYield = makeYielder();
 
@@ -181,10 +183,8 @@ export async function anonymiseArchiveEntries(
 
   // Phase 2: one dictionary across all text, then anonymise + re-gzip each entry.
   onProgress?.('Anonymising files', 0, total);
-  const dict = await buildAnonymizationDictionaryFromTexts(
-    decoded.filter((d) => d.text !== null).map((d) => d.text as string),
-    salt,
-  );
+  const texts = decoded.filter((d) => d.text !== null).map((d) => d.text as string);
+  const dict = await buildAnonymizationDictionaryFromTexts(texts, salt);
   const apply = buildCompiledAnonymizer(dict);
 
   const outFiles: TarFile[] = [];
@@ -204,7 +204,7 @@ export async function anonymiseArchiveEntries(
   // Phase 3: pack + compress (single blocking step → indeterminate).
   onProgress?.('Compressing', 0, 0);
   await maybeYield();
-  return { gz: gzipSync(buildTar(outFiles)), dict };
+  return { gz: gzipSync(buildTar(outFiles)), dict, texts };
 }
 
 /** Result of anonymising one dropped file, ready to download. */
@@ -217,11 +217,23 @@ export interface AnonymisedFile {
   readonly isArchive: boolean;
   /** Whose rageshake it is, read from the original. */
   readonly identity: DeviceIdentity;
+  /** The rooms its logs mention and list, for the user header (see `roomCount`). */
+  readonly rooms: RoomsInLog;
 }
 
 /** Element Web login lines, the only ones `deviceIdentity` reads: no copy of every line of an archive. */
 // Anchored: unanchored, `.*` retries from every column, quadratic on a long line.
 const loginLines = (text: string | null): string[] => text?.match(/^.*setLoggedIn: .*$/gm) ?? [];
+
+/** What the texts say about the user's rooms: only the room list lines are parsed, for their timestamps. */
+function roomsOf(texts: readonly string[], dict: AnonymizationDictionary): RoomsInLog {
+  // ponytail: lines lead with an ISO timestamp, so a string sort is chronological across files, as in identityOf.
+  const listLines = texts.flatMap((t) => t.match(/^.*Rebuilding room summaries.*$/gm) ?? []).sort();
+  // The mapping holds every ID of the texts, each spelling once: their room IDs without a second scan.
+  const ids = Object.keys(dict.forward).map((rawText) => ({ rawText, timestampUs: 0 }));
+  const lists = listLines.length > 0 ? parseLogFile(listLines.join('\n')).rawLogLines : [];
+  return roomsInLog([...lists, ...ids]);
+}
 
 /** Whose rageshake: `details.json` first, else the last Element Web login line of its logs. */
 function identityOf(details: ListingDetails | null, lines: () => readonly string[]): DeviceIdentity {
@@ -252,13 +264,13 @@ export async function anonymiseDroppedFile(
 ): Promise<AnonymisedFile> {
   if (TAR_GZ_NAME.test(name)) {
     const entries = parseTarGzArchive(bytes);
-    const { gz, dict } = await anonymiseArchiveEntries(entries, salt, onProgress);
-    const identity = identityOf(detailsFromEntries(entries), () => entries.flatMap((e) => loginLines(decodeEntryText(e))));
-    return { name: deriveAnonymizedArchiveName(name), data: gz, mime: 'application/gzip', dict, isArchive: true, identity };
+    const { gz, dict, texts } = await anonymiseArchiveEntries(entries, salt, onProgress);
+    const identity = identityOf(detailsFromEntries(entries), () => texts.flatMap(loginLines));
+    return { name: deriveAnonymizedArchiveName(name), data: gz, mime: 'application/gzip', dict, isArchive: true, identity, rooms: roomsOf(texts, dict) };
   }
   const text = decodeEntryText({ name, data: bytes });
   if (text === null) throw new FileError(`${name} is not a text log, so it cannot be anonymised.`);
   const dict = await buildAnonymizationDictionaryFromTexts([text], salt);
   const data = `${ANONYMIZED_LOG_MARKER}\n${buildCompiledAnonymizer(dict)(text)}`;
-  return { name: deriveAnonymizedFilename(name), data, mime: 'text/plain', dict, isArchive: false, identity: identityOf(null, () => loginLines(text)) };
+  return { name: deriveAnonymizedFilename(name), data, mime: 'text/plain', dict, isArchive: false, identity: identityOf(null, () => loginLines(text)), rooms: roomsOf([text], dict) };
 }

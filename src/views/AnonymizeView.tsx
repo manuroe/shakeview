@@ -20,6 +20,7 @@ import {
 } from '../utils/deanonymizeReport';
 import { downloadBlob } from '../utils/downloadBlob';
 import { plural } from '../utils/crypto/format';
+import { roomCount } from '../utils/roomCount';
 import { BackIcon, CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, EyeIcon, KeyIcon, PencilIcon, TrashIcon, UploadIcon } from '../components/icons';
 import { SaltField } from '../components/SaltField';
 import { UserHeader } from '../components/UserHeader';
@@ -69,6 +70,7 @@ function Identity({ jobs }: { readonly jobs: readonly AnonymizeJob[] }) {
         userId={users[0]}
         deviceId={devices.length > 1 ? plural(devices.length, 'device') : devices[0]}
         deviceKeys={curveKey && `curve25519:${curveKey}`}
+        rooms={roomCount(jobs.flatMap((j) => (j.output?.identity.userId ? [j.output.rooms] : [])))}
       />
     );
   }
