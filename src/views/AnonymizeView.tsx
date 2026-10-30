@@ -20,7 +20,7 @@ import {
 } from '../utils/deanonymizeReport';
 import { downloadBlob } from '../utils/downloadBlob';
 import { plural } from '../utils/crypto/format';
-import { BackIcon, CheckIcon, CodeIcon, CopyIcon, DownloadIcon, KeyIcon, TrashIcon, UploadIcon } from '../components/icons';
+import { BackIcon, CheckIcon, CopyIcon, DownloadIcon, EyeIcon, KeyIcon, PencilIcon, TrashIcon, UploadIcon } from '../components/icons';
 import { SaltField } from '../components/SaltField';
 import buttonStyles from '../components/Button.module.css';
 import dropdownStyles from '../components/Dropdown.module.css';
@@ -278,14 +278,14 @@ function TextPane({ title, note, source, markdown = source, saveName, onEdit, on
         {headerAction}
         <button
           type="button"
-          className={`${buttonStyles.iconButton} ${showSource ? buttonStyles.pillButtonActive : ''}`}
+          className={buttonStyles.iconButton}
           onClick={() => setShowSource((v) => !v)}
           disabled={!isMarkdown}
-          aria-pressed={showSource}
-          title="Show markdown source"
-          aria-label={`Show ${lower} markdown source`}
+          // Named for what a click does: edit the rendered view, preview the edit.
+          title={showSource ? 'Preview' : 'Edit'}
+          aria-label={`${showSource ? 'Preview' : 'Edit'} ${lower}`}
         >
-          <CodeIcon />
+          {showSource ? <EyeIcon /> : <PencilIcon />}
         </button>
         <button
           type="button"
@@ -323,18 +323,13 @@ function TextPane({ title, note, source, markdown = source, saveName, onEdit, on
           placeholder={placeholder}
           aria-label={title}
           spellCheck={false}
-          // Mounted by a click on the rendered view (or the source button): straight to typing.
+          // Mounted by the Edit button: straight to typing.
           autoFocus={showSource}
         />
       ) : (
         <div
           className={`${styles.report} ${styles.rendered}`}
           aria-label={title}
-          title="Click to edit"
-          // A click edits; following a link or selecting text to copy does not.
-          onClick={(e) => {
-            if (!(e.target as Element).closest('a') && !window.getSelection()?.toString()) setShowSource(true);
-          }}
         >
           <Markdown
             // remarkBreaks: a newline is a line break, as in GitHub comments.

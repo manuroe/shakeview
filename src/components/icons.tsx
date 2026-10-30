@@ -48,9 +48,19 @@ export function CheckIcon(props: IconProps) {
   return <svg aria-hidden="true" {...base(props)}><path d="M3 8.5l3 3 7-7" {...stroke}/></svg>;
 }
 
-/** Angle brackets: show the source. */
-export function CodeIcon(props: IconProps) {
-  return <svg aria-hidden="true" {...base(props)}><path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5" {...stroke}/></svg>;
+/** Pencil: edit. */
+export function PencilIcon(props: IconProps) {
+  return <svg aria-hidden="true" {...base(props)}><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5zM9.5 4l2.5 2.5" {...stroke}/></svg>;
+}
+
+/** Eye: preview. */
+export function EyeIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...base(props)}>
+      <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" {...stroke}/>
+      <circle cx="8" cy="8" r="2" {...stroke}/>
+    </svg>
+  );
 }
 
 /** Bin: forget. */

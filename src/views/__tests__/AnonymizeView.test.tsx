@@ -77,7 +77,7 @@ describe('AnonymizeView', () => {
     expect(useAnonymizeSessionStore.getState()).toMatchObject({ jobs: [], text, driver: 'anonymised' });
     expect(revoke).toHaveBeenCalledWith('blob:http://localhost/1');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show real ids markdown source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit real ids' }));
     expect(screen.getByRole('textbox', { name: 'Real IDs' })).toHaveValue(text);
   });
 
@@ -88,7 +88,7 @@ describe('AnonymizeView', () => {
     await vi.waitFor(() => expect(screen.getByText(/^@user-[0-9a-f]{12}:domain-[0-9a-f]{8}\.org left$/)).toBeInTheDocument());
     expect(screen.queryByText(/real ID/)).toBeNull(); // all anonymised: nothing to warn about
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show anonymised markdown source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit anonymised' }));
     const right = screen.getByRole('textbox', { name: 'Anonymised' }) as HTMLTextAreaElement;
     const edited = `${right.value}, then came back`;
     fireEvent.change(right, { target: { value: edited } });
@@ -154,7 +154,7 @@ describe('AnonymizeView', () => {
     fireEvent.change(input, { target: { value: '# Notes' } });
     expect(screen.getAllByRole('heading', { name: 'Notes' })).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show anonymised markdown source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit anonymised' }));
     expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveValue('# Notes');
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy anonymised' }));
@@ -255,19 +255,24 @@ describe('AnonymizeView', () => {
     fireEvent.change(input, { target: { value: '2026-10-29 12:00:00 D/Sync: started\n2026-10-29 12:00:01 E/Sync: failed' } });
 
     expect(screen.getByRole('textbox', { name: 'Real IDs' })).toHaveValue('2026-10-29 12:00:00 D/Sync: started\n2026-10-29 12:00:01 E/Sync: failed');
-    expect(screen.getByRole('button', { name: 'Show real ids markdown source' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit real ids' })).toBeDisabled();
   });
 
-  it('edits rendered markdown on a click, but not on a link click', () => {
+  it('edits rendered markdown from the Edit button only, not on a click in it', () => {
     useAnonymizeSessionStore.setState({ text: '# Notes\nsee [log](https://example.org)' });
     page();
 
     const anonymised = within(screen.getByLabelText('Anonymised'));
     fireEvent.click(anonymised.getByRole('link', { name: 'log' }));
+    fireEvent.click(anonymised.getByRole('heading', { name: 'Notes' }));
     expect(screen.queryByRole('textbox', { name: 'Anonymised' })).toBeNull();
 
-    fireEvent.click(anonymised.getByRole('heading', { name: 'Notes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit anonymised' }));
     expect(screen.getByRole('textbox', { name: 'Anonymised' })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview anonymised' }));
+    expect(screen.queryByRole('textbox', { name: 'Anonymised' })).toBeNull();
+    expect(within(screen.getByLabelText('Anonymised')).getByRole('heading', { name: 'Notes' })).toBeInTheDocument();
   });
 
   it('keeps editing when pasting into existing text, and shows the drop target while dragging a file', () => {

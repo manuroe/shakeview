@@ -255,7 +255,6 @@
     line-height: 1.5;
     white-space: normal;
     overflow-wrap: break-word;
-    cursor: text; /* a click edits */
 }
 
 /* GitHub's markdown rhythm, put back after foundation.css resets every margin and padding. */
