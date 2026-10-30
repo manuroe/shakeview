@@ -363,12 +363,19 @@ function verdictOf(
   },
 ): { verdict: string; because: string } {
   if (open.length === 0) {
-    const delays = utds.map((u) => (u.resolution.state === 'resolved' ? u.resolution.delay : 0));
+    const resolved = utds.flatMap((u) => (u.resolution.state === 'resolved' ? [u.resolution] : []));
     const r = utds[0].resolution;
     const gaps = utds.flatMap((u) => applyGap(u) ?? []);
     const slow = gaps.length > 0 ? `; the key was applied up to ${formatUs(Math.max(...gaps))} after it arrived` : '';
+    // No re-decryption logged: an inferred delay is the key's arrival, not when the user saw the event.
+    const upTo = (confirmed: boolean) => formatUs(Math.max(...resolved.filter((x) => x.confirmed === confirmed).map((x) => x.delay)));
+    const inferred = resolved.filter((x) => !x.confirmed).length;
+    const arrived = `the key arrived up to ${upTo(false)} after the failure; when it was applied is not logged`;
+    const when = inferred === 0 ? `, after up to ${upTo(true)}${slow}`
+      : inferred === resolved.length ? `: ${arrived}`
+      : `, after up to ${upTo(true)}${slow}; for ${plural(inferred, 'other event')}, ${arrived}`;
     return {
-      verdict: `Decrypted late: ${plural(utds.length, 'event')} by ${r.state === 'resolved' ? mechanismLabel(r.by) : '?'}, after up to ${formatUs(Math.max(...delays))}${slow}`,
+      verdict: `Decrypted late: ${plural(utds.length, 'event')} by ${r.state === 'resolved' ? mechanismLabel(r.by) : '?'}${when}`,
       because: 'Decrypted late',
     };
   }

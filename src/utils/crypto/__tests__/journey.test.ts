@@ -57,7 +57,7 @@ describe('buildJourney', () => {
       'enabled · 00:00:14.000', '00:00:15.000 · MissingMegolmSession', '00:00:15.250 · +250ms',
       '1 event · key backup · inferred · +250ms', '00:00:16.000 · m.room_key · +1.0s',
     ]);
-    expect(j.verdict).toBe('Decrypted late: 1 event by key backup, after up to 250ms');
+    expect(j.verdict).toBe('Decrypted late: 1 event by key backup: the key arrived up to 250ms after the failure; when it was applied is not logged');
   });
 
   it('sender loaded, key sent but never received: lost in delivery', () => {
@@ -152,7 +152,7 @@ describe('buildJourney', () => {
   it('late decryption: every UTD resolved, with its mechanism, and a per-event list', () => {
     const j = journey([utd('bob', 20), utd('bob', 22, '$ev2'), st('bob', 'roomkey.received', 40, { sessionId: 'S', toDeviceType: 'm.room_key', firstKnownIndex: 0 })]);
     expect(j.tone).toBe('late');
-    expect(j.verdict).toBe('Decrypted late: 2 events by late key, after up to 20.0s');
+    expect(j.verdict).toBe('Decrypted late: 2 events by late key: the key arrived up to 20.0s after the failure; when it was applied is not logged');
     expect(shape(j)).toContain('ok Decrypted late');
     expect(j.events.map((e) => [e.eventId, e.ok, e.text])).toEqual([
       ['$ev1', true, 'late key after 20.0s (inferred)'], ['$ev2', true, 'late key after 18.0s (inferred)'],
@@ -170,6 +170,15 @@ describe('buildJourney', () => {
       'Key received over to-device 00:00:10.500 · m.room_key · +500ms', 'Decrypted late 1 event · late key · confirmed · +26.4s',
     ]);
     expect(j.events.map((e) => e.text)).toEqual(['late key after 500ms, decrypted after 26.4s (confirmed)']);
+  });
+
+  it('late decryption, confirmed and inferred: the logged decryption and the inferred key arrival are told apart', () => {
+    const j = journey([
+      utd('bob', 10), utd('bob', 12, '$ev2'),
+      st('bob', 'roomkey.received', 13, { sessionId: 'S', toDeviceType: 'm.room_key' }),
+      st('bob', 'event.redecrypted', 13, { eventIds: ['$ev1'] }),
+    ]);
+    expect(j.verdict).toBe('Decrypted late: 2 events by late key, after up to 3.0s; for 1 other event, the key arrived up to 1.0s after the failure; when it was applied is not logged');
   });
 
   it('analytics: each event says whether analytics received it, and a line sums them; not reported is muted', () => {

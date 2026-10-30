@@ -276,7 +276,7 @@ describe('DecryptionView', () => {
     renderView();
     expect(screen.getByRole('button', { name: /^Session OK: Key received/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Session S9: late_key/ }));
-    expect(screen.getByText(/Decrypted late: 1 event by late key, after up to 10\.0s/)).toBeInTheDocument();
+    expect(screen.getByText(/Decrypted late: 1 event by late key: the key arrived up to 10\.0s after the failure; when it was applied is not logged/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Session S: MissingMegolmSession/ }));
     expect(screen.getByText('received 5.0s →')).toBeInTheDocument();
     expect(screen.getByText('→ batch +5.0s')).toBeInTheDocument();
