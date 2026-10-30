@@ -70,7 +70,7 @@ describe('utdStepNote', () => {
     const retry = utd('bob', 12, '$a');
     const key = st('bob', 'roomkey.received', 20, { sessionId: 'S', toDeviceType: 'm.room_key' });
     const [s] = buildCryptoModel([dev('bob', BOB_PHONE, [first, retry, key])]);
-    expect(utdStepNote(first, s, 'bob')).toEqual({ text: 'resolved · late key · 10.0s · inferred · 2 attempts', keyStep: key.line });
+    expect(utdStepNote(first, s, 'bob')).toEqual({ text: 'resolved · late key · key after 10.0s · inferred · 2 attempts', keyStep: key.line });
     expect(utdStepNote(retry, s, 'bob')).toBeUndefined();
     expect(utdStepNote(key, s, 'bob')).toBeUndefined();
   });

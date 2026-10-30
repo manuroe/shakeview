@@ -99,7 +99,7 @@ export function stepTone(s: CryptoStep): 'good' | 'bad' | undefined {
  * How a UTD ended, under its first failure step only (retries repeat the event): resolved or not, by what,
  * after how long, and the key step that resolved it, which the card links to.
  *
- * @example utdStepNote(firstUtdStep, session, 'bob') // { text: 'resolved · late key · 10.0s · inferred · 2 attempts', keyStep: { archive, file, line } }
+ * @example utdStepNote(firstUtdStep, session, 'bob') // { text: 'resolved · late key · key after 10.0s · inferred · 2 attempts', keyStep: { archive, file, line } }
  */
 export function utdStepNote(step: CryptoStep, session: MegolmSession, deviceId: string): { readonly text: string; readonly keyStep?: LineRef } | undefined {
   if (step.kind !== 'event.utd') return undefined;
@@ -108,5 +108,5 @@ export function utdStepNote(step: CryptoStep, session: MegolmSession, deviceId: 
   const attempts = utd.attempts > 1 ? ` · ${utd.attempts} attempts` : '';
   const r = utd.resolution;
   if (r.state !== 'resolved') return { text: `unresolved${attempts}` };
-  return { text: `resolved · ${mechanismLabel(r.by)} · ${formatUs(r.delay)} · ${r.confirmed ? 'confirmed' : 'inferred'}${attempts}`, keyStep: r.evidence[0] };
+  return { text: `resolved · ${mechanismLabel(r.by)} · ${r.confirmed ? `${formatUs(r.delay)} · confirmed` : `key after ${formatUs(r.delay)} · inferred`}${attempts}`, keyStep: r.evidence[0] };
 }
