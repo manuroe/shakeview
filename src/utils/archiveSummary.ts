@@ -20,6 +20,7 @@ import { getEntryKind } from './listingEntries';
 import { extractSteps } from './crypto/steps';
 import { countBy, countUtdEvents, utdEventId } from './crypto/decryptionSummary';
 import { addTo, buildCryptoModel, byTs, deviceFromSteps } from './crypto/buildCryptoModel';
+import { roomsInLog, type RoomsInLog } from './roomCount';
 import type { CryptoStep, UtdReason } from './crypto/types';
 
 /** Comprehensive summary matching what the browser extension shows per log file. */
@@ -51,6 +52,8 @@ export interface ArchiveSummary {
   readonly utdReasons: Readonly<Partial<Record<UtdReason, number>>>;
   /** This file's crypto steps, kept so UTDs can be judged over the whole archive (see `utdsByFile`). */
   readonly cryptoSteps: readonly CryptoStep[];
+  /** The rooms this file mentions, merged over the archive for the user header (see `roomCount`). */
+  readonly rooms: RoomsInLog;
 }
 
 /**
@@ -83,7 +86,8 @@ export function isAnalyzableEntry(name: string): boolean {
  * // { totalLines: 5000, errorCount: 3, warnCount: 0, sentryCount: 1,
  * //   httpCount: 41, totalUploadBytes: 8192, totalDownloadBytes: 204800,
  * //   statusCodes: { "200": 38, "404": 3 },
- * //   utdCount: 2, utdReasons: { missing_key: 2 }, cryptoSteps: [...] }
+ * //   utdCount: 2, utdReasons: { missing_key: 2 }, cryptoSteps: [...],
+ * //   rooms: { seenIds: ['!room1:example.org'], lists: {} } }
  */
 export function computeArchiveSummary(text: string, file = ''): ArchiveSummary {
   const result = parseLogFile(text);
@@ -120,6 +124,7 @@ export function computeArchiveSummary(text: string, file = ''): ArchiveSummary {
     utdCount: utd.count,
     utdReasons: utd.byReason,
     cryptoSteps: steps,
+    rooms: roomsInLog(result.rawLogLines),
   };
 }
 
@@ -141,6 +146,7 @@ export function emptyArchiveSummary(): ArchiveSummary {
     utdCount: 0,
     utdReasons: {},
     cryptoSteps: [],
+    rooms: { seenIds: [], lists: {} },
   };
 }
 

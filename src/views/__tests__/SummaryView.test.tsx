@@ -7,6 +7,8 @@ import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SummaryView } from '../SummaryView';
 import { useLogStore } from '../../stores/logStore';
+import { useArchiveStore } from '../../stores/archiveStore';
+import { emptyArchiveSummary } from '../../utils/archiveSummary';
 import {
   createParsedLogLine,
   createParsedLogLines,
@@ -1114,6 +1116,29 @@ describe('SummaryView', () => {
   // ============================================================================
   // Sentry Reports Section
   // ============================================================================
+
+  describe('user header rooms', () => {
+    afterEach(() => {
+      useArchiveStore.getState().clearArchive();
+    });
+
+    it('reuses the archive summary of a file opened from /archive instead of rescanning it', () => {
+      const name = 'dir/logs.2026-04-14-09.log.gz';
+      const bytes = (s: string) => new TextEncoder().encode(s);
+      useArchiveStore.getState().loadArchive('test.tar.gz', [
+        { name: 'dir/details.json', data: bytes(JSON.stringify({ data: { device_id: 'BOBPHONE' } })) },
+        { name, data: bytes('') },
+      ]);
+      useArchiveStore.getState().setArchiveSummary(name, {
+        ...emptyArchiveSummary(),
+        rooms: { seenIds: ['!a:example.org', '!b:example.org'], lists: {} },
+      });
+      // The loaded lines mention no room: only the summary can say 2.
+      useLogStore.getState().loadLogParserResult(parseLogFile(RECEIVER_LOG), { loadedEntryNames: [name] });
+      renderSummaryView();
+      expect(screen.getByTitle('Distinct rooms these logs mention')).toHaveTextContent('2 rooms in logs');
+    });
+  });
 
   describe('Sentry Reports section', () => {
     const BASE_SENTRY = 1_706_000_000_000_000 as TimestampMicros;

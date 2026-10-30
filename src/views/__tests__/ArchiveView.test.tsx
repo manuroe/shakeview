@@ -57,7 +57,7 @@ vi.mock('../../utils/archiveSummary', () => ({
     statusCodes: { '200': 2, '404': 1 },
     utdCount: 0,
     utdReasons: {},
-    cryptoSteps: [],
+    cryptoSteps: [], rooms: { seenIds: [], lists: {} },
   })),
 }));
 
@@ -321,7 +321,7 @@ describe('ArchiveView', () => {
         statusCodes: {},
         utdCount: 0,
         utdReasons: {},
-        cryptoSteps: [],
+        cryptoSteps: [], rooms: { seenIds: [], lists: {} },
       });
 
       renderArchiveView();
@@ -340,7 +340,7 @@ describe('ArchiveView', () => {
       useArchiveStore.getState().setArchiveSummary('dir/logs.2026-04-14-09.log.gz', {
         totalLines: 10, errorCount: 0, warnCount: 0, sentryCount: 0, httpCount: 0,
         totalUploadBytes: 0, totalDownloadBytes: 0, statusCodes: {},
-        utdCount: 42, utdReasons: { ['missing_key']: 40, ['unknown_index']: 2 }, cryptoSteps: [],
+        utdCount: 42, utdReasons: { ['missing_key']: 40, ['unknown_index']: 2 }, cryptoSteps: [], rooms: { seenIds: [], lists: {} },
       });
       renderArchiveView();
       expect(screen.getByRole('columnheader', { name: 'UTDs' })).toBeInTheDocument();
@@ -351,7 +351,7 @@ describe('ArchiveView', () => {
     const withUtds = (name: string, utdCount: number) => useArchiveStore.getState().setArchiveSummary(name, {
       totalLines: 10, errorCount: 0, warnCount: 0, sentryCount: 0, httpCount: 0,
       totalUploadBytes: 0, totalDownloadBytes: 0, statusCodes: {},
-      utdCount, utdReasons: { ['missing_key']: utdCount }, cryptoSteps: [],
+      utdCount, utdReasons: { ['missing_key']: utdCount }, cryptoSteps: [], rooms: { seenIds: [], lists: {} },
     });
     const utdCell = (name: string) => {
       const column = screen.getAllByRole('columnheader').findIndex((h) => h.textContent === 'UTDs');
@@ -412,7 +412,8 @@ describe('ArchiveView', () => {
       ]);
       renderArchiveView();
       expect(screen.getByText('Device ID')).toBeInTheDocument();
-      expect(screen.getByText('ABCDEF12')).toBeInTheDocument();
+      // In the user header and the details card.
+      expect(screen.getAllByText('ABCDEF12')).toHaveLength(2);
     });
 
     it('renders app id from base_bundle_identifier', () => {
@@ -487,7 +488,7 @@ describe('ArchiveView', () => {
       renderArchiveView();
 
       await waitFor(() => {
-        expect(screen.getByText('Alice')).toBeInTheDocument();
+        expect(screen.getAllByText('Alice')).toHaveLength(2);
       });
     });
 
@@ -665,6 +666,59 @@ describe('ArchiveView', () => {
     });
   });
 
+  describe('user header and clickable counts', () => {
+    const name = 'dir/logs.2026-04-14-09.log.gz';
+    /** One summarized log, with every count non-zero. */
+    const load = () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', [
+        makeEntry('dir/details.json', JSON.stringify({ data: { user_id: '@bob:example.org', device_id: 'BOBPHONE' } })),
+        makeEntry(name),
+      ]);
+      useArchiveStore.getState().setArchiveSummary(name, {
+        totalLines: 10, errorCount: 2, warnCount: 0, sentryCount: 0, httpCount: 4,
+        totalUploadBytes: 0, totalDownloadBytes: 0, statusCodes: { '200': 3, incomplete: 1 },
+        utdCount: 42, utdReasons: { ['missing_key']: 42 }, cryptoSteps: [],
+        rooms: { seenIds: ['!a:example.org', '!b:example.org'], lists: {} },
+      });
+      renderArchiveView();
+    };
+    const click = async (label: string | RegExp) => {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: label }));
+      });
+    };
+
+    it('shows whose rageshake it is, with the rooms its logs mention', () => {
+      load();
+      expect(screen.getByTitle('Distinct rooms these logs mention')).toHaveTextContent('2 rooms in logs');
+    });
+
+    it('opens the file on the view a count details', async () => {
+      load();
+      await click('Open the errors of logs.2026-04-14-09.log.gz');
+      expect(useLogStore.getState().loadedEntryNames).toEqual([name]);
+      expect(mockNavigate).toHaveBeenLastCalledWith('/logs?filter=ERROR');
+    });
+
+    it('opens the reported UTDs and all UTDs from their own number', async () => {
+      load();
+      await click('Open the reported UTDs of logs.2026-04-14-09.log.gz');
+      expect(mockNavigate).toHaveBeenLastCalledWith('/decryption?analytics=reported');
+      await click('Open the UTDs of logs.2026-04-14-09.log.gz');
+      expect(mockNavigate).toHaveBeenLastCalledWith('/decryption');
+    });
+
+    it('lists the incomplete requests with incomplete requests shown', async () => {
+      useLogStore.getState().setShowIncompleteHttp(false);
+      load();
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Show the incomplete requests'));
+      });
+      expect(mockNavigate).toHaveBeenLastCalledWith('/http_requests?status=Incomplete');
+      expect(useLogStore.getState().showIncompleteHttp).toBe(true);
+    });
+  });
+
   describe('multi-select open', () => {
     const entries = [
       makeEntry('dir/logs.2026-04-14-08.log.gz'),
@@ -698,6 +752,32 @@ describe('ArchiveView', () => {
         'dir/logs.2026-04-14-08.log.gz',
         'dir/logs.2026-04-14-09.log.gz',
       ]);
+      expect(mockNavigate).toHaveBeenCalledWith('/summary');
+    });
+
+    it('opens every log of the archive from its file count', async () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', entries);
+      renderArchiveView();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Open all the logs' }));
+      });
+
+      expect(useLogStore.getState().loadedEntryNames).toEqual([
+        'dir/logs.2026-04-14-08.log.gz',
+        'dir/logs.2026-04-14-09.log.gz',
+      ]);
+      expect(mockNavigate).toHaveBeenCalledWith('/summary');
+    });
+
+    it('opens the logs on /summary from the file count, even undated ones', async () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', [makeEntry('dir/logcat.log.gz')]);
+      renderArchiveView();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Open all the logs' }));
+      });
+
       expect(mockNavigate).toHaveBeenCalledWith('/summary');
     });
 

@@ -8,7 +8,7 @@
 import { fetchBytes } from './fileValidator';
 
 /**
- * The other side of each demo conversation: Alice on Element X (`demo.log`) and Bob
+ * The other side of each demo conversation: Bob on Element X (`demo.log`) and Alice
  * on Element Web (`demo-web.log`) share megolm sessions, so either one is the
  * sender rageshake the other's /decryption asks for.
  */

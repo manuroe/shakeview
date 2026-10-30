@@ -225,13 +225,13 @@ async function main(): Promise<void> {
   await shot('sync-dark');
 
   // Megolm decryption: the web demo added as the sender of the mobile demo, on the
-  // UTD a late room key resolved. Without that session (demo logs edited) the view
+  // UTD of a key Alice shared with Bob's other device only. Without that session (demo logs edited) the view
   // falls back to its first session, still a valid shot.
   await page.goto(`${BASE_URL}/#/decryption`);
   const addSender = page.getByRole('button', { name: 'Add sender rageshake' });
   await addSender.click();
   await addSender.waitFor({ state: 'detached', timeout: 15_000 });
-  await page.goto(`${BASE_URL}/#/decryption?session=${encodeURIComponent('yN9zHYIa4UOrGNATMuDJawTgsu8PO+799nKSNrh9UCa')}`);
+  await page.goto(`${BASE_URL}/#/decryption?session=${encodeURIComponent('uSDmLhuVtcqcYezdZ/tDDj8hYs5suKcNd8Zra9A9sKP')}`);
   await page.waitForTimeout(600);
   await setTheme('light');
   await shot('decryption-light');

@@ -29,10 +29,10 @@ describe('the demo conversation', () => {
     expect(DEMO_PEER['demo-web.log']).toBe('demo.log');
   });
 
-  it('links Alice on Element X and Bob on Element Web: one session per outcome', async () => {
+  it('links Bob on Element X and Alice on Element Web: one session per outcome', async () => {
     const [ex, ew] = await Promise.all([demo('demo.log'), demo('demo-web.log')]);
-    expect(ex.identity).toMatchObject({ userId: '@alice:example.org', deviceId: 'ALICEPHONE' });
-    expect(ew.identity).toMatchObject({ userId: '@bob:example.org', deviceId: 'BOBWEB' });
+    expect(ex.identity).toMatchObject({ userId: '@bob:example.org', deviceId: 'BOBPHONE' });
+    expect(ew.identity).toMatchObject({ userId: '@alice:example.org', deviceId: 'ALICEWEB' });
     const sessions = buildCryptoModel([ex, ew], { includeHealthy: true });
     const outcomes = sessions.map((s) => [
       s.sender.loadedId,
@@ -43,12 +43,13 @@ describe('the demo conversation', () => {
       ['demo.log', 'late_key not_reported'],
       ['demo.log', 'unresolved reported'],
       ['demo-web.log', 'late_key reported'],
-      ['demo-web.log', 'key received'],
+      // s5: Alice shared with BOBLAPTOP, not this BOBPHONE.
+      ['demo-web.log', 'unresolved reported'],
     ]));
     expect(sessions).toHaveLength(5);
     // Every key sent to the other loaded device arrived there.
     const toPeer = sessions.flatMap((s) => s.deliveries.filter((d) => d.receiverId));
-    expect(toPeer).toHaveLength(4);
+    expect(toPeer).toHaveLength(3);
     expect(toPeer.every((d) => d.received)).toBe(true);
   });
 });

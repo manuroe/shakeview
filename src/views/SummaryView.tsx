@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useLogStore } from '../stores/logStore';
 import { useArchiveStore } from '../stores/archiveStore';
 import { loadedArchive } from '../stores/cryptoStore';
-import { useMatrixProfile } from '../hooks/useMatrixProfile';
 import { deviceIdentity } from '../utils/crypto/identity';
 import { detailsFromEntries } from '../utils/crypto/loadDevice';
 import { useURLParams } from '../hooks/useURLParams';
 import { BurgerMenu } from '../components/BurgerMenu';
+import { UserHeader } from '../components/UserHeader';
 import { TimeRangeSelector } from '../components/TimeRangeSelector';
 import { LogActivityChart } from '../components/LogActivityChart';
 import { HttpActivityChart } from '../components/HttpActivityChart';
@@ -15,9 +15,11 @@ import { BandwidthChart } from '../components/BandwidthChart';
 import { DecryptionActivityCard } from '../components/DecryptionActivityCard';
 import { calculateTimeRangeMicros, formatTimestamp, formatDuration, getMinMaxTimestamps, snapSelectionToLogLine, SNAP_TOLERANCE_US } from '../utils/timeUtils';
 import { formatBytes } from '../utils/sizeUtils';
+import { roomCount, roomsInLog } from '../utils/roomCount';
 import { getHttpStatusBadgeClass } from '../utils/httpStatusColors';
 import { stripMatrixClientPath } from '../utils/uriUtils';
 import { computeSummaryStats, messageGroupFilter } from '../utils/summaryStats';
+import type { ArchiveSummary } from '../utils/archiveSummary';
 import type { TimestampMicros } from '../types/time.types';
 import type { SelectionRange } from '../hooks/useChartInteraction';
 import styles from './SummaryView.module.css';
@@ -53,10 +55,20 @@ export function SummaryView() {
   const archiveEntries = useArchiveStore((s) => s.archiveEntries);
 
   // Whose rageshake this is: details.json of the loaded archive, else the logs (as on /decryption).
-  const identity = useMemo(() => deviceIdentity(
-    loadedArchive(archiveName, archiveEntries, loadedEntryNames) ? detailsFromEntries(archiveEntries) : null, rawLogLines,
-  ), [archiveName, archiveEntries, loadedEntryNames, rawLogLines]);
-  const profile = useMatrixProfile(isAnonymized ? undefined : identity.userId);
+  const details = useMemo(
+    () => (loadedArchive(archiveName, archiveEntries, loadedEntryNames) ? detailsFromEntries(archiveEntries) : null),
+    [archiveName, archiveEntries, loadedEntryNames],
+  );
+  const identity = useMemo(() => deviceIdentity(details, rawLogLines), [details, rawLogLines]);
+  // Files from /archive were already scanned for rooms there; rescan only logs it has no summary of.
+  const archiveSummaries = useArchiveStore((s) => s.archiveSummaries);
+  const rooms = useMemo(() => {
+    const fromArchive = loadedArchive(archiveName, archiveEntries, loadedEntryNames);
+    const summaries = fromArchive ? loadedEntryNames.map((n) => archiveSummaries.get(n)) : [];
+    return summaries.length > 0 && summaries.every((s): s is ArchiveSummary => s !== undefined)
+      ? roomCount(summaries.map((s) => s.rooms))
+      : roomCount([roomsInLog(rawLogLines)]);
+  }, [archiveName, archiveEntries, loadedEntryNames, archiveSummaries, rawLogLines]);
 
   const summaryTitle = `Summary${detectedPlatform ? ` - ${detectedPlatform === 'ios' ? 'iOS' : 'Android'}` : ''}`;
 
@@ -264,15 +276,10 @@ export function SummaryView() {
           {logFileName && <p className={styles.fileName}>{logFileName}</p>}
         </div>
 
-        {(identity.userId || identity.deviceId) && (
-          <div className={`header-center ${styles.identity}`}>
-            {profile?.avatarHttpUrl && <img src={profile.avatarHttpUrl} alt="" className={styles.avatar} onError={(e) => { e.currentTarget.hidden = true; }} />}
-            <div className={styles.identityText}>
-              {profile?.displayName && <div className={styles.displayName}>{profile.displayName}</div>}
-              <div className={styles.ids}>{[identity.userId, identity.deviceId].filter(Boolean).join(' · ')}</div>
-            </div>
-          </div>
-        )}
+        <UserHeader
+          userId={identity.userId} deviceId={identity.deviceId} deviceKeys={details?.deviceKeys}
+          rooms={rooms} anonymized={isAnonymized}
+        />
 
         <div className="header-right">
           {shouldShowApplyButton && localStartTime !== null && localEndTime !== null && (

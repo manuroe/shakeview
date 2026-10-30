@@ -24,6 +24,7 @@ import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { decompressSync } from 'fflate';
 import { useArchiveStore } from '../stores/archiveStore';
+import { useLogStore } from '../stores/logStore';
 import { isAnalyzableEntry, computeArchiveSummary, emptyArchiveSummary, utdsByFile, type ArchiveSummary, type FileUtds } from '../utils/archiveSummary';
 import { formatCounts } from '../utils/crypto/decryptionSummary';
 import { REPORTED_MEANING } from '../utils/crypto/labels';
@@ -35,15 +36,22 @@ import { openMergedEntries } from '../utils/openMergedLogs';
 import { userInitial } from '../utils/matrixProfile';
 import { useMatrixProfile } from '../hooks/useMatrixProfile';
 import { formatBytes } from '../utils/sizeUtils';
-import { isNumericStatus } from '../utils/statusCodeUtils';
+import { roomCount } from '../utils/roomCount';
+import { CLIENT_ERROR_STATUS_KEY, INCOMPLETE_STATUS_KEY, isNumericStatus } from '../utils/statusCodeUtils';
 import { BurgerMenu } from '../components/BurgerMenu';
+import { UserHeader } from '../components/UserHeader';
 import tableStyles from '../components/Table.module.css';
 import styles from './ArchiveView.module.css';
 
 const NUMERIC_CODE_RE = { test: isNumericStatus };
 
-/** Renders a row of status-code chips for a summary. */
-function StatusChips({ statusCodes }: { readonly statusCodes: Readonly<Record<string, number>> }) {
+/** The /http_requests status filter key of an archive summary's synthetic status. */
+const STATUS_FILTER_KEY: Readonly<Record<string, string>> = { ['client-error']: CLIENT_ERROR_STATUS_KEY, incomplete: INCOMPLETE_STATUS_KEY };
+
+/** Renders a row of status-code chips for a summary; clicking one lists its requests. */
+function StatusChips({ statusCodes, onSelect }: {
+  readonly statusCodes: Readonly<Record<string, number>>; readonly onSelect: (code: string) => void;
+}) {
   const sorted = Object.entries(statusCodes).sort((a, b) => {
     const an = parseInt(a[0], 10);
     const bn = parseInt(b[0], 10);
@@ -65,10 +73,13 @@ function StatusChips({ statusCodes }: { readonly statusCodes: Readonly<Record<st
           else if (n >= 500) colorClass = styles.chip5xx;
         }
         return (
-          <span key={code} className={`${styles.chip} ${colorClass} ${NUMERIC_CODE_RE.test(code) ? styles.chipNumeric : ''}`}>
+          <button
+            type="button" key={code} className={`${styles.chip} ${colorClass} ${NUMERIC_CODE_RE.test(code) ? styles.chipNumeric : ''}`}
+            onClick={() => onSelect(STATUS_FILTER_KEY[code] ?? code)} title={`Show the ${code} requests`}
+          >
             <span className={styles.chipCode}>{code}</span>
             <span className={styles.chipCount}>×{count}</span>
-          </span>
+          </button>
         );
       })}
     </span>
@@ -84,6 +95,17 @@ function utdTitle(u: UtdCell): string {
     : u.reported === null ? 'Reported: unknown, no timeline logs'
     : `${u.reported.toLocaleString()} reported of ${plural(u.count, 'UTD')}`;
   return `${head}\n${REPORTED_MEANING}\n${formatCounts(u.byReason)}`;
+}
+
+/** A count opening its file on the view that details it. */
+function CountLink({ label, onClick, className, children }: {
+  readonly label: string; readonly onClick: () => void; readonly className?: string; readonly children: React.ReactNode;
+}) {
+  return (
+    <button type="button" className={`${styles.countLink} ${className ?? ''}`} onClick={onClick} aria-label={label}>
+      {children}
+    </button>
+  );
 }
 
 /** A single data cell — shows "…" while loading, "—" for non-analyzable, or the value. */
@@ -141,6 +163,12 @@ export function ArchiveView() {
 
   /** Matrix profile fetched from the user's homeserver; `null` while loading or without a userId. */
   const matrixProfile = useMatrixProfile(parsedDetails?.userId);
+
+  /** Rooms over every file, for the user header; `null` until all are summarized, not re-merged per summary. */
+  const rooms = useMemo(() => {
+    if (!sortedEntries.every((e) => !isAnalyzableEntry(e.name) || archiveSummaries.has(e.name))) return null;
+    return roomCount([...archiveSummaries.values()].map((s) => s.rooms));
+  }, [sortedEntries, archiveSummaries]);
 
   /**
    * Object URLs for PNG entries, created once and revoked on unmount.
@@ -212,13 +240,28 @@ export function ArchiveView() {
   }, [sortedEntries, setArchiveSummary]);
 
   const openEntries = useCallback(
-    (entryNames: readonly string[]) => {
+    (entryNames: readonly string[], at?: string) => {
       void (async () => {
         const route = await openMergedEntries(entryNames);
-        if (route) void navigate(route);
+        if (route) void navigate(at ?? route);
       })();
     },
     [navigate]
+  );
+
+  const setShowIncompleteHttp = useLogStore((s) => s.setShowIncompleteHttp);
+
+  /** Open one log on the view a clicked count details, e.g. its UTDs on /decryption. */
+  const openAt = useCallback(
+    (entryName: string, route: string, showIncomplete = false) => {
+      void (async () => {
+        if (!(await openMergedEntries([entryName]))) return;
+        // /http_requests hides incomplete requests by default: a status=Incomplete link would list none.
+        if (showIncomplete) setShowIncompleteHttp(true);
+        void navigate(route);
+      })();
+    },
+    [navigate, setShowIncompleteHttp]
   );
 
   const handleOpen = useCallback(
@@ -322,6 +365,9 @@ export function ArchiveView() {
           <BurgerMenu />
           <h1 className="header-title">{archiveName}</h1>
         </div>
+        <UserHeader
+          userId={parsedDetails?.userId} deviceId={parsedDetails?.deviceId} deviceKeys={parsedDetails?.deviceKeys} rooms={rooms}
+        />
         <div className="header-right">
           {selected.size > 0 && (
             <>
@@ -333,7 +379,11 @@ export function ArchiveView() {
               </button>
             </>
           )}
-          <span className={styles.entryCount}>{archiveEntries.length} files</span>
+          {selectableNames.length > 0 ? (
+            <CountLink label="Open all the logs" className={styles.entryCount} onClick={() => openEntries(selectableNames, '/summary')}>
+              {archiveEntries.length} files
+            </CountLink>
+          ) : <span className={styles.entryCount}>{archiveEntries.length} files</span>}
         </div>
       </div>
       <div className="content">
@@ -407,45 +457,68 @@ export function ArchiveView() {
                   </td>
 
                   <DataCell summary={summary} analyzable={analyzable}>
-                    {(s) => s.totalLines.toLocaleString()}
-                  </DataCell>
-
-                  <DataCell summary={summary} analyzable={analyzable}>
                     {(s) => (
-                      <span className={s.sentryCount > 0 ? styles.sentryCount : styles.zeroCount}>
-                        {s.sentryCount > 0 ? s.sentryCount.toLocaleString() : '—'}
-                      </span>
+                      <CountLink label={`Open the logs of ${displayName}`} onClick={() => openAt(entry.name, '/logs')}>
+                        {s.totalLines.toLocaleString()}
+                      </CountLink>
                     )}
                   </DataCell>
 
                   <DataCell summary={summary} analyzable={analyzable}>
                     {(s) => (
-                      <span className={s.errorCount > 0 ? styles.errorCount : styles.zeroCount}>
-                        {s.errorCount > 0 ? s.errorCount.toLocaleString() : '—'}
-                      </span>
+                      s.sentryCount > 0 ? (
+                        <CountLink label={`Open the Sentry reports of ${displayName}`} className={styles.sentryCount} onClick={() => openAt(entry.name, '/logs?filter=sentry')}>
+                          {s.sentryCount.toLocaleString()}
+                        </CountLink>
+                      ) : <span className={styles.zeroCount}>—</span>
                     )}
                   </DataCell>
 
                   <DataCell summary={summary} analyzable={analyzable}>
                     {(s) => (
-                      <span className={s.warnCount > 0 ? styles.warnCount : styles.zeroCount}>
-                        {s.warnCount > 0 ? s.warnCount.toLocaleString() : '—'}
-                      </span>
+                      s.errorCount > 0 ? (
+                        <CountLink label={`Open the errors of ${displayName}`} className={styles.errorCount} onClick={() => openAt(entry.name, '/logs?filter=ERROR')}>
+                          {s.errorCount.toLocaleString()}
+                        </CountLink>
+                      ) : <span className={styles.zeroCount}>—</span>
                     )}
                   </DataCell>
 
                   <DataCell summary={summary} analyzable={analyzable}>
                     {(s) => (
-                      <span className={s.httpCount === 0 ? styles.zeroCount : ''}>
-                        {s.httpCount > 0 ? s.httpCount.toLocaleString() : '—'}
-                      </span>
+                      s.warnCount > 0 ? (
+                        <CountLink label={`Open the warnings of ${displayName}`} className={styles.warnCount} onClick={() => openAt(entry.name, '/logs?filter=WARN')}>
+                          {s.warnCount.toLocaleString()}
+                        </CountLink>
+                      ) : <span className={styles.zeroCount}>—</span>
+                    )}
+                  </DataCell>
+
+                  <DataCell summary={summary} analyzable={analyzable}>
+                    {(s) => (
+                      s.httpCount > 0 ? (
+                        <CountLink label={`Open the requests of ${displayName}`} onClick={() => openAt(entry.name, '/http_requests')}>
+                          {s.httpCount.toLocaleString()}
+                        </CountLink>
+                      ) : <span className={styles.zeroCount}>—</span>
                     )}
                   </DataCell>
 
                   <DataCell summary={summary} analyzable={analyzable}>
                     {() => (utds && utds.count > 0 ? (
                       <span className={styles.errorCount} title={utdTitle(utds)}>
-                        {`${utds.reported === undefined ? '…' : utds.reported === null ? '?' : utds.reported.toLocaleString()} (${utds.count.toLocaleString()})`}
+                        {typeof utds.reported === 'number' ? (
+                          <CountLink
+                            label={`Open the reported UTDs of ${displayName}`} onClick={() => openAt(entry.name, '/decryption?analytics=reported')}
+                          >
+                            {utds.reported.toLocaleString()}
+                          </CountLink>
+                        ) : utds.reported === undefined ? '…' : '?'}
+                        {' ('}
+                        <CountLink label={`Open the UTDs of ${displayName}`} onClick={() => openAt(entry.name, '/decryption')}>
+                          {utds.count.toLocaleString()}
+                        </CountLink>
+                        {')'}
                       </span>
                     ) : <span className={styles.zeroCount}>—</span>)}
                   </DataCell>
@@ -473,7 +546,10 @@ export function ArchiveView() {
                     <td className={tableStyles.tableCell}><span className={styles.loadingCell}>…</span></td>
                   ) : (
                     <td className={tableStyles.tableCell}>
-                      <StatusChips statusCodes={summary.statusCodes} />
+                      <StatusChips
+                        statusCodes={summary.statusCodes}
+                        onSelect={(key) => openAt(entry.name, `/http_requests?status=${encodeURIComponent(key)}`, key === INCOMPLETE_STATUS_KEY)}
+                      />
                     </td>
                   )}
                 </tr>
