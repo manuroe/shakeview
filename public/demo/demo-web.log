@@ -1,7 +1,7 @@
 2026-01-15T10:00:00.000Z D Initialised rageshake.
 2026-01-15T10:00:00.000Z D Using Web platform
 2026-01-15T10:00:00.001Z I App version: 1.12.3
-2026-01-15T10:00:00.010Z D setLoggedIn: mxid: @bob:example.org deviceId: BOBWEB guest: false
+2026-01-15T10:00:00.010Z D setLoggedIn: mxid: @alice:example.org deviceId: ALICEWEB guest: false
 2026-01-15T10:00:00.030Z D Configuring rageshake persistence...
 2026-01-15T10:00:00.070Z D rageshake: removing logs: instance-4fQ2xVb7KpL9sT1a
 2026-01-15T10:00:00.090Z D set language to en
@@ -48,15 +48,15 @@
 2026-01-15T10:00:06.710Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/members?not_membership=xxx&at=xxx [410ms 200]
 2026-01-15T10:00:06.800Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
-    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@alice:example.org"
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@bob:example.org"
 2026-01-15T10:00:06.810Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ab12Cd34?version=xxx
 2026-01-15T10:00:06.850Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
-    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@bob:example.org"
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@alice:example.org"
 2026-01-15T10:00:06.860Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ef56Gh78?version=xxx
 2026-01-15T10:00:06.900Z W WARN matrix_sdk_crypto::machine: Failed to decrypt a room event: Can't find the room key to decrypt the event, withheld code: None
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1912
-    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@bob:example.org"
+    in matrix_sdk_crypto::machine::decrypt_room_event with room_id="!room1:example.org" sender="@alice:example.org"
 2026-01-15T10:00:06.910Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ij90Kl12?version=xxx
 2026-01-15T10:00:06.950Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ab12Cd34?version=xxx [140ms 404]
 2026-01-15T10:00:07.000Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/room_keys/keys/!room1%3Aexample.org/Ef56Gh78?version=xxx [140ms 404]
@@ -72,10 +72,10 @@
 2026-01-15T10:00:14.402Z D Event sent to !room1:example.org with event id $msg1Xq7aLw2Ns9Pc
 2026-01-15T10:00:14.450Z D FetchHttpApi: --> POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/receipt/m.read/%24msg1Xq7aLw2Ns9Pc
 2026-01-15T10:00:14.540Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/rooms/!room1%3Aexample.org/receipt/m.read/%24msg1Xq7aLw2Ns9Pc [90ms 200]
-2026-01-15T10:00:18.500Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org
-2026-01-15T10:00:18.530Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org [30ms 429]
-2026-01-15T10:00:19.600Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org
-2026-01-15T10:00:19.655Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/profile/%40bob%3Aexample.org [55ms 200]
+2026-01-15T10:00:18.500Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/profile/%40alice%3Aexample.org
+2026-01-15T10:00:18.530Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/profile/%40alice%3Aexample.org [30ms 429]
+2026-01-15T10:00:19.600Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/profile/%40alice%3Aexample.org
+2026-01-15T10:00:19.655Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/profile/%40alice%3Aexample.org [55ms 200]
 2026-01-15T10:00:22.000Z D Switching to room id !room2:example.org at event undefined
 2026-01-15T10:00:22.050Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx
 2026-01-15T10:00:22.340Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/rooms/!room2%3Aexample.org/messages?dir=xxx&from=xxx&limit=xxx&filter=xxx [290ms 200]
@@ -118,14 +118,14 @@ onSelectionChange@https://app.example.org/bundles/1a2b3c/init.js:4410:21
 2026-01-15T10:00:59.100Z D FetchHttpApi: <-- POST https://matrix-client.example.org/_matrix/client/v3/keys/query [1100ms 200]
 2026-01-15T10:01:00.620Z D DEBUG matrix_sdk_crypto::machine: Received a to-device event
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1673
-    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@alice:example.org" event_type="m.room.encrypted" message_id="m-s1-web"
+    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@bob:example.org" event_type="m.room.encrypted" message_id="m-s1-web"
     in matrix_sdk_crypto::machine::receive_sync_changes
 2026-01-15T10:01:00.630Z I INFO matrix_sdk_crypto::store: Received a new megolm room key
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/store/mod.rs:703
     in matrix_sdk_crypto::store::handle_key with room_id="!room1:example.org" session_id="pTyGJMuHbEL31IeL2HPcHyGcFRl1SPnXNYvMIHa/2o7" message_index=0 shared_history=false
     in matrix_sdk_crypto::store::add_room_key with algorithm="m.megolm.v1.aes-sha2"
     in matrix_sdk_crypto::machine::handle_decrypted_to_device_event with sender_key="curve25519:xZ9W3qLy7zKUVQDT7S8sTQCBNR3YbDgbleph1QHt61Q" event_type="m.room_key"
-    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@alice:example.org" event_type="m.room.encrypted" message_id="m-s1-web"
+    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@bob:example.org" event_type="m.room.encrypted" message_id="m-s1-web"
     in matrix_sdk_crypto::machine::receive_sync_changes
 2026-01-15T10:01:05.135Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
 2026-01-15T10:01:05.140Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
@@ -133,22 +133,22 @@ onSelectionChange@https://app.example.org/bundles/1a2b3c/init.js:4410:21
 2026-01-15T10:01:07.545Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
 2026-01-15T10:01:15.345Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [7800ms 200]
 2026-01-15T10:01:15.350Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
-2026-01-15T10:01:30.900Z W Error decrypting event (id=$s2-ev1 type=m.room.encrypted sender=@alice:example.org room=!room1:example.org ts=2026-01-15T10:01:30.500Z): DecryptionError[msg: The sender's device has not sent us the keys for this message., sender_key: xZ9W3qLy7zKUVQDT7S8sTQCBNR3YbDgbleph1QHt61Q, session_id: 6umfXfKm/r5kJP1VrT+1FJors/6ILi8IHn5kxsC7tVO]
+2026-01-15T10:01:30.900Z W Error decrypting event (id=$s2-ev1 type=m.room.encrypted sender=@bob:example.org room=!room1:example.org ts=2026-01-15T10:01:30.500Z): DecryptionError[msg: The sender's device has not sent us the keys for this message., sender_key: xZ9W3qLy7zKUVQDT7S8sTQCBNR3YbDgbleph1QHt61Q, session_id: 6umfXfKm/r5kJP1VrT+1FJors/6ILi8IHn5kxsC7tVO]
 2026-01-15T10:01:32.400Z D DEBUG matrix_sdk_crypto::machine: Received a to-device event
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/machine/mod.rs:1673
-    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@alice:example.org" event_type="m.room.encrypted" message_id="m-s2-web"
+    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@bob:example.org" event_type="m.room.encrypted" message_id="m-s2-web"
     in matrix_sdk_crypto::machine::receive_sync_changes
 2026-01-15T10:01:32.410Z I INFO matrix_sdk_crypto::store: Received a new megolm room key
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/store/mod.rs:703
     in matrix_sdk_crypto::store::handle_key with room_id="!room1:example.org" session_id="6umfXfKm/r5kJP1VrT+1FJors/6ILi8IHn5kxsC7tVO" message_index=0 shared_history=false
     in matrix_sdk_crypto::store::add_room_key with algorithm="m.megolm.v1.aes-sha2"
     in matrix_sdk_crypto::machine::handle_decrypted_to_device_event with sender_key="curve25519:xZ9W3qLy7zKUVQDT7S8sTQCBNR3YbDgbleph1QHt61Q" event_type="m.room_key"
-    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@alice:example.org" event_type="m.room.encrypted" message_id="m-s2-web"
+    in matrix_sdk_crypto::machine::receive_to_device_event with sender="@bob:example.org" event_type="m.room.encrypted" message_id="m-s2-web"
     in matrix_sdk_crypto::machine::receive_sync_changes
-2026-01-15T10:01:32.450Z I Decrypted event on retry (id=$s2-ev1 type=m.room.message sender=@alice:example.org room=!room1:example.org ts=2026-01-15T10:01:30.500Z)
+2026-01-15T10:01:32.450Z I Decrypted event on retry (id=$s2-ev1 type=m.room.message sender=@bob:example.org room=!room1:example.org ts=2026-01-15T10:01:30.500Z)
 2026-01-15T10:01:45.350Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
 2026-01-15T10:01:45.355Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
-2026-01-15T10:02:00.900Z W Error decrypting event (id=$s3-ev1 type=m.room.encrypted sender=@alice:example.org room=!room1:example.org ts=2026-01-15T10:02:00.500Z): DecryptionError[msg: The sender's device has not sent us the keys for this message., sender_key: xZ9W3qLy7zKUVQDT7S8sTQCBNR3YbDgbleph1QHt61Q, session_id: /HbkQfyy/KV5zjR3j1twdTKWTddB+XhkAS1voQG6yyz]
+2026-01-15T10:02:00.900Z W Error decrypting event (id=$s3-ev1 type=m.room.encrypted sender=@bob:example.org room=!room1:example.org ts=2026-01-15T10:02:00.500Z): DecryptionError[msg: The sender's device has not sent us the keys for this message., sender_key: xZ9W3qLy7zKUVQDT7S8sTQCBNR3YbDgbleph1QHt61Q, session_id: /HbkQfyy/KV5zjR3j1twdTKWTddB+XhkAS1voQG6yyz]
 2026-01-15T10:02:00.910Z D [PerSessionKeyBackupDownloader] Checking key backup for session /HbkQfyy/KV5zjR3j1twdTKWTddB+XhkAS1voQG6yyz
 2026-01-15T10:02:01.050Z I [PerSessionKeyBackupDownloader] No luck requesting key backup for session /HbkQfyy/KV5zjR3j1twdTKWTddB+XhkAS1voQG6yyz: M_NOT_FOUND: MatrixError: [404] No room_keys found
 2026-01-15T10:02:15.355Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
@@ -160,11 +160,11 @@ onSelectionChange@https://app.example.org/bundles/1a2b3c/init.js:4410:21
 2026-01-15T10:02:46.320Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [30000ms 200]
 2026-01-15T10:02:46.325Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
 2026-01-15T10:03:00.000Z I INFO matrix_sdk_crypto::session_manager::group_sessions: Trying to encrypt a room key
-    recipients={"@alice:example.org": {"ALICEPHONE"}, "@bob:example.org": {"BOBPHONE"}} message_index=0 room_id="!room1:example.org" session_id="yN9zHYIa4UOrGNATMuDJawTgsu8PO+799nKSNrh9UCa"
+    recipients={"@bob:example.org": {"BOBPHONE"}, "@alice:example.org": {"ALICEPHONE"}} message_index=0 room_id="!room1:example.org" session_id="yN9zHYIa4UOrGNATMuDJawTgsu8PO+799nKSNrh9UCa"
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/session_manager/group_sessions/mod.rs:486
     in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room1:example.org"
 2026-01-15T10:03:00.050Z I INFO matrix_sdk_crypto::session_manager::group_sessions: Created batch of to-device messages of type m.room.encrypted
-    request_id="td-s4" message_list=[("m-s4-alice", "@alice:example.org", "ALICEPHONE"), ("m-s4-phone", "@bob:example.org", "BOBPHONE")] session_id="yN9zHYIa4UOrGNATMuDJawTgsu8PO+799nKSNrh9UCa"
+    request_id="td-s4" message_list=[("m-s4-bob", "@bob:example.org", "BOBPHONE"), ("m-s4-phone", "@alice:example.org", "ALICEPHONE")] session_id="yN9zHYIa4UOrGNATMuDJawTgsu8PO+799nKSNrh9UCa"
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/session_manager/group_sessions/mod.rs:631
     in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room1:example.org"
 2026-01-15T10:03:00.060Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/sendToDevice/m.room.encrypted/td-s4
@@ -180,11 +180,11 @@ onSelectionChange@https://app.example.org/bundles/1a2b3c/init.js:4410:21
 2026-01-15T10:03:16.970Z D FetchHttpApi: <-- GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx [640ms 200]
 2026-01-15T10:03:16.975Z D FetchHttpApi: --> GET https://matrix-client.example.org/_matrix/client/v3/sync?filter=xxx&timeout=xxx&org.matrix.msc4222.use_state_after=xxx&set_presence=xxx&since=xxx
 2026-01-15T10:03:30.000Z I INFO matrix_sdk_crypto::session_manager::group_sessions: Trying to encrypt a room key
-    recipients={"@alice:example.org": {"ALICEPHONE"}, "@bob:example.org": {"BOBPHONE"}} message_index=0 room_id="!room1:example.org" session_id="uSDmLhuVtcqcYezdZ/tDDj8hYs5suKcNd8Zra9A9sKP"
+    recipients={"@bob:example.org": {"BOBLAPTOP"}, "@alice:example.org": {"ALICEPHONE"}} message_index=0 room_id="!room1:example.org" session_id="uSDmLhuVtcqcYezdZ/tDDj8hYs5suKcNd8Zra9A9sKP"
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/session_manager/group_sessions/mod.rs:486
     in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room1:example.org"
 2026-01-15T10:03:30.050Z I INFO matrix_sdk_crypto::session_manager::group_sessions: Created batch of to-device messages of type m.room.encrypted
-    request_id="td-s5" message_list=[("m-s5-alice", "@alice:example.org", "ALICEPHONE"), ("m-s5-phone", "@bob:example.org", "BOBPHONE")] session_id="uSDmLhuVtcqcYezdZ/tDDj8hYs5suKcNd8Zra9A9sKP"
+    request_id="td-s5" message_list=[("m-s5-laptop", "@bob:example.org", "BOBLAPTOP"), ("m-s5-phone", "@alice:example.org", "ALICEPHONE")] session_id="uSDmLhuVtcqcYezdZ/tDDj8hYs5suKcNd8Zra9A9sKP"
     at /home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/matrix-sdk-crypto-0.18.0/src/session_manager/group_sessions/mod.rs:631
     in matrix_sdk_crypto::session_manager::group_sessions::share_room_key with room_id="!room1:example.org"
 2026-01-15T10:03:30.060Z D FetchHttpApi: --> PUT https://matrix-client.example.org/_matrix/client/v3/sendToDevice/m.room.encrypted/td-s5
