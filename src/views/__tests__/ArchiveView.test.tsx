@@ -755,6 +755,32 @@ describe('ArchiveView', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/summary');
     });
 
+    it('opens every log of the archive from its file count', async () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', entries);
+      renderArchiveView();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Open all the logs' }));
+      });
+
+      expect(useLogStore.getState().loadedEntryNames).toEqual([
+        'dir/logs.2026-04-14-08.log.gz',
+        'dir/logs.2026-04-14-09.log.gz',
+      ]);
+      expect(mockNavigate).toHaveBeenCalledWith('/summary');
+    });
+
+    it('opens the logs on /summary from the file count, even undated ones', async () => {
+      useArchiveStore.getState().loadArchive('test.tar.gz', [makeEntry('dir/logcat.log.gz')]);
+      renderArchiveView();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Open all the logs' }));
+      });
+
+      expect(mockNavigate).toHaveBeenCalledWith('/summary');
+    });
+
     it('select-all ticks every analyzable entry; Clear unticks them', () => {
       useArchiveStore.getState().loadArchive('test.tar.gz', entries);
       renderArchiveView();

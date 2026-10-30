@@ -240,10 +240,10 @@ export function ArchiveView() {
   }, [sortedEntries, setArchiveSummary]);
 
   const openEntries = useCallback(
-    (entryNames: readonly string[]) => {
+    (entryNames: readonly string[], at?: string) => {
       void (async () => {
         const route = await openMergedEntries(entryNames);
-        if (route) void navigate(route);
+        if (route) void navigate(at ?? route);
       })();
     },
     [navigate]
@@ -379,7 +379,11 @@ export function ArchiveView() {
               </button>
             </>
           )}
-          <span className={styles.entryCount}>{archiveEntries.length} files</span>
+          {selectableNames.length > 0 ? (
+            <CountLink label="Open all the logs" className={styles.entryCount} onClick={() => openEntries(selectableNames, '/summary')}>
+              {archiveEntries.length} files
+            </CountLink>
+          ) : <span className={styles.entryCount}>{archiveEntries.length} files</span>}
         </div>
       </div>
       <div className="content">

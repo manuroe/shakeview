@@ -333,18 +333,18 @@
     word-break: break-all;
 }
 
-/* A count in the table: opens its file on the view that details it. */
+/* A count that opens its file(s) on the view that details it. */
 .countLink {
     background: none;
     border: none;
     padding: 0;
-    font: inherit;
     cursor: pointer;
 }
 
-/* No specificity: a count's own colour class (.errorCount…) wins whatever the stylesheet order. */
+/* No specificity: a count's own class (.errorCount, .entryCount…) wins its colour and font whatever the stylesheet order. */
 :where(.countLink) {
     color: inherit;
+    font: inherit;
 }
 
 .countLink:hover {
