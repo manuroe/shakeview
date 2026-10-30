@@ -93,7 +93,7 @@ export function UserHeader({ userId, deviceId, deviceKeys, rooms, anonymized = f
             aria-expanded={isOpen} aria-haspopup="dialog" title="Show the device keys"
           >{identity}</button>
         ) : identity}
-        {isOpen && (
+        {isOpen && keys.length > 0 && (
           <div className={styles.keys} role="dialog" aria-label="Device keys">
             <div className={styles.keysTitle}>
               Device keys{deviceId && <code>{deviceId}</code>}

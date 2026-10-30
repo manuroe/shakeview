@@ -1,9 +1,13 @@
 import { describe, it, expect, afterEach, afterAll, vi } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { gzipSync, strToU8 } from 'fflate';
 import { AnonymizeView } from '../AnonymizeView';
 import { useAnonymizeSessionStore, type AnonymizeJob } from '../../stores/anonymizeSessionStore';
 import { useAnonSaltStore } from '../../stores/anonSaltStore';
+import { useArchiveStore } from '../../stores/archiveStore';
+import { useLogStore } from '../../stores/logStore';
+import { buildTar } from '../../utils/tarWriter';
 import type { AnonymizationDictionary } from '../../types/log.types';
 import type { MatrixProfile } from '../../types/listing';
 import { applyAnonymization, buildAnonymizationDictionaryFromTexts } from '../../utils/anonymizeUtils';
@@ -36,12 +40,16 @@ describe('AnonymizeView', () => {
   URL.revokeObjectURL = revoke;
   const initialState = useAnonymizeSessionStore.getState();
   const initialSalt = useAnonSaltStore.getState().salt;
+  const initialArchive = useArchiveStore.getState();
+  const initialLog = useLogStore.getState();
   afterEach(() => {
     vi.restoreAllMocks();
     profiles.clear();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- removing the stubbed JSDOM property
     delete (navigator as any).clipboard;
     useAnonymizeSessionStore.setState(initialState, true);
+    useArchiveStore.setState(initialArchive, true);
+    useLogStore.setState(initialLog, true);
     // Back to the first salt. A salt change re-anonymises after a debounce: run that here, not in the next test.
     vi.useFakeTimers();
     act(() => {
@@ -318,19 +326,23 @@ describe('AnonymizeView', () => {
   });
 
   describe('identity', () => {
-    it('shows one user like the summary page, counting their devices', () => {
+    it('shows one user with the summary page header, its device keys included, counting their devices', () => {
       profiles.set('@alice:matrix.org', { displayName: 'Alice', avatarHttpUrl: null });
-      useAnonymizeSessionStore.setState({ jobs: [job({ userId: '@alice:matrix.org', deviceId: 'PHONE' })] });
-      const { container } = page();
+      useAnonymizeSessionStore.setState({
+        jobs: [job({ output: { ...job().output!, identity: { userId: '@alice:matrix.org', deviceId: 'PHONE', curveKey: 'abc' } } })],
+      });
+      page();
 
       expect(screen.getByText('Alice')).toBeInTheDocument();
-      expect(screen.getByText('@alice:matrix.org · PHONE')).toBeInTheDocument();
+      expect(screen.getByText('@alice:matrix.org')).toBeInTheDocument();
+      expect(screen.getByText('PHONE')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Alice/ }));
+      expect(within(screen.getByRole('dialog', { name: 'Device keys' })).getByText('abc')).toBeInTheDocument();
 
       act(() => useAnonymizeSessionStore.setState({
         jobs: [job({ userId: '@alice:matrix.org', deviceId: 'PHONE' }), job({ id: 2, userId: '@alice:matrix.org', deviceId: 'DESKTOP' })],
       }));
-      expect(screen.getByText('@alice:matrix.org · 2 devices')).toBeInTheDocument();
-      expect(container.querySelector('[title="@alice:matrix.org · PHONE · DESKTOP"]')).not.toBeNull();
+      expect(screen.getByText('2 devices')).toBeInTheDocument();
     });
 
     it('stacks several users, naming two, counting more', () => {
@@ -352,6 +364,45 @@ describe('AnonymizeView', () => {
       const { container } = page();
 
       expect(container.querySelector('header')).toHaveTextContent(/^Anonymise1 rageshake ▾$/);
+    });
+  });
+
+  describe('open', () => {
+    const openPage = () => render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<AnonymizeView />} />
+          <Route path="/archive" element={<div>archive page</div>} />
+          <Route path="/summary" element={<div>summary page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const logLine = '2026-10-29T12:00:00.000Z INFO started';
+
+    it('opens a rageshake loaded on the real side as dropped, in the archive listing', async () => {
+      const tarGz = gzipSync(buildTar([{ name: 'rs/console.log', data: strToU8(logLine) }]));
+      // jsdom's File lacks arrayBuffer(), which every browser has.
+      const file = Object.assign(new File([tarGz], 'rs.tar.gz'), { arrayBuffer: () => Promise.resolve(tarGz.buffer) });
+      useAnonymizeSessionStore.setState({ jobs: [job({ file })] });
+      openPage();
+      fireEvent.click(screen.getByRole('button', { name: '1 rageshake ▾' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open rs.tar.gz' }));
+
+      expect(await screen.findByText('archive page')).toBeInTheDocument();
+      expect(useArchiveStore.getState().archiveName).toBe('rs.tar.gz');
+      expect(useArchiveStore.getState().archiveEntries.map((e) => e.name)).toEqual(['rs/console.log']);
+    });
+
+    it('opens a log loaded on the anonymised side as its anonymised copy, in the summary', async () => {
+      useAnonymizeSessionStore.setState({
+        jobs: [job({ sourceName: 'app.log', save: true, output: { ...job().output!, name: 'app-anonym.log', data: logLine, isArchive: false } })],
+      });
+      openPage();
+      fireEvent.click(screen.getByRole('button', { name: '1 rageshake ▾' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Open app-anonym.log' }));
+
+      expect(await screen.findByText('summary page')).toBeInTheDocument();
+      expect(useLogStore.getState().logFileName).toBe('app-anonym.log');
     });
   });
 });

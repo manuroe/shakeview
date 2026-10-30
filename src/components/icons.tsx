@@ -53,6 +53,11 @@ export function PencilIcon(props: IconProps) {
   return <svg aria-hidden="true" {...base(props)}><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5zM9.5 4l2.5 2.5" {...stroke}/></svg>;
 }
 
+/** Box with an arrow out: open in the viewer. */
+export function ExternalLinkIcon(props: IconProps) {
+  return <svg aria-hidden="true" {...base(props)}><path d="M9 2.5h4.5V7M13.5 2.5L7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" {...stroke}/></svg>;
+}
+
 /** Eye: preview. */
 export function EyeIcon(props: IconProps) {
   return (

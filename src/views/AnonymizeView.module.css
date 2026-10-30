@@ -60,21 +60,9 @@
     box-shadow: 0 0 0 2px var(--bg-secondary);
 }
 
-.identityText {
-    min-width: 0;
-    line-height: 1.3;
-}
-
 .displayName {
     font-weight: 600;
     color: var(--text-primary);
-}
-
-.ids {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    word-break: break-all;
 }
 
 .saltPanel {

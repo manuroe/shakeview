@@ -56,7 +56,7 @@ const REMOVED_NOTE = 'Removed by shakeview anonymization: this file could not be
  * gzip (corrupt/mislabelled), or any member that fails to decompress. Returning
  * null replaces the entry with a marker instead of throwing and aborting the export.
  */
-function decodeEntryText(entry: { name: string; data: Uint8Array }): string | null {
+export function decodeEntryText(entry: { name: string; data: Uint8Array }): string | null {
   if (!isTextEntry(entry.name)) return null;
   // An empty member is empty text, not undecodable: an empty `.gz` would otherwise
   // fail the gzip-header check below and be replaced by a marker telling the reader
