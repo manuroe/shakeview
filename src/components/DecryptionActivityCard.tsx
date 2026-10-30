@@ -229,7 +229,7 @@ export function DecryptionActivityCard({ rawLogLines, filteredLogLines, ...chart
                         <td className={styles.alignRight}>{count(r.sessions, [lateOutcomeKey(r.by)])}</td>
                         <td className={styles.alignRight}>{count(r.count, [lateOutcomeKey(r.by)])}</td>
                         <td className={styles.alignRight}>{count(r.reported, [lateOutcomeKey(r.by)], true)}</td>
-                        <td className={styles.alignRight}>{formatUs(r.medianDelayUs)}</td>
+                        <td className={styles.alignRight} title={r.lowerBound ? 'At least: some re-decryptions are not logged, their key arrival stands in' : undefined}>{r.lowerBound ? '≥ ' : ''}{formatUs(r.medianDelayUs)}</td>
                       </tr>
                     ))}
                   </tbody>

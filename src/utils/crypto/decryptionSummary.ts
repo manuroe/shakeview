@@ -11,8 +11,10 @@ export interface UtdPoint {
   readonly resolved: boolean;
   readonly by?: ResolutionMechanism;
   readonly reason: UtdReason;
-  /** µs to resolution, when resolved. */
+  /** µs to resolution, when resolved: to the logged re-decryption, else to the key's arrival. */
   readonly delay?: number;
+  /** No re-decryption logged: `delay` is the key's arrival, a lower bound of the decryption. */
+  readonly inferred?: boolean;
   readonly analytics: AnalyticsCategory;
 }
 
@@ -40,6 +42,8 @@ export interface LateDecryptionRow {
   readonly sessions: number;
   readonly reported: number;
   readonly medianDelayUs: number;
+  /** Some delays are key arrivals with no re-decryption logged: the median is a lower bound. */
+  readonly lowerBound: boolean;
 }
 
 /** What the /summary card charts: UTD events and new keys, each at its own time. */
@@ -103,14 +107,14 @@ const isOutboundStart = (s: CryptoStep) => s.kind === 'share.encrypt' && s.keys.
  *
  * @example
  * const { events, keys } = summarizeDecryption(loadedLogSteps(rawLogLines));
- * events[0]; // { ts, sessionId: 'S', resolved: true, by: 'late_key', reason: 'missing_key', delay: 20_000_000, analytics: 'reported' }
+ * events[0]; // { ts, sessionId: 'S', resolved: true, by: 'late_key', reason: 'missing_key', delay: 20_000_000, inferred: true, analytics: 'reported' }
  * keys[0]; // { ts, source: 'room_key_late' }
  */
 export function summarizeDecryption(steps: readonly CryptoStep[]): DecryptionSummary {
   const device = deviceFromSteps('loaded', steps);
   const utds = buildCryptoModel([device]).flatMap((s) => s.utds.map((u) => ({ ...u, sessionId: s.sessionId })));
   const events = utds.map((u): UtdPoint => (u.resolution.state === 'resolved'
-    ? { ts: u.firstFailedAt, sessionId: u.sessionId, resolved: true, by: u.resolution.by, reason: u.reason, delay: u.resolution.delay, analytics: u.analytics.category }
+    ? { ts: u.firstFailedAt, sessionId: u.sessionId, resolved: true, by: u.resolution.by, reason: u.reason, delay: u.resolution.delay, inferred: !u.resolution.confirmed, analytics: u.analytics.category }
     : { ts: u.firstFailedAt, sessionId: u.sessionId, resolved: false, reason: u.reason, analytics: u.analytics.category }));
   // Sessions this device sent are encryption, not decryption.
   // ponytail: backup imports and keys without a to-device type left out, they bring thousands of keys at once.
@@ -164,13 +168,13 @@ const median = (sorted: readonly number[]) => {
 /**
  * One row per resolution mechanism, most first, with sessions and median delay: the /summary card's right table.
  *
- * @example lateDecryptionRows(events) // [{ by: 'late_key', count: 2, sessions: 1, reported: 1, medianDelayUs: 30_000_000 }]
+ * @example lateDecryptionRows(events) // [{ by: 'late_key', count: 2, sessions: 1, reported: 1, medianDelayUs: 30_000_000, lowerBound: false }]
  */
 export function lateDecryptionRows(events: readonly UtdPoint[]): LateDecryptionRow[] {
   return [...groupBy(events, (e) => (e.delay !== undefined ? e.by : undefined))]
     .map(([by, list]) => {
       const delays = list.map((e) => e.delay!).sort((a, b) => a - b);
-      return { by, count: list.length, sessions: new Set(list.map((e) => e.sessionId)).size, reported: list.filter(isReported).length, medianDelayUs: median(delays) };
+      return { by, count: list.length, sessions: new Set(list.map((e) => e.sessionId)).size, reported: list.filter(isReported).length, medianDelayUs: median(delays), lowerBound: list.some((e) => e.inferred === true) };
     })
     .sort((a, b) => b.count - a.count);
 }

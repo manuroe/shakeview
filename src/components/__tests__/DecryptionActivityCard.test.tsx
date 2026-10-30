@@ -39,7 +39,7 @@ describe('DecryptionActivityCard', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'What Reported counts' })[0]);
     expect(screen.getByRole('dialog', { name: 'What Reported counts' })).toHaveTextContent(/still not decrypted 4 s after the app first tried to show it.*Worked out from the logs with the same rules as Element Web and Element X/);
     expect(screen.getByRole('row', { name: /MissingMegolmSession/ })).toHaveTextContent('MissingMegolmSession110');
-    expect(screen.getByRole('row', { name: /late_key/ })).toHaveTextContent('late_key11020.0s');
+    expect(screen.getByRole('row', { name: /late_key/ })).toHaveTextContent('late_key110≥ 20.0s');
   });
 
   it('the Reported ⓘ links the decryption page on the same time window', () => {

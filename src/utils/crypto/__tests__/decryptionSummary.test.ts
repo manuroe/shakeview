@@ -114,14 +114,15 @@ describe('utdReasonRows', () => {
 describe('lateDecryptionRows', () => {
   it('one row per mechanism of the resolved UTDs, most first, with sessions and median delay', () => {
     expect(lateDecryptionRows([
-      { ts: 1, sessionId: 'A', resolved: true, by: 'backup', reason: 'missing_key', delay: 5, ...pt },
+      { ts: 1, sessionId: 'A', resolved: true, by: 'backup', reason: 'missing_key', delay: 5, inferred: true, ...pt },
       { ts: 2, sessionId: 'B', resolved: true, by: 'late_key', reason: 'missing_key', delay: 30, ...pt, analytics: 'reported' },
       { ts: 3, sessionId: 'B', resolved: true, by: 'late_key', reason: 'unknown_index', delay: 10, ...pt },
       { ts: 4, sessionId: 'C', resolved: false, reason: 'missing_key', ...pt },
     ])).toEqual([
       // An even count: the mean of the two middle delays, [10, 30] → 20.
-      { by: 'late_key', count: 2, sessions: 1, reported: 1, medianDelayUs: 20 },
-      { by: 'backup', count: 1, sessions: 1, reported: 0, medianDelayUs: 5 },
+      { by: 'late_key', count: 2, sessions: 1, reported: 1, medianDelayUs: 20, lowerBound: false },
+      // A key arrival with no logged re-decryption: the median is only a lower bound.
+      { by: 'backup', count: 1, sessions: 1, reported: 0, medianDelayUs: 5, lowerBound: true },
     ]);
   });
 });
