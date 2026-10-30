@@ -183,6 +183,7 @@
     gap: 6px;
     flex: 1;
     min-width: 0;
+    min-height: 0; /* else rendered markdown grows the pane past the viewport instead of scrolling */
     position: relative;
 }
 
