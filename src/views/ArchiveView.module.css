@@ -229,6 +229,8 @@
 
 .chip {
     display: inline-flex;
+    border: none;
+    cursor: pointer;
     align-items: baseline;
     gap: 2px;
     padding: 1px 5px;
@@ -329,4 +331,23 @@
     color: var(--text-muted);
     text-align: center;
     word-break: break-all;
+}
+
+/* A count in the table: opens its file on the view that details it. */
+.countLink {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+}
+
+/* No specificity: a count's own colour class (.errorCount…) wins whatever the stylesheet order. */
+:where(.countLink) {
+    color: inherit;
+}
+
+.countLink:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
