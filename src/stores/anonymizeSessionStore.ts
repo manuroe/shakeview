@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import type { AnonymizationDictionary } from '../types/log.types';
-import { anonymiseDroppedFile, type AnonymisedFile } from '../utils/anonymizeArchive';
+import { anonymiseDroppedFile, decodeEntryText, type AnonymisedFile } from '../utils/anonymizeArchive';
 import { buildAnonymizationDictionaryFromTexts } from '../utils/anonymizeUtils';
 import { downloadBlob } from '../utils/downloadBlob';
-import { assertArchiveSizeOk } from '../utils/tarGzArchive';
+import { parseLogFile } from '../utils/logParser';
+import { assertArchiveSizeOk, parseTarGzArchive } from '../utils/tarGzArchive';
+import { useArchiveStore } from './archiveStore';
+import { useLogStore } from './logStore';
 import { useAnonSaltStore } from './anonSaltStore';
 
 /** One file dropped on the anonymise page, from queued to anonymised. */
@@ -82,6 +85,26 @@ export function phaseProgress(phase: string, current: number, total: number): nu
 /** Download a finished job's anonymised file. */
 export function saveJobOutput(job: AnonymizeJob): void {
   if (job.output) downloadBlob(job.output.data, job.output.name, job.output.mime);
+}
+
+/**
+ * Load a finished job into the viewer, like a drop on the start page, and return
+ * the route to land on. A file loaded above the anonymised side opens as its
+ * anonymised copy, one loaded above the real side as dropped.
+ */
+export async function openJob(job: AnonymizeJob): Promise<string> {
+  const { output } = job;
+  if (!output) throw new Error('Not anonymised yet');
+  const name = job.save ? output.name : job.sourceName;
+  const data = job.save ? output.data : new Uint8Array(await job.file.arrayBuffer());
+  if (output.isArchive) {
+    useArchiveStore.getState().loadArchive(name, parseTarGzArchive(data as Uint8Array));
+    return '/archive';
+  }
+  // Decodes as it did to anonymise, so never null here.
+  const text = typeof data === 'string' ? data : decodeEntryText({ name, data })!;
+  useLogStore.getState().loadMergedLogParserResults([{ name, result: parseLogFile(text) }]);
+  return '/summary';
 }
 
 let nextId = 0;

@@ -3,6 +3,7 @@ import { decompressSync, gzipSync, strToU8, strFromU8 } from 'fflate';
 import { parseTar } from '../tarParser';
 import { anonymiseDroppedFile, buildAnonymisedArchiveGz, buildArchiveDictionary, deriveAnonymizedArchiveName } from '../anonymizeArchive';
 import { buildTar } from '../tarWriter';
+import { roomCount } from '../roomCount';
 
 const SALT = 'test-salt';
 const USER_RE = /@user-[0-9a-f]{12}:domain-[0-9a-f]{8}\.org/;
@@ -190,6 +191,23 @@ describe('anonymiseDroppedFile', () => {
     expect(out.name).toBe('console-anonym.log');
     expect(out.isArchive).toBe(false);
     expect(out.data).toMatch(/^# \[shakeview-anonymized\]\n@user-[0-9a-f]{12}:domain-[0-9a-f]{8}\.org joined\n$/);
+  });
+
+  it('counts the rooms of an archive across its files, and of a single log, as the user header shows them', async () => {
+    const older = [
+      '2026-01-15T10:00:00.000000Z  INFO AllRooms: Rebuilding room summaries for 50 rooms',
+      '2026-01-15T10:00:01.000000Z  INFO joined !room1:example.org',
+    ].join('\n');
+    const newer = [
+      '2026-01-15T11:00:00.000000Z  INFO AllRooms: Rebuilding room summaries for 12 rooms',
+      '2026-01-15T11:00:01.000000Z  INFO GET /rooms/%21room2%3Aexample.org/state as @alice:example.org',
+    ].join('\n');
+    const bytes = gzipSync(buildTar([
+      { name: 'logs/console.1.log', data: strToU8(newer) },
+      { name: 'logs/console.log', data: strToU8(older) },
+    ]));
+    expect(roomCount([(await anonymiseDroppedFile('rs.tar.gz', bytes, SALT)).rooms])).toEqual({ listed: 12, seen: 2 });
+    expect(roomCount([(await anonymiseDroppedFile('console.log', strToU8(older), SALT)).rooms])).toEqual({ listed: 50, seen: 1 });
   });
 
   it('refuses a binary single file', async () => {

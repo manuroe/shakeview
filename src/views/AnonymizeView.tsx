@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import Markdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { saveJobOutput, useAnonymizeSessionStore, type AnonymizeJob, type TextSide } from '../stores/anonymizeSessionStore';
+import { openJob, saveJobOutput, useAnonymizeSessionStore, type AnonymizeJob, type TextSide } from '../stores/anonymizeSessionStore';
 import { useAnonSaltStore } from '../stores/anonSaltStore';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -20,8 +20,10 @@ import {
 } from '../utils/deanonymizeReport';
 import { downloadBlob } from '../utils/downloadBlob';
 import { plural } from '../utils/crypto/format';
-import { BackIcon, CheckIcon, CodeIcon, CopyIcon, DownloadIcon, KeyIcon, TrashIcon, UploadIcon } from '../components/icons';
+import { roomCount } from '../utils/roomCount';
+import { BackIcon, CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, EyeIcon, KeyIcon, PencilIcon, TrashIcon, UploadIcon } from '../components/icons';
 import { SaltField } from '../components/SaltField';
+import { UserHeader } from '../components/UserHeader';
 import buttonStyles from '../components/Button.module.css';
 import dropdownStyles from '../components/Dropdown.module.css';
 import styles from './AnonymizeView.module.css';
@@ -43,9 +45,9 @@ function UserName({ userId }: { readonly userId: string }) {
 }
 
 /**
- * Whose rageshakes are loaded, like the summary page's header: one user shows
- * their face, name and IDs; several show a stack of faces, naming two users and
- * counting more, each user and device listed in the tooltip.
+ * Whose rageshakes are loaded: one user gets the summary page's header (their
+ * devices counted when several); several show a stack of faces, naming two users
+ * and counting more, each user and device listed in the tooltip.
  */
 function Identity({ jobs }: { readonly jobs: readonly AnonymizeJob[] }) {
   const devicesByUser = new Map<string, Set<string>>();
@@ -57,25 +59,22 @@ function Identity({ jobs }: { readonly jobs: readonly AnonymizeJob[] }) {
     devicesByUser.set(userId, devices);
   }
   const users = [...devicesByUser.keys()];
-  const profile = useMatrixProfile(users.length === 1 ? users[0] : undefined);
   if (users.length === 0) return null;
 
-  const tooltip = [...devicesByUser].map(([u, d]) => [u, ...d].join(' · ')).join('\n');
   if (users.length === 1) {
-    const [userId] = users;
-    const devices = [...devicesByUser.get(userId)!];
+    const devices = [...devicesByUser.get(users[0])!];
+    // This user's key only: a job without a user ID may still carry another device's key.
+    const curveKey = devices.length === 1 ? jobs.find((j) => j.output?.identity.userId === users[0] && j.output.identity.curveKey)?.output?.identity.curveKey : undefined;
     return (
-      <div className={styles.identity} title={tooltip}>
-        <Avatar userId={userId} />
-        <div className={styles.identityText}>
-          {profile?.displayName && <div className={styles.displayName}>{profile.displayName}</div>}
-          <div className={styles.ids}>
-            {[userId, devices.length > 1 ? plural(devices.length, 'device') : devices[0]].filter(Boolean).join(' · ')}
-          </div>
-        </div>
-      </div>
+      <UserHeader
+        userId={users[0]}
+        deviceId={devices.length > 1 ? plural(devices.length, 'device') : devices[0]}
+        deviceKeys={curveKey && `curve25519:${curveKey}`}
+        rooms={roomCount(jobs.flatMap((j) => (j.output?.identity.userId ? [j.output.rooms] : [])))}
+      />
     );
   }
+  const tooltip = [...devicesByUser].map(([u, d]) => [u, ...d].join(' · ')).join('\n');
   return (
     <div className={styles.identity} title={tooltip}>
       <div className={styles.avatarStack}>
@@ -98,6 +97,7 @@ interface RageshakesDropdownProps {
 /** Header dropdown listing the dropped rageshakes: whose, progress, a save button each, and Forget all. */
 function RageshakesDropdown({ jobs, onForget }: RageshakesDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(ref, () => setIsOpen(false), isOpen);
 
@@ -118,6 +118,7 @@ function RageshakesDropdown({ jobs, onForget }: RageshakesDropdownProps) {
           <ul className={styles.jobs}>
             {jobs.map((j) => {
               const { userId } = j.output?.identity ?? {};
+              const openName = j.save ? j.output?.name : j.sourceName;
               return (
                 <li key={j.id} className={styles.job}>
                   {userId && <Avatar userId={userId} small />}
@@ -128,6 +129,17 @@ function RageshakesDropdown({ jobs, onForget }: RageshakesDropdownProps) {
                   {j.status === 'done' && j.output && (
                     <>
                       <span className={styles.done} title="Anonymised"><CheckIcon /></span>
+                      <button
+                        type="button"
+                        className={buttonStyles.iconButton}
+                        // Back here keeps the session: the store outlives the page.
+                        // An unreadable file (changed on disk since the drop) stays here, logged.
+                        onClick={() => { void openJob(j).then((route) => navigate(route), (err) => console.error('Failed to open rageshake:', err)); }}
+                        title={`Open ${openName}`}
+                        aria-label={`Open ${openName}`}
+                      >
+                        <ExternalLinkIcon />
+                      </button>
                       <button
                         type="button"
                         className={buttonStyles.iconButton}
@@ -278,14 +290,14 @@ function TextPane({ title, note, source, markdown = source, saveName, onEdit, on
         {headerAction}
         <button
           type="button"
-          className={`${buttonStyles.iconButton} ${showSource ? buttonStyles.pillButtonActive : ''}`}
+          className={buttonStyles.iconButton}
           onClick={() => setShowSource((v) => !v)}
           disabled={!isMarkdown}
-          aria-pressed={showSource}
-          title="Show markdown source"
-          aria-label={`Show ${lower} markdown source`}
+          // Named for what a click does: edit the rendered view, preview the edit.
+          title={showSource ? 'Preview' : 'Edit'}
+          aria-label={`${showSource ? 'Preview' : 'Edit'} ${lower}`}
         >
-          <CodeIcon />
+          {showSource ? <EyeIcon /> : <PencilIcon />}
         </button>
         <button
           type="button"
@@ -323,18 +335,13 @@ function TextPane({ title, note, source, markdown = source, saveName, onEdit, on
           placeholder={placeholder}
           aria-label={title}
           spellCheck={false}
-          // Mounted by a click on the rendered view (or the source button): straight to typing.
+          // Mounted by the Edit button: straight to typing.
           autoFocus={showSource}
         />
       ) : (
         <div
           className={`${styles.report} ${styles.rendered}`}
           aria-label={title}
-          title="Click to edit"
-          // A click edits; following a link or selecting text to copy does not.
-          onClick={(e) => {
-            if (!(e.target as Element).closest('a') && !window.getSelection()?.toString()) setShowSource(true);
-          }}
         >
           <Markdown
             // remarkBreaks: a newline is a line break, as in GitHub comments.
