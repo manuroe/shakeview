@@ -116,6 +116,15 @@ describe('rageshake CLI', () => {
     expect(cmdPrecheck(ingest(bytes, 'web.log')).report).toMatch(/^PASS/);
   });
 
+  it('precheck passes domainless aliases followed by a path segment', () => {
+    const bytes = strToU8([
+      '# [shakeview-anonymized]',
+      '2026-09-29T15:36:15.377Z I FetchHttpApi: --> GET https://domain-0a1b2c3d.org/_matrix/client/v1/rooms/!room-56b8a38cf0f0/hierarchy',
+      '2026-09-29T15:36:16.000Z I FetchHttpApi: --> GET https://domain-0a1b2c3d.org/_matrix/client/v1/rooms/!room-56b8a38cf0f0/relations/$event-dd06b04bbd34/m.thread',
+    ].join('\n'));
+    expect(cmdPrecheck(ingest(bytes, 'web.log')).report).toMatch(/^PASS/);
+  });
+
   it('precheck fails on a raw URL host without printing it, and passes an aliased one', () => {
     const line = (host: string) => `2026-01-15T10:00:00.000000Z INFO @user-0123456789ab:domain-01234567.org send{uri="https://${host}/_matrix/client/v3/sync"}`;
     const raw = cmdPrecheck(ingest(strToU8(line('matrix.hosting.example')), 'raw.log'));

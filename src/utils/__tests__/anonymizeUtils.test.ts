@@ -119,6 +119,36 @@ describe('buildAnonymizationDictionary', () => {
     expect(Object.keys(encoded.forward)).not.toContain('%21VkdmKnrz9stD0mzv2QrS3sP%2F');
   });
 
+  it('keeps the slash after a modern event ID, so `<event>/<path>` aliases the event as everywhere else', async () => {
+    // GET /rooms/{roomId}/relations/{eventId}/m.thread; a v4+ event ID is URL-safe base64, never `/`.
+    const text = 'GET /rooms/!VkdmKnrz9stD0mzv2QrS3sP/relations/$Q2xvdWRzQXJlV2hpdGVBbmRCbHVl/m.thread · event_id="$Q2xvdWRzQXJlV2hpdGVBbmRCbHVl"';
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    const event = dict.forward['$Q2xvdWRzQXJlV2hpdGVBbmRCbHVl'];
+    expect(dict.forward['$Q2xvdWRzQXJlV2hpdGVBbmRCbHVl/m.thread']).toBeUndefined();
+    expect(applyAnonymization(text, dict)).toBe(
+      `GET /rooms/${dict.forward['!VkdmKnrz9stD0mzv2QrS3sP']}/relations/${event}/m.thread · event_id="${event}"`,
+    );
+    // Percent-encoded: `%24<event>%2F…` keeps its separator too.
+    const encoded = await buildAnonymizationDictionaryFromTexts(['via=%24Q2xvdWRzQXJlV2hpdGVBbmRCbHVl%2Fm.thread'], SALT);
+    expect(applyAnonymization('via=%24Q2xvdWRzQXJlV2hpdGVBbmRCbHVl%2Fm.thread', encoded)).toMatch(/^via=%24event-[0-9a-f]{12}%2Fm\.thread$/);
+    // A full-length (43-char) v4 ID with no `-`/`_` is not taken for a v3 one running into the path.
+    const v4 = '$Q2xvdWRzQXJlV2hpdGVBbmRCbHVlQW5kV2hpdGVBbmR';
+    const full = await buildAnonymizationDictionaryFromTexts([`${v4}/m.thread`], SALT);
+    expect(applyAnonymization(`${v4}/m.thread`, full)).toMatch(/^\$event-[0-9a-f]{12}\/m\.thread$/);
+  });
+
+  it('aliases a whole room version 3 event ID, `+` and `/` included', async () => {
+    // Room v3 event IDs are standard base64 (spec example), unlike v4+.
+    const v3 = '$acR1l0raoZnm60CBwAVgqbZqoO/mYU81xysh1u7XcJk';
+    const v3Plus = '$acR+1l0raoZnm60CBwAVgqbZqoO/mYU81xysh1u7XcJ';
+    const encoded = '%24acR1l0raoZnm60CBwAVgqbZqoO%2FmYU81xysh1u7XcJk';
+    const text = `event_id=${v3} other=${v3Plus} via=${encoded}`;
+    const dict = await buildAnonymizationDictionaryFromTexts([text], SALT);
+    expect(applyAnonymization(text, dict)).toMatch(
+      /^event_id=\$event-([0-9a-f]{12}) other=\$event-[0-9a-f]{12} via=%24event-\1$/,
+    );
+  });
+
   it('replaces an event ID (with domain) with the $event-<hash>:domain-<hash>.org format', async () => {
     const dict = await buildAnonymizationDictionary([makeLine(0, '$ev1:example.org')], SALT);
     const alias = dict.forward['$ev1:example.org'];
