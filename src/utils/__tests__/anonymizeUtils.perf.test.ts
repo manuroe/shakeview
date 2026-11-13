@@ -36,7 +36,7 @@ const SERVERS = [
 
 /**
  * Modern base64url-style event IDs (no domain suffix) — these exercise the
- * `![A-Za-z0-9…]{10,}` path in MATRIX_IDENTIFIER_RE.
+ * `(?:%2[14]|[!$])[A-Za-z0-9…]{10,}` path in MATRIX_IDENTIFIER_RE.
  */
 const MODERN_EVENT_IDS = [
   '$abcdefghijklmnopqrstuvwx',
